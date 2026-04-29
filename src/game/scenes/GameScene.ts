@@ -7,10 +7,12 @@ export class GameScene extends Phaser.Scene {
   private terrainData!: TerrainData;
   private terrainGraphics!: Phaser.GameObjects.Graphics;
   private aimLine!: Phaser.GameObjects.Graphics;
-  private hudText!: Phaser.GameObjects.Text;
 
   private player1Angle: number = GAME_CONFIG.aiming.initialAngle;
   private player1Power: number = GAME_CONFIG.aiming.initialPower;
+
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private spaceKey!: Phaser.Input.Keyboard.Key;
 
   private tanks: TankData[] = [];
 
@@ -33,53 +35,29 @@ export class GameScene extends Phaser.Scene {
     this.aimLine = this.add.graphics();
     this.drawAimLine();
 
-    this.hudText = this.add.text(16, 16, '', {
-      color: '#ffffff',
-      fontSize: '16px'
-    });
-
-    this.input.keyboard?.addCapture([
-      Phaser.Input.Keyboard.KeyCodes.LEFT,
-      Phaser.Input.Keyboard.KeyCodes.RIGHT,
-      Phaser.Input.Keyboard.KeyCodes.UP,
-      Phaser.Input.Keyboard.KeyCodes.DOWN,
-      Phaser.Input.Keyboard.KeyCodes.SPACE
-    ]);
-
-    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      switch (event.code) {
-        case 'ArrowLeft':
-          this.player1Angle = Math.max(GAME_CONFIG.aiming.minAngle, this.player1Angle - GAME_CONFIG.aiming.angleStep);
-          break;
-        case 'ArrowRight':
-          this.player1Angle = Math.min(GAME_CONFIG.aiming.maxAngle, this.player1Angle + GAME_CONFIG.aiming.angleStep);
-          break;
-        case 'ArrowUp':
-          this.player1Power = Math.min(GAME_CONFIG.aiming.maxPower, this.player1Power + GAME_CONFIG.aiming.powerStep);
-          break;
-        case 'ArrowDown':
-          this.player1Power = Math.max(GAME_CONFIG.aiming.minPower, this.player1Power - GAME_CONFIG.aiming.powerStep);
-          break;
-        case 'Space':
-          console.log(`fire: angle=${this.player1Angle}, power=${this.player1Power}`);
-          break;
-        default:
-          return;
-      }
-
-      this.drawAimLine();
-      this.updateHudText();
-    });
-
-    this.updateHudText();
+    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
   }
 
-  private updateHudText(): void {
-    this.hudText.setText([
-      `Angle: ${this.player1Angle}`,
-      `Power: ${this.player1Power}`,
-      'Controls: ←/→ angle, ↑/↓ power, space fire'
-    ]);
+  update(): void {
+    if (this.cursors.left.isDown) {
+      this.player1Angle = Math.max(GAME_CONFIG.aiming.minAngle, this.player1Angle - GAME_CONFIG.aiming.angleStep);
+    }
+    if (this.cursors.right.isDown) {
+      this.player1Angle = Math.min(GAME_CONFIG.aiming.maxAngle, this.player1Angle + GAME_CONFIG.aiming.angleStep);
+    }
+    if (this.cursors.up.isDown) {
+      this.player1Power = Math.min(GAME_CONFIG.aiming.maxPower, this.player1Power + GAME_CONFIG.aiming.powerStep);
+    }
+    if (this.cursors.down.isDown) {
+      this.player1Power = Math.max(GAME_CONFIG.aiming.minPower, this.player1Power - GAME_CONFIG.aiming.powerStep);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      console.log(`fire: angle=${this.player1Angle}, power=${this.player1Power}`);
+    }
+
+    this.drawAimLine();
   }
 
   private createTanks(): TankData[] {
