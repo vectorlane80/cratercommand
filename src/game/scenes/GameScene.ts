@@ -8,8 +8,8 @@ export class GameScene extends Phaser.Scene {
   private terrainGraphics!: Phaser.GameObjects.Graphics;
   private aimLine!: Phaser.GameObjects.Graphics;
 
-  private player1Angle = GAME_CONFIG.aiming.initialAngle;
-  private player1Power = GAME_CONFIG.aiming.initialPower;
+  private player1Angle: number = GAME_CONFIG.aiming.initialAngle;
+  private player1Power: number = GAME_CONFIG.aiming.initialPower;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
