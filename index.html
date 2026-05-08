@@ -4,6 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Crater Command</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      canvas {
+        width: min(100vw, 177.78vh, 960px);
+        height: auto;
+        image-rendering: pixelated;
+        outline: none;
+      }
+    </style>
   </head>
   <body>
     <script type="module" src="/src/game/main.ts"></script>

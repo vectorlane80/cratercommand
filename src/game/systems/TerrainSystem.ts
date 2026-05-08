@@ -2,23 +2,33 @@ import Phaser from 'phaser';
 import { GAME_CONFIG, type TerrainData } from '../types/GameTypes';
 
 export class TerrainSystem {
-  generate(sceneWidth: number, sceneHeight: number): TerrainData {
-    const { sampleCount, baseHeightRatio, variation, smoothingPasses } = GAME_CONFIG.terrain;
+  generate(sceneWidth: number, battlefieldHeight: number): TerrainData {
+    const { sampleCount, baseY, variation, minY, maxY } = GAME_CONFIG.terrain;
     const segmentWidth = sceneWidth / (sampleCount - 1);
-    const baseHeight = sceneHeight * baseHeightRatio;
 
-    const heights = Array.from({ length: sampleCount }, () => baseHeight + Phaser.Math.Between(-variation, variation));
+    const heights = Array.from({ length: sampleCount }, (_, index) => {
+      const t = index / (sampleCount - 1);
+      const ridge =
+        Math.sin(t * Math.PI * 3.4 + 0.4) * 0.48 +
+        Math.sin(t * Math.PI * 8.8 - 0.7) * 0.25 +
+        Math.sin(t * Math.PI * 22.5) * 0.18;
+      const jag = ((index * 37) % 19) - 9;
+      const valley = Math.exp(-Math.pow((t - 0.48) / 0.13, 2)) * 82;
+      const y = baseY - ridge * variation + valley + jag;
 
-    for (let pass = 0; pass < smoothingPasses; pass += 1) {
-      for (let i = 1; i < heights.length - 1; i += 1) {
-        heights[i] = (heights[i - 1] + heights[i] + heights[i + 1]) / 3;
+      return Phaser.Math.Clamp(y, minY, maxY);
+    });
+
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (let index = 1; index < heights.length - 1; index += 1) {
+        heights[index] = (heights[index - 1] + heights[index] * 2 + heights[index + 1]) / 4;
       }
     }
 
     return {
       heights,
       width: sceneWidth,
-      height: sceneHeight,
+      height: battlefieldHeight,
       segmentWidth
     };
   }
@@ -27,7 +37,7 @@ export class TerrainSystem {
     const { heights, width, height, segmentWidth } = terrainData;
 
     graphics.clear();
-    graphics.fillStyle(GAME_CONFIG.terrain.color, 1);
+    graphics.fillStyle(GAME_CONFIG.colors.darkGreen, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
 
@@ -38,6 +48,45 @@ export class TerrainSystem {
     graphics.lineTo(width, height);
     graphics.closePath();
     graphics.fillPath();
+
+    graphics.lineStyle(3, GAME_CONFIG.colors.ridgeGreen, 1);
+    graphics.beginPath();
+    heights.forEach((sampleHeight, index) => {
+      const x = index * segmentWidth;
+      if (index === 0) {
+        graphics.moveTo(x, sampleHeight);
+      } else {
+        graphics.lineTo(x, sampleHeight);
+      }
+    });
+    graphics.strokePath();
+
+    graphics.fillStyle(0x00881a, 0.45);
+    for (let index = 0; index < heights.length; index += 2) {
+      const x = index * segmentWidth;
+      const y = heights[index] + 12;
+      graphics.fillRect(x, y, 2, Math.max(0, height - y));
+    }
+  }
+
+  applyCrater(terrainData: TerrainData, x: number, y: number, radius: number): void {
+    const { heights, segmentWidth } = terrainData;
+    const centerIndex = Math.round(x / segmentWidth);
+    const sampleRadius = Math.ceil(radius / segmentWidth);
+
+    for (let index = centerIndex - sampleRadius; index <= centerIndex + sampleRadius; index += 1) {
+      if (index < 0 || index >= heights.length) continue;
+
+      const sampleX = index * segmentWidth;
+      const dx = sampleX - x;
+      if (Math.abs(dx) > radius) continue;
+
+      const circleDepth = Math.sqrt(radius * radius - dx * dx);
+      const craterY = Phaser.Math.Clamp(y + circleDepth, 0, GAME_CONFIG.terrain.craterMaxY);
+      heights[index] = Math.max(heights[index], craterY);
+    }
+
+    this.relaxCraterEdges(terrainData, centerIndex, sampleRadius + 4);
   }
 
   getHeightAtX(terrainData: TerrainData, x: number): number {
@@ -46,5 +95,23 @@ export class TerrainSystem {
     const t = (x - index * segmentWidth) / segmentWidth;
 
     return Phaser.Math.Linear(heights[index], heights[index + 1], t);
+  }
+
+  isBelowTerrain(terrainData: TerrainData, x: number, y: number): boolean {
+    if (x < 0 || x > terrainData.width) return false;
+
+    return y >= this.getHeightAtX(terrainData, x);
+  }
+
+  private relaxCraterEdges(terrainData: TerrainData, centerIndex: number, range: number): void {
+    const { heights } = terrainData;
+    const start = Math.max(1, centerIndex - range);
+    const end = Math.min(heights.length - 2, centerIndex + range);
+
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (let index = start; index <= end; index += 1) {
+        heights[index] = (heights[index - 1] + heights[index] * 2 + heights[index + 1]) / 4;
+      }
+    }
   }
 }
