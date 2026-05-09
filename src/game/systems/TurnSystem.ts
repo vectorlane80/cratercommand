@@ -7,13 +7,29 @@ export class TurnSystem {
       activePlayerId: 0,
       phase: 'aiming',
       winnerId: null,
-      wind: this.createWind(0)
+      wind: this.createInitialWind()
     };
   }
 
-  createWind(turnNumber: number): WindState {
-    const magnitude = Phaser.Math.Clamp(((turnNumber * 7 + 13) % (GAME_CONFIG.wind.max + 1)), GAME_CONFIG.wind.min, GAME_CONFIG.wind.max);
-    const direction = turnNumber % 2 === 0 ? -1 : 1;
+  createInitialWind(): WindState {
+    const direction: -1 | 1 = Math.random() < 0.5 ? -1 : 1;
+    const range = GAME_CONFIG.wind.max - GAME_CONFIG.wind.min;
+    const magnitude = Math.round(GAME_CONFIG.wind.min + Math.random() * range);
+
+    return { direction, magnitude };
+  }
+
+  evolveWind(prev: WindState, terrainDisturbance: number): WindState {
+    const drift = (Math.random() - 0.5) * 4;
+    const magnitude = Phaser.Math.Clamp(
+      Math.round(prev.magnitude + drift),
+      GAME_CONFIG.wind.min,
+      GAME_CONFIG.wind.max
+    );
+
+    const flipChance = Math.min(0.3, terrainDisturbance / 220);
+    const direction: -1 | 1 =
+      Math.random() < flipChance ? (prev.direction === 1 ? -1 : 1) : prev.direction;
 
     return { direction, magnitude };
   }

@@ -6,14 +6,24 @@ export class TerrainSystem {
     const { sampleCount, baseY, variation, minY, maxY } = GAME_CONFIG.terrain;
     const segmentWidth = sceneWidth / (sampleCount - 1);
 
+    const phaseA = Math.random() * Math.PI * 2;
+    const phaseB = Math.random() * Math.PI * 2;
+    const phaseC = Math.random() * Math.PI * 2;
+    const freqA = 2.4 + Math.random() * 2.4;
+    const freqB = 5.5 + Math.random() * 5;
+    const freqC = 16 + Math.random() * 10;
+    const valleyCenter = 0.25 + Math.random() * 0.5;
+    const valleyDepth = 40 + Math.random() * 70;
+    const valleyWidth = 0.1 + Math.random() * 0.08;
+
     const heights = Array.from({ length: sampleCount }, (_, index) => {
       const t = index / (sampleCount - 1);
       const ridge =
-        Math.sin(t * Math.PI * 3.4 + 0.4) * 0.48 +
-        Math.sin(t * Math.PI * 8.8 - 0.7) * 0.25 +
-        Math.sin(t * Math.PI * 22.5) * 0.18;
-      const jag = ((index * 37) % 19) - 9;
-      const valley = Math.exp(-Math.pow((t - 0.48) / 0.13, 2)) * 82;
+        Math.sin(t * Math.PI * freqA + phaseA) * 0.48 +
+        Math.sin(t * Math.PI * freqB + phaseB) * 0.25 +
+        Math.sin(t * Math.PI * freqC + phaseC) * 0.18;
+      const jag = (Math.random() - 0.5) * 12;
+      const valley = Math.exp(-Math.pow((t - valleyCenter) / valleyWidth, 2)) * valleyDepth;
       const y = baseY - ridge * variation + valley + jag;
 
       return Phaser.Math.Clamp(y, minY, maxY);

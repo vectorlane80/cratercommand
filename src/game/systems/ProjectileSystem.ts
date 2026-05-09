@@ -58,7 +58,6 @@ export class ProjectileSystem {
     if (
       projectile.x < -40 ||
       projectile.x > terrainData.width + 40 ||
-      projectile.y < -80 ||
       projectile.y > terrainData.height + 40 ||
       projectile.ageMs > GAME_CONFIG.projectile.maxAgeMs
     ) {

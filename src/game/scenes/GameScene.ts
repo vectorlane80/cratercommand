@@ -32,6 +32,7 @@ export class GameScene extends Phaser.Scene {
   private activeProjectile: ProjectileState | null = null;
   private selectedWeapon!: WeaponDefinition;
   private completedTurns = 0;
+  private turnDisturbance = 0;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -153,6 +154,7 @@ export class GameScene extends Phaser.Scene {
 
     if (impact.kind === 'terrain' || impact.kind === 'tank') {
       this.terrainSystem.applyCrater(this.terrainData, impact.x, impact.y, this.selectedWeapon.craterRadius);
+      this.turnDisturbance += this.selectedWeapon.craterRadius;
     }
 
     if (impact.kind === 'tank' && impact.targetTankId !== undefined) {
@@ -170,7 +172,8 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.completedTurns += 1;
       this.turn.activePlayerId = this.turnSystem.nextActivePlayer(this.turn.activePlayerId, this.tanks);
-      this.turn.wind = this.turnSystem.createWind(this.completedTurns);
+      this.turn.wind = this.turnSystem.evolveWind(this.turn.wind, this.turnDisturbance);
+      this.turnDisturbance = 0;
       this.turn.phase = 'aiming';
     }
 

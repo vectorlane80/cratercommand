@@ -61,11 +61,12 @@ export class HudSystem {
     this.drawSelectedWeapon(weapon, top);
     this.drawLogo(top);
 
+    const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
     this.graphics.fillStyle(colors.black, 1);
-    this.graphics.fillRect(0, GAME_CONFIG.layout.bottomStatusTop + 4, GAME_CONFIG.width, 16);
-    this.addText(42, 526, 'F1 = Help', 0x2e66ff, GAME_CONFIG.font.tiny);
-    this.addText(382, 526, 'EMPIRE INTERACTIVE', colors.yellow, GAME_CONFIG.font.tiny);
-    this.addText(790, 526, 'F10 = Sound', 0x2e66ff, GAME_CONFIG.font.tiny);
+    this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 26);
+    this.addText(36, stripY + 4, 'F1 = Help', 0x2e66ff, GAME_CONFIG.font.medium);
+    this.addText(420, stripY + 4, 'ESC = Exit', colors.yellow, GAME_CONFIG.font.medium);
+    this.addText(770, stripY + 4, 'F10 = Sound', 0x2e66ff, GAME_CONFIG.font.medium);
   }
 
   private drawFireButton(top: number): void {
@@ -97,8 +98,6 @@ export class HudSystem {
       this.addText(20, top + 38 + index * rowStep, `${key} ${name}`, color, GAME_CONFIG.font.small);
       this.addText(258, top + 38 + index * rowStep, ammo, color, GAME_CONFIG.font.small);
     });
-
-    this.addText(20, top + 145, 'ESC to Exit', GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
   }
 
   private drawAimPowerPanel(activeTank: TankState, phase: string, top: number): void {
