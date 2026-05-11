@@ -273,7 +273,11 @@ export class AISystem {
 }
 
 export function isAIController(kind: ControllerKind): boolean {
-  return kind !== 'human';
+  return kind === 'cpu-cadet' || kind === 'cpu-veteran' || kind === 'cpu-marshal';
+}
+
+export function isRemoteController(kind: ControllerKind): boolean {
+  return kind === 'remote';
 }
 
 export function controllerForPlayer(profiles: { controller: ControllerKind }[], id: PlayerId): ControllerKind {

@@ -155,6 +155,34 @@ export class MenuScene extends Phaser.Scene {
       soundSystem.playUiSelect();
       this.startMatch();
     }
+    // Online buttons sit beneath the START MATCH button.
+    const hostBtn = this.hostButtonRect();
+    if (x >= hostBtn.x && x <= hostBtn.x + hostBtn.w && y >= hostBtn.y && y <= hostBtn.y + hostBtn.h) {
+      soundSystem.playUiSelect();
+      this.scene.start('LobbyScene', {
+        mode: 'host',
+        localName: this.names[0] ?? 'PLAYER 1',
+        roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin
+      });
+      return;
+    }
+    const joinBtn = this.joinButtonRect();
+    if (x >= joinBtn.x && x <= joinBtn.x + joinBtn.w && y >= joinBtn.y && y <= joinBtn.y + joinBtn.h) {
+      soundSystem.playUiSelect();
+      this.scene.start('LobbyScene', {
+        mode: 'join',
+        localName: this.names[0] ?? 'PLAYER 1'
+      });
+      return;
+    }
+  }
+
+  private hostButtonRect() {
+    return { x: GAME_CONFIG.width / 2 - 260, y: 458, w: 240, h: 32 };
+  }
+
+  private joinButtonRect() {
+    return { x: GAME_CONFIG.width / 2 + 20, y: 458, w: 240, h: 32 };
   }
 
   private matchLengthRect() {
@@ -265,12 +293,28 @@ export class MenuScene extends Phaser.Scene {
     if (!enabled) {
       this.addText(
         GAME_CONFIG.width / 2 - 222,
-        460,
+        434,
         'Need at least 2 participants and 1 human.',
         colors.red,
         GAME_CONFIG.font.small
       );
     }
+
+    // Online buttons (always available — they open the lobby scene, which
+    // ignores the local slot config).
+    const host = this.hostButtonRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(host.x, host.y, host.w, host.h);
+    this.graphics.lineStyle(2, colors.cyan, 1);
+    this.graphics.strokeRect(host.x, host.y, host.w, host.h);
+    this.addText(host.x + 50, host.y + 6, 'HOST ONLINE', colors.cyan, GAME_CONFIG.font.medium);
+
+    const join = this.joinButtonRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(join.x, join.y, join.w, join.h);
+    this.graphics.lineStyle(2, colors.magenta, 1);
+    this.graphics.strokeRect(join.x, join.y, join.w, join.h);
+    this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', colors.magenta, GAME_CONFIG.font.medium);
   }
 
   private drawSlotRow(idx: number, y: number, label: string, slot: Slot, accent: number, optional: boolean): void {

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { AISystem, isAIController, type AIDecision } from '../systems/AISystem';
+import { AISystem, isAIController, isRemoteController, type AIDecision } from '../systems/AISystem';
 import { HudSystem, SHOP_LAYOUT } from '../systems/HudSystem';
+import { networkSystem, type GameSnapshot, type NetInput, type NetworkMessage } from '../systems/NetworkSystem';
 import { soundSystem } from '../systems/SoundSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
@@ -88,6 +89,17 @@ export class GameScene extends Phaser.Scene {
   private yesKey!: Phaser.Input.Keyboard.Key;
   private noKey!: Phaser.Input.Keyboard.Key;
 
+  // Online mode. If isOnlineHost is true we run the sim and broadcast.
+  // If isOnlineJoiner is true we run no sim; we just render snapshots and
+  // forward local inputs (when it's our turn) to the host.
+  private isOnlineHost = false;
+  private isOnlineJoiner = false;
+  /**
+   * For the joiner: the PlayerId that "we" control. Inputs apply only when
+   * turn.activePlayerId === localPlayerId.
+   */
+  private localPlayerId: PlayerId = 0;
+
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
@@ -105,13 +117,27 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { controllers?: ControllerKind[]; names?: Array<string | null>; roundsToWin?: number }): void {
+  init(data: {
+    controllers?: ControllerKind[];
+    names?: Array<string | null>;
+    roundsToWin?: number;
+    online?: { isHost: boolean };
+  }): void {
     if (data?.controllers && data.controllers.length >= 2) {
       this.pendingControllers = data.controllers;
     }
     if (data?.names) this.pendingNames = data.names;
     if (typeof data?.roundsToWin === 'number' && data.roundsToWin >= 1) {
       this.pendingRoundsToWin = data.roundsToWin;
+    }
+    if (data?.online) {
+      this.isOnlineHost = data.online.isHost;
+      this.isOnlineJoiner = !data.online.isHost;
+      // Joiner is always slot index where 'human' (their own controller) is.
+      this.localPlayerId = this.pendingControllers.indexOf('human') as PlayerId;
+    } else {
+      this.isOnlineHost = false;
+      this.isOnlineJoiner = false;
     }
   }
 
@@ -203,6 +229,19 @@ export class GameScene extends Phaser.Scene {
     // Mouse/touch routing.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
 
+    // Online networking.
+    if (this.isOnlineHost || this.isOnlineJoiner) {
+      networkSystem.setEvents({
+        onMessage: (msg) => this.handleNetworkMessage(msg),
+        onStateChange: (s) => {
+          if (s === 'disconnected' || s === 'error') {
+            // Drop back to menu on connection loss.
+            this.scene.start('MenuScene');
+          }
+        }
+      });
+    }
+
     this.renderAll();
   }
 
@@ -244,6 +283,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Joiner runs no sim — it just forwards inputs to the host and renders
+    // whatever snapshots come back. All sim/AI/projectile/shop logic below
+    // belongs to the local + host paths.
+    if (this.isOnlineJoiner) {
+      this.updateJoiner();
+      return;
+    }
+
     if (this.turn.phase === 'matchOver') {
       if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
         this.scene.restart();
@@ -263,6 +310,8 @@ export class GameScene extends Phaser.Scene {
         this.tickAIShop(delta);
         return;
       }
+      // Host: when the remote player is shopping, wait for their NetInputs.
+      if (this.isCurrentShopperRemote()) return;
       const changed = this.handleShoppingInput();
       if (changed) this.renderAll();
       return;
@@ -273,6 +322,8 @@ export class GameScene extends Phaser.Scene {
         this.tickAITurn(delta);
         return;
       }
+      // Host: when the remote player is aiming, wait for their NetInputs.
+      if (this.isActivePlayerRemote()) return;
 
       const moved = this.handleMovementInput(delta);
       const pointerMoved = this.tickPointerMovement(delta);
@@ -301,9 +352,18 @@ export class GameScene extends Phaser.Scene {
     return isAIController(this.match.profiles[this.turn.activePlayerId].controller);
   }
 
+  private isActivePlayerRemote(): boolean {
+    return isRemoteController(this.match.profiles[this.turn.activePlayerId].controller);
+  }
+
   private isCurrentShopperAI(): boolean {
     const id = this.match.shoppingPlayerId;
     return id !== null && isAIController(this.match.profiles[id].controller);
+  }
+
+  private isCurrentShopperRemote(): boolean {
+    const id = this.match.shoppingPlayerId;
+    return id !== null && isRemoteController(this.match.profiles[id].controller);
   }
 
   private startAITurn(): void {
@@ -482,6 +542,233 @@ export class GameScene extends Phaser.Scene {
   /** Display name for a tank — custom name from the menu or default. */
   private playerName(id: PlayerId): string {
     return this.match.profiles[id]?.displayName ?? `PLAYER ${id + 1}`;
+  }
+
+  // -------- ONLINE NETWORKING --------
+
+  /**
+   * Inbound message handler shared by host and joiner. Host gets 'input'
+   * messages from the joiner and applies them to its local sim. Joiner gets
+   * 'snapshot' messages from the host and replays them as the new state.
+   */
+  private handleNetworkMessage(msg: NetworkMessage): void {
+    if (this.isOnlineHost && msg.type === 'input') {
+      this.applyRemoteInput(msg.action);
+    } else if (this.isOnlineJoiner && msg.type === 'snapshot') {
+      this.applySnapshot(msg.data);
+    }
+  }
+
+  /** Host: apply an input action received from the remote player. */
+  private applyRemoteInput(action: NetInput): void {
+    // Inputs are only valid when it's the remote player's turn. The remote
+    // player's id is the slot index whose controller === 'remote'.
+    const remoteId = this.match.profiles.findIndex((p) => p.controller === 'remote') as PlayerId;
+    if (this.turn.activePlayerId !== remoteId && action.kind !== 'shop-buy' && action.kind !== 'shop-remove' && action.kind !== 'shop-undo' && action.kind !== 'shop-finish' && action.kind !== 'advance-round') {
+      return; // ignore aim/move/fire if not their turn
+    }
+    const activeTank = this.tanks[remoteId];
+
+    switch (action.kind) {
+      case 'aim': {
+        activeTank.angle = Phaser.Math.Clamp(action.angle, GAME_CONFIG.aiming.minAngle, GAME_CONFIG.aiming.maxAngle);
+        activeTank.power = Phaser.Math.Clamp(action.power, GAME_CONFIG.aiming.minPower, GAME_CONFIG.aiming.maxPower);
+        this.renderTanksAndHud();
+        break;
+      }
+      case 'move-step': {
+        const others = this.tanks.filter((t) => t.id !== activeTank.id);
+        this.tankSystem.moveTank(activeTank, action.direction, 0.06, this.terrainSystem, this.terrainData, others);
+        this.renderTanksAndHud();
+        break;
+      }
+      case 'select-weapon':
+        if (this.tankHasAmmo(activeTank, action.index)) {
+          activeTank.selectedWeaponIndex = action.index;
+          this.renderTanksAndHud();
+        }
+        break;
+      case 'fire':
+        if (this.turn.phase === 'aiming') this.fireActiveWeapon();
+        break;
+      case 'shop-buy':
+        if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === remoteId) {
+          this.tryQueueShopBuy(this.match.profiles[remoteId], action.itemKey);
+          this.renderAll();
+        }
+        break;
+      case 'shop-remove':
+        if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === remoteId) {
+          this.removeFromCart(action.itemKey);
+          this.renderAll();
+        }
+        break;
+      case 'shop-undo':
+        if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === remoteId) {
+          this.undoLastShopBuy();
+          this.renderAll();
+        }
+        break;
+      case 'shop-finish':
+        if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === remoteId) {
+          this.commitPendingShop(this.match.profiles[remoteId]);
+          this.finishShoppingForCurrentPlayer();
+        }
+        break;
+      case 'advance-round':
+        if (this.turn.phase === 'roundOver') this.enterShoppingPhase();
+        break;
+    }
+  }
+
+  /** Send a snapshot of the current state to the joiner (host only). */
+  private broadcastSnapshot(): void {
+    if (!this.isOnlineHost) return;
+    const snapshot: GameSnapshot = {
+      match: JSON.parse(JSON.stringify(this.match)),
+      turn: JSON.parse(JSON.stringify(this.turn)),
+      tanks: JSON.parse(JSON.stringify(this.tanks)),
+      terrainHeights: this.terrainData.heights.slice(),
+      projectiles: this.activeProjectiles.map((p) => ({
+        ownerId: p.ownerId,
+        weaponId: p.weapon.id,
+        x: p.x,
+        y: p.y,
+        velocityX: p.velocityX,
+        velocityY: p.velocityY,
+        trail: p.trail.slice(),
+        ageMs: p.ageMs,
+        bouncesLeft: p.bouncesLeft,
+        hasSplit: p.hasSplit
+      })),
+      statusMessage: this.statusMessage,
+      topToast: this.topToast,
+      quitConfirmActive: this.quitConfirmActive,
+      pendingShopBuys: { ...this.pendingShopBuys }
+    };
+    networkSystem.send({ type: 'snapshot', data: snapshot });
+  }
+
+  /** Joiner: replace local state with a snapshot received from the host. */
+  private applySnapshot(snap: GameSnapshot): void {
+    // Build new tanks/match/turn references in place so any objects that
+    // captured them keep working.
+    this.match = snap.match;
+    this.turn = snap.turn;
+    this.tanks = snap.tanks;
+    if (!this.terrainData) {
+      // Joiner hasn't run beginRound — fake one up from the snapshot.
+      this.terrainData = {
+        width: this.scale.width,
+        height: GAME_CONFIG.layout.battlefieldHeight,
+        segmentWidth: this.scale.width / (snap.terrainHeights.length - 1),
+        heights: snap.terrainHeights.slice()
+      };
+    } else {
+      this.terrainData.heights = snap.terrainHeights.slice();
+    }
+    this.activeProjectiles = snap.projectiles.map((p) => {
+      const weapon = GAME_CONFIG.weapons.find((w) => w.id === p.weaponId)!;
+      return {
+        ownerId: p.ownerId as PlayerId,
+        weapon,
+        x: p.x,
+        y: p.y,
+        velocityX: p.velocityX,
+        velocityY: p.velocityY,
+        trail: p.trail,
+        ageMs: p.ageMs,
+        bouncesLeft: p.bouncesLeft,
+        hasSplit: p.hasSplit
+      };
+    });
+    this.statusMessage = snap.statusMessage;
+    this.topToast = snap.topToast;
+    this.pendingShopBuys = snap.pendingShopBuys;
+    this.renderAll();
+  }
+
+  /** Joiner-side: send an input action to the host. */
+  private sendInput(action: NetInput): void {
+    if (this.isOnlineJoiner) networkSystem.send({ type: 'input', action });
+  }
+
+  /**
+   * Joiner-side update tick. Only forwards local inputs to the host as
+   * NetInput messages; never mutates local state directly.
+   */
+  private updateJoiner(): void {
+    if (this.turn.phase === 'matchOver') {
+      // Host owns restart. Joiner can ESC out to menu.
+      return;
+    }
+    if (this.turn.phase === 'roundOver') {
+      if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+        this.sendInput({ kind: 'advance-round' });
+      }
+      return;
+    }
+    if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === this.localPlayerId) {
+      this.handleJoinerShoppingInput();
+      return;
+    }
+    if (this.turn.phase === 'aiming' && this.turn.activePlayerId === this.localPlayerId) {
+      this.handleJoinerAimingInput();
+      return;
+    }
+  }
+
+  private handleJoinerAimingInput(): void {
+    const tank = this.tanks[this.localPlayerId];
+    if (!tank) return;
+
+    // Continuous aim/power: re-send the desired (clamped) values whenever
+    // an arrow key is held. Host applies and the snapshot rebroadcasts.
+    let nextAngle = tank.angle;
+    let nextPower = tank.power;
+    let aimChanged = false;
+    if (this.cursors.left.isDown) { nextAngle -= GAME_CONFIG.aiming.angleStep; aimChanged = true; }
+    if (this.cursors.right.isDown) { nextAngle += GAME_CONFIG.aiming.angleStep; aimChanged = true; }
+    if (this.cursors.up.isDown) { nextPower += GAME_CONFIG.aiming.powerStep; aimChanged = true; }
+    if (this.cursors.down.isDown) { nextPower -= GAME_CONFIG.aiming.powerStep; aimChanged = true; }
+    if (aimChanged) {
+      nextAngle = Phaser.Math.Clamp(nextAngle, GAME_CONFIG.aiming.minAngle, GAME_CONFIG.aiming.maxAngle);
+      nextPower = Phaser.Math.Clamp(nextPower, GAME_CONFIG.aiming.minPower, GAME_CONFIG.aiming.maxPower);
+      this.sendInput({ kind: 'aim', angle: nextAngle, power: nextPower });
+    }
+
+    // Discrete events: weapon select, fire, movement (one step per frame
+    // while key is held).
+    for (let i = 0; i < this.weaponKeys.length; i += 1) {
+      if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
+        this.sendInput({ kind: 'select-weapon', index: i });
+      }
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      this.sendInput({ kind: 'fire' });
+    }
+    if (this.moveLeftKey.isDown) this.sendInput({ kind: 'move-step', direction: -1 });
+    if (this.moveRightKey.isDown) this.sendInput({ kind: 'move-step', direction: 1 });
+  }
+
+  private handleJoinerShoppingInput(): void {
+    for (let i = 0; i < this.weaponKeys.length; i += 1) {
+      if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
+        this.sendInput({ kind: 'shop-buy', itemKey: GAME_CONFIG.weapons[i].id });
+      }
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.parachuteBuyKey)) {
+      this.sendInput({ kind: 'shop-buy', itemKey: 'parachute' });
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.shieldBuyKey)) {
+      this.sendInput({ kind: 'shop-buy', itemKey: 'shield' });
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.backspaceKey)) {
+      this.sendInput({ kind: 'shop-undo' });
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.sendInput({ kind: 'shop-finish' });
+    }
   }
 
   // -------- PENDING SHOP HELPERS --------
@@ -1149,6 +1436,8 @@ export class GameScene extends Phaser.Scene {
     if (this.topToast && Date.now() > this.topToast.expiresAt) {
       this.topToast = null;
     }
+    // Host broadcasts a snapshot every time the state would re-render.
+    if (this.isOnlineHost) this.broadcastSnapshot();
     this.tankSystem.draw(this.tankGraphics, this.tanks, this.turn.activePlayerId, this.visualSystem);
     this.hudSystem.render(
       this.turn,

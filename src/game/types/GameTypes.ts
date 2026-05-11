@@ -40,15 +40,17 @@ export interface TankState {
  * the given difficulty tier. `remote` is reserved for future online play
  * where decisions arrive over the network — not yet implemented.
  */
-export type ControllerKind = 'human' | 'cpu-cadet' | 'cpu-veteran' | 'cpu-marshal';
+export type ControllerKind = 'human' | 'cpu-cadet' | 'cpu-veteran' | 'cpu-marshal' | 'remote';
 
 export const CONTROLLER_LABELS: Record<ControllerKind, string> = {
   'human': 'HUMAN',
   'cpu-cadet': 'CPU: CADET',
   'cpu-veteran': 'CPU: VETERAN',
-  'cpu-marshal': 'CPU: MARSHAL'
+  'cpu-marshal': 'CPU: MARSHAL',
+  'remote': 'REMOTE'
 };
 
+// Menu cycle does NOT include 'remote' — that's set by the lobby flow.
 export const CONTROLLER_CYCLE: ControllerKind[] = [
   'human',
   'cpu-cadet',
