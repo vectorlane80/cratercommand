@@ -25,19 +25,31 @@ export class HudSystem {
   ): void {
     this.clearTexts();
     this.graphics.clear();
-    this.drawTopHud(turn, tanks, match);
-    this.drawConsole(turn, tanks[turn.activePlayerId], weapon, match);
 
-    if (turn.phase === 'shopping' && match.shoppingPlayerId !== null) {
+    const inShop = turn.phase === 'shopping' && match.shoppingPlayerId !== null;
+    const matchOver = turn.phase === 'matchOver' && match.matchWinnerId !== null;
+
+    if (!inShop && !matchOver) {
+      this.drawTopHud(turn, tanks, match);
+      this.drawConsole(turn, tanks[turn.activePlayerId], weapon, match);
+    }
+
+    if (inShop) {
       this.drawShopOverlay(match);
     } else if (turn.phase === 'roundOver' && statusMessage) {
       this.drawCenterBanner(statusMessage, 'PRESS SPACE OR ENTER FOR SHOP');
-    } else if (turn.phase === 'matchOver' && match.matchWinnerId !== null) {
+    } else if (matchOver) {
+      this.drawFullScreenBackdrop();
       this.drawCenterBanner(
-        `PLAYER ${match.matchWinnerId + 1} WINS THE MATCH`,
+        `PLAYER ${match.matchWinnerId! + 1} WINS THE MATCH`,
         'PRESS R TO RESTART'
       );
     }
+  }
+
+  private drawFullScreenBackdrop(): void {
+    this.graphics.fillStyle(GAME_CONFIG.colors.black, 1);
+    this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
   }
 
   destroy(): void {

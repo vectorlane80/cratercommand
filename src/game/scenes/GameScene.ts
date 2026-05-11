@@ -451,31 +451,18 @@ export class GameScene extends Phaser.Scene {
 
   private drawRetroBattlefieldBackground(): void {
     const colors = GAME_CONFIG.colors;
-    const battlefieldHeight = GAME_CONFIG.layout.battlefieldHeight;
 
     this.backgroundGraphics.clear();
     this.backgroundGraphics.fillStyle(colors.black, 1);
     this.backgroundGraphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
 
-    this.backgroundGraphics.fillStyle(colors.purple, 0.45);
-    for (let y = 166; y < 260; y += 8) {
-      for (let x = (y / 2) % 10; x < GAME_CONFIG.width; x += 10) {
-        this.backgroundGraphics.fillRect(x, y, 2, 2);
-      }
-    }
-
-    this.backgroundGraphics.fillStyle(colors.red, 0.7);
-    for (let y = 246; y < battlefieldHeight; y += 6) {
-      for (let x = (y * 3) % 14; x < GAME_CONFIG.width; x += 14) {
-        this.backgroundGraphics.fillRect(x, y, 3, 2);
-      }
-    }
-
-    this.backgroundGraphics.fillStyle(colors.blue, 0.8);
-    this.backgroundGraphics.fillRect(352, 318, 208, 48);
-    this.backgroundGraphics.fillStyle(0x508bff, 0.9);
-    for (let x = 356; x < 556; x += 9) {
-      this.backgroundGraphics.fillRect(x, 318 + ((x / 9) % 2), 5, 3);
+    // Faint starfield in the upper sky
+    this.backgroundGraphics.fillStyle(colors.white, 0.45);
+    const starSeed = 1337;
+    for (let i = 0; i < 60; i += 1) {
+      const px = ((i * 73 + starSeed) % GAME_CONFIG.width);
+      const py = ((i * 41 + starSeed) % 150) + 12;
+      this.backgroundGraphics.fillRect(px, py, 1, 1);
     }
 
     this.backgroundGraphics.lineStyle(2, colors.white, 1);
