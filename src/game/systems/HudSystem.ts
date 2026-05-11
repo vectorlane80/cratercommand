@@ -552,7 +552,8 @@ export class HudSystem {
       fontSize,
       fontStyle: 'bold'
     });
-    text.setResolution(1);
+    // Higher resolution makes text crisp under Phaser scale.zoom + CSS scale.
+    text.setResolution(2);
     this.texts.push(text);
   }
 

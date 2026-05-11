@@ -152,7 +152,7 @@ export class MenuScene extends Phaser.Scene {
       fontSize,
       fontStyle: 'bold'
     });
-    text.setResolution(1);
+    text.setResolution(2);
     this.texts.push(text);
   }
 

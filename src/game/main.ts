@@ -7,14 +7,16 @@ import { GAME_CONFIG } from './types/GameTypes';
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: document.body,
-  // Anti-aliased rendering looks better at fractional CSS scales than the
-  // previous pixelArt: true nearest-neighbor upscale. The retro pixel
-  // sprite system (currently hidden) would need its own per-texture
-  // NEAREST filter if it ever comes back.
   antialias: true,
+  // scale.zoom doubles the canvas backing-store while keeping game-world
+  // coordinates the same. Game logic still sees a 960x540 world; the canvas
+  // is 1920x1080 internally. Combined with Text.setResolution(2) (in HUD /
+  // MenuScene), text textures match the higher backing density so they
+  // render crisply when CSS-stretched to fit the viewport.
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    zoom: 2,
     width: GAME_CONFIG.width,
     height: GAME_CONFIG.height
   },
