@@ -7,6 +7,8 @@ import { TurnSystem } from '../systems/TurnSystem';
 import {
   GAME_CONFIG,
   type ImpactResult,
+  type MatchState,
+  type PlayerId,
   type ProjectileState,
   type TankState,
   type TerrainData,
@@ -29,11 +31,17 @@ export class GameScene extends Phaser.Scene {
   private terrainData!: TerrainData;
   private tanks: TankState[] = [];
   private turn!: TurnState;
+  private match!: MatchState;
   private activeProjectiles: ProjectileState[] = [];
+  private statusMessage: string | null = null;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private enterKey!: Phaser.Input.Keyboard.Key;
   private restartKey!: Phaser.Input.Keyboard.Key;
+  private moveLeftKey!: Phaser.Input.Keyboard.Key;
+  private moveRightKey!: Phaser.Input.Keyboard.Key;
+  private parachuteBuyKey!: Phaser.Input.Keyboard.Key;
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
 
   constructor() {
@@ -54,14 +62,16 @@ export class GameScene extends Phaser.Scene {
     this.turnSystem = new TurnSystem();
     this.hudSystem = new HudSystem(this);
 
-    this.turn = this.turnSystem.createInitialState();
-    this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
-    this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData);
-    this.ensureSelectableWeapon(this.tanks[this.turn.activePlayerId]);
+    this.match = this.turnSystem.createMatchState();
+    this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.restartKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.moveLeftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.moveRightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.parachuteBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     const numberKeyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
       Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -79,6 +89,10 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.UP,
       Phaser.Input.Keyboard.KeyCodes.DOWN,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
+      Phaser.Input.Keyboard.KeyCodes.ENTER,
+      Phaser.Input.Keyboard.KeyCodes.A,
+      Phaser.Input.Keyboard.KeyCodes.D,
+      Phaser.Input.Keyboard.KeyCodes.P,
       ...numberKeyCodes
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
@@ -88,22 +102,37 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.turn.phase === 'gameOver') {
+    if (this.turn.phase === 'matchOver') {
       if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
         this.scene.restart();
       }
       return;
     }
 
+    if (this.turn.phase === 'roundOver') {
+      if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+        this.enterShoppingPhase();
+      }
+      return;
+    }
+
+    if (this.turn.phase === 'shopping') {
+      const changed = this.handleShoppingInput();
+      if (changed) this.renderAll();
+      return;
+    }
+
     if (this.turn.phase === 'aiming') {
+      const moved = this.handleMovementInput(delta);
       const changed = this.handleAimingInput();
       const switched = this.handleWeaponSelection();
+
       if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
         this.fireActiveWeapon();
         return;
       }
 
-      if (changed || switched) {
+      if (moved || changed || switched) {
         this.renderTanksAndHud();
       }
       return;
@@ -113,6 +142,73 @@ export class GameScene extends Phaser.Scene {
       this.tickProjectiles(delta);
     }
   }
+
+  // -------- ROUND / MATCH LIFECYCLE --------
+
+  private beginRound(startingPlayer: PlayerId): void {
+    this.statusMessage = null;
+    this.activeProjectiles = [];
+    this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
+    this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
+    this.turn = {
+      activePlayerId: startingPlayer,
+      phase: 'aiming',
+      winnerId: null,
+      wind: this.turnSystem.rollWind()
+    };
+    if (this.terrainGraphics) this.renderAll();
+  }
+
+  private resolveRoundEnd(winnerId: PlayerId): void {
+    this.turnSystem.saveTanksToProfiles(this.tanks, this.match);
+
+    this.tanks.forEach((tank) => {
+      const earned = tank.damageDealt * GAME_CONFIG.match.damageCashMultiplier;
+      this.match.profiles[tank.id].cash += earned;
+    });
+
+    this.match.profiles[winnerId].wins += 1;
+    this.match.profiles[winnerId].cash += GAME_CONFIG.match.roundWinBonus;
+    if (this.tanks[winnerId].alive) {
+      this.match.profiles[winnerId].cash += GAME_CONFIG.match.survivalBonus;
+    }
+
+    this.turn.winnerId = winnerId;
+
+    if (this.match.profiles[winnerId].wins >= this.match.roundsToWin) {
+      this.match.matchWinnerId = winnerId;
+      this.turn.phase = 'matchOver';
+    } else {
+      this.turn.phase = 'roundOver';
+      this.statusMessage = `PLAYER ${winnerId + 1} WINS ROUND ${this.match.round}`;
+    }
+
+    this.renderAll();
+  }
+
+  private enterShoppingPhase(): void {
+    const winnerId = this.turn.winnerId ?? 0;
+    this.match.shoppingPlayerId = winnerId;
+    this.match.shopVisitsRemaining = 2;
+    this.turn.phase = 'shopping';
+    this.statusMessage = null;
+    this.renderAll();
+  }
+
+  private finishShoppingForCurrentPlayer(): void {
+    this.match.shopVisitsRemaining -= 1;
+    if (this.match.shopVisitsRemaining <= 0) {
+      this.match.shoppingPlayerId = null;
+      this.match.round += 1;
+      const nextStarter: PlayerId = this.turn.winnerId === 0 ? 1 : 0;
+      this.beginRound(nextStarter);
+      return;
+    }
+    this.match.shoppingPlayerId = (this.match.shoppingPlayerId === 0 ? 1 : 0) as PlayerId;
+    this.renderAll();
+  }
+
+  // -------- INPUT HANDLERS --------
 
   private handleAimingInput(): boolean {
     const activeTank = this.tanks[this.turn.activePlayerId];
@@ -138,6 +234,25 @@ export class GameScene extends Phaser.Scene {
     return changed;
   }
 
+  private handleMovementInput(delta: number): boolean {
+    const activeTank = this.tanks[this.turn.activePlayerId];
+    const other = this.tanks[activeTank.id === 0 ? 1 : 0];
+    const deltaSeconds = delta / 1000;
+    let moved = false;
+
+    if (this.moveLeftKey.isDown) {
+      if (this.tankSystem.moveTank(activeTank, -1, deltaSeconds, this.terrainSystem, this.terrainData, other)) {
+        moved = true;
+      }
+    }
+    if (this.moveRightKey.isDown) {
+      if (this.tankSystem.moveTank(activeTank, 1, deltaSeconds, this.terrainSystem, this.terrainData, other)) {
+        moved = true;
+      }
+    }
+    return moved;
+  }
+
   private handleWeaponSelection(): boolean {
     const activeTank = this.tanks[this.turn.activePlayerId];
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
@@ -150,6 +265,42 @@ export class GameScene extends Phaser.Scene {
     }
     return false;
   }
+
+  private handleShoppingInput(): boolean {
+    if (this.match.shoppingPlayerId === null) return false;
+    const profile = this.match.profiles[this.match.shoppingPlayerId];
+    let changed = false;
+
+    for (let i = 0; i < this.weaponKeys.length; i += 1) {
+      if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
+        const weapon = GAME_CONFIG.weapons[i];
+        if (weapon.price > 0 && profile.cash >= weapon.price) {
+          profile.cash -= weapon.price;
+          if (profile.ammo[weapon.id] === -1) profile.ammo[weapon.id] = 0;
+          profile.ammo[weapon.id] += 1;
+          changed = true;
+        }
+      }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.parachuteBuyKey)) {
+      const price = GAME_CONFIG.match.parachutePrice;
+      if (profile.cash >= price) {
+        profile.cash -= price;
+        profile.parachutes += 1;
+        changed = true;
+      }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.finishShoppingForCurrentPlayer();
+      return true;
+    }
+
+    return changed;
+  }
+
+  // -------- WEAPON LOGIC --------
 
   private tankHasAmmo(tank: TankState, weaponIndex: number): boolean {
     const weapon = GAME_CONFIG.weapons[weaponIndex];
@@ -176,9 +327,7 @@ export class GameScene extends Phaser.Scene {
   private fireActiveWeapon(): void {
     const activeTank = this.tanks[this.turn.activePlayerId];
     const weapon = this.activeWeapon();
-    if (!this.tankHasAmmo(activeTank, activeTank.selectedWeaponIndex)) {
-      return;
-    }
+    if (!this.tankHasAmmo(activeTank, activeTank.selectedWeaponIndex)) return;
 
     if (activeTank.ammo[weapon.id] !== -1) {
       activeTank.ammo[weapon.id] -= 1;
@@ -189,6 +338,8 @@ export class GameScene extends Phaser.Scene {
     this.renderTanksAndHud();
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
   }
+
+  // -------- PROJECTILE TICK --------
 
   private tickProjectiles(delta: number): void {
     const remaining: ProjectileState[] = [];
@@ -205,9 +356,7 @@ export class GameScene extends Phaser.Scene {
         this.tanks
       );
 
-      if (tick.spawned.length) {
-        spawnedThisFrame.push(...tick.spawned);
-      }
+      if (tick.spawned.length) spawnedThisFrame.push(...tick.spawned);
 
       if (tick.impact) {
         this.applyImpact(projectile, tick.impact);
@@ -226,39 +375,61 @@ export class GameScene extends Phaser.Scene {
 
   private applyImpact(projectile: ProjectileState, impact: ImpactResult): void {
     const weapon = projectile.weapon;
+    const shooter = this.tanks[projectile.ownerId];
+    let terrainChanged = false;
 
     if (impact.kind === 'terrain' || impact.kind === 'tank') {
       if (weapon.behavior === 'dirt') {
         const radius = weapon.moundRadius ?? weapon.craterRadius ?? 30;
         this.terrainSystem.applyMound(this.terrainData, impact.x, impact.y, radius);
+        terrainChanged = true;
       } else if (weapon.craterRadius > 0) {
         this.terrainSystem.applyCrater(this.terrainData, impact.x, impact.y, weapon.craterRadius);
+        terrainChanged = true;
       }
     }
 
     if (impact.kind === 'tank' && impact.targetTankId !== undefined && weapon.damage > 0) {
-      this.tankSystem.applyDamage(this.tanks[impact.targetTankId], weapon.damage);
+      const target = this.tanks[impact.targetTankId];
+      const damageDealt = Math.min(weapon.damage, target.health);
+      this.tankSystem.applyDamage(target, weapon.damage);
+      shooter.damageDealt += damageDealt;
+    }
+
+    if (terrainChanged) {
+      const falls = this.tankSystem.settleTanksAfterTerrainChange(
+        this.tanks,
+        this.terrainSystem,
+        this.terrainData
+      );
+      falls.forEach((fall) => {
+        if (fall.damage > 0 && fall.tankId !== shooter.id) {
+          shooter.damageDealt += fall.damage;
+        }
+      });
     }
   }
 
   private endTurn(): void {
     this.activeProjectiles = [];
     this.projectileSystem.drawAll(this.projectileGraphics, []);
-    this.tankSystem.updateTerrainPositions(this.tanks, this.terrainSystem, this.terrainData);
 
     const winnerId = this.turnSystem.findWinner(this.tanks);
     if (winnerId !== null) {
-      this.turn.phase = 'gameOver';
-      this.turn.winnerId = winnerId;
-    } else {
-      this.turn.activePlayerId = this.turnSystem.nextActivePlayer(this.turn.activePlayerId, this.tanks);
-      this.turn.wind = this.turnSystem.rollWind();
-      this.ensureSelectableWeapon(this.tanks[this.turn.activePlayerId]);
-      this.turn.phase = 'aiming';
+      this.resolveRoundEnd(winnerId);
+      return;
     }
+
+    this.turn.activePlayerId = this.turnSystem.nextActivePlayer(this.turn.activePlayerId, this.tanks);
+    this.turn.wind = this.turnSystem.rollWind();
+    this.tankSystem.refillMovement(this.tanks[this.turn.activePlayerId]);
+    this.ensureSelectableWeapon(this.tanks[this.turn.activePlayerId]);
+    this.turn.phase = 'aiming';
 
     this.renderAll();
   }
+
+  // -------- RENDERING --------
 
   private renderAll(): void {
     this.drawRetroBattlefieldBackground();
@@ -269,7 +440,13 @@ export class GameScene extends Phaser.Scene {
 
   private renderTanksAndHud(): void {
     this.tankSystem.draw(this.tankGraphics, this.tanks, this.turn.activePlayerId);
-    this.hudSystem.render(this.turn, this.tanks, this.activeWeapon());
+    this.hudSystem.render(
+      this.turn,
+      this.tanks,
+      this.activeWeapon(),
+      this.match,
+      this.statusMessage
+    );
   }
 
   private drawRetroBattlefieldBackground(): void {

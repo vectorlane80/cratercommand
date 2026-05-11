@@ -1,5 +1,10 @@
 export type PlayerId = 0 | 1;
-export type GamePhase = 'aiming' | 'projectileInFlight' | 'resolvingImpact' | 'gameOver';
+export type GamePhase =
+  | 'aiming'
+  | 'projectileInFlight'
+  | 'roundOver'
+  | 'shopping'
+  | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
 export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo';
 
@@ -23,12 +28,32 @@ export interface TankState {
   alive: boolean;
   ammo: Record<string, number>;
   selectedWeaponIndex: number;
+  moveRemaining: number;
+  parachutes: number;
+  damageDealt: number;
+}
+
+export interface PlayerProfile {
+  cash: number;
+  wins: number;
+  ammo: Record<string, number>;
+  parachutes: number;
+}
+
+export interface MatchState {
+  round: number;
+  roundsToWin: number;
+  profiles: [PlayerProfile, PlayerProfile];
+  shoppingPlayerId: PlayerId | null;
+  shopVisitsRemaining: number;
+  matchWinnerId: PlayerId | null;
 }
 
 export interface WeaponDefinition {
   id: string;
   name: string;
   startingAmmo: number; // -1 means unlimited
+  price: number; // 0 means cannot be bought (e.g. unlimited freebie)
   damage: number;
   craterRadius: number;
   projectileSpeedScale: number;
@@ -74,6 +99,13 @@ export interface ImpactResult {
   targetTankId?: PlayerId;
 }
 
+export interface FallEvent {
+  tankId: PlayerId;
+  distance: number;
+  damage: number;
+  usedParachute: boolean;
+}
+
 export const GAME_CONFIG = {
   width: 960,
   height: 540,
@@ -99,7 +131,8 @@ export const GAME_CONFIG = {
     red: 0xe43d21,
     blue: 0x0837ff,
     purple: 0x79217d,
-    dimGray: 0x707070
+    dimGray: 0x707070,
+    overlayDim: 0x000000
   },
   font: {
     family: 'Courier New, monospace',
@@ -147,11 +180,31 @@ export const GAME_CONFIG = {
     min: 0,
     max: 18
   },
+  movement: {
+    perTurn: 70,
+    speedPxPerSec: 65,
+    minTankSeparation: 36
+  },
+  fall: {
+    threshold: 8,
+    damagePerPixel: 0.85,
+    maxDamage: 75
+  },
+  match: {
+    roundsToWin: 2,
+    startingCash: 1500,
+    startingParachutes: 1,
+    parachutePrice: 250,
+    damageCashMultiplier: 3,
+    roundWinBonus: 500,
+    survivalBonus: 150
+  },
   weapons: [
     {
       id: 'small-missile',
       name: 'Small Missile',
       startingAmmo: -1,
+      price: 0,
       damage: 35,
       craterRadius: 25,
       projectileSpeedScale: 1,
@@ -161,6 +214,7 @@ export const GAME_CONFIG = {
       id: 'big-missile',
       name: 'Big Missile',
       startingAmmo: 8,
+      price: 350,
       damage: 55,
       craterRadius: 38,
       projectileSpeedScale: 1,
@@ -170,6 +224,7 @@ export const GAME_CONFIG = {
       id: 'triple-missile',
       name: 'Triple Missile',
       startingAmmo: 6,
+      price: 1000,
       damage: 30,
       craterRadius: 22,
       projectileSpeedScale: 1,
@@ -181,6 +236,7 @@ export const GAME_CONFIG = {
       id: 'huge-missile',
       name: 'Huge Missile',
       startingAmmo: 3,
+      price: 1800,
       damage: 90,
       craterRadius: 60,
       projectileSpeedScale: 1,
@@ -190,6 +246,7 @@ export const GAME_CONFIG = {
       id: 'dirt-mover',
       name: 'Dirt Mover',
       startingAmmo: 4,
+      price: 500,
       damage: 0,
       craterRadius: 0,
       projectileSpeedScale: 1,
@@ -200,6 +257,7 @@ export const GAME_CONFIG = {
       id: 'bouncing-bomb',
       name: 'Bouncing Bomb',
       startingAmmo: 5,
+      price: 800,
       damage: 50,
       craterRadius: 32,
       projectileSpeedScale: 1,
@@ -210,6 +268,7 @@ export const GAME_CONFIG = {
       id: 'bullet',
       name: 'Bullet',
       startingAmmo: 12,
+      price: 150,
       damage: 22,
       craterRadius: 12,
       projectileSpeedScale: 1.7,
@@ -219,6 +278,7 @@ export const GAME_CONFIG = {
       id: 'stream',
       name: 'Stream',
       startingAmmo: 4,
+      price: 1300,
       damage: 18,
       craterRadius: 14,
       projectileSpeedScale: 0.95,

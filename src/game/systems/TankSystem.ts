@@ -1,18 +1,25 @@
 import Phaser from 'phaser';
-import { GAME_CONFIG, type PlayerId, type TankState, type TerrainData } from '../types/GameTypes';
+import {
+  GAME_CONFIG,
+  type FallEvent,
+  type PlayerId,
+  type PlayerProfile,
+  type TankState,
+  type TerrainData
+} from '../types/GameTypes';
 import { TerrainSystem } from './TerrainSystem';
 
 export class TankSystem {
-  createTanks(terrainSystem: TerrainSystem, terrainData: TerrainData): TankState[] {
+  createTanks(
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData,
+    profiles: [PlayerProfile, PlayerProfile]
+  ): TankState[] {
     const tankXs = [terrainData.width * 0.16, terrainData.width * 0.86];
 
     return tankXs.map((x, index) => {
       const id = index as PlayerId;
-
-      const ammo: Record<string, number> = {};
-      GAME_CONFIG.weapons.forEach((weapon) => {
-        ammo[weapon.id] = weapon.startingAmmo;
-      });
+      const profile = profiles[id];
 
       return {
         id,
@@ -25,23 +32,111 @@ export class TankSystem {
         angle: GAME_CONFIG.aiming.initialAngles[id],
         power: GAME_CONFIG.aiming.initialPower,
         alive: true,
-        ammo,
-        selectedWeaponIndex: 0
+        ammo: { ...profile.ammo },
+        selectedWeaponIndex: this.firstAvailableWeapon(profile.ammo),
+        moveRemaining: GAME_CONFIG.movement.perTurn,
+        parachutes: profile.parachutes,
+        damageDealt: 0
       };
     });
   }
 
-  updateTerrainPositions(tanks: TankState[], terrainSystem: TerrainSystem, terrainData: TerrainData): void {
+  private firstAvailableWeapon(ammo: Record<string, number>): number {
+    for (let i = 0; i < GAME_CONFIG.weapons.length; i += 1) {
+      const w = GAME_CONFIG.weapons[i];
+      const count = ammo[w.id];
+      if (count === -1 || count > 0) return i;
+    }
+    return 0;
+  }
+
+  refillMovement(tank: TankState): void {
+    tank.moveRemaining = GAME_CONFIG.movement.perTurn;
+  }
+
+  moveTank(
+    tank: TankState,
+    direction: -1 | 1,
+    deltaSeconds: number,
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData,
+    otherTank: TankState
+  ): boolean {
+    if (tank.moveRemaining <= 0) return false;
+
+    const stepDistance = Math.min(
+      tank.moveRemaining,
+      GAME_CONFIG.movement.speedPxPerSec * deltaSeconds
+    );
+    if (stepDistance <= 0.01) return false;
+
+    const minX = 12;
+    const maxX = terrainData.width - 12;
+    let targetX = tank.x + direction * stepDistance;
+    targetX = Phaser.Math.Clamp(targetX, minX, maxX);
+
+    if (otherTank.alive) {
+      const minSep = GAME_CONFIG.movement.minTankSeparation;
+      if (direction === 1 && otherTank.x > tank.x) {
+        targetX = Math.min(targetX, otherTank.x - minSep);
+      } else if (direction === -1 && otherTank.x < tank.x) {
+        targetX = Math.max(targetX, otherTank.x + minSep);
+      }
+    }
+
+    const actualStep = Math.abs(targetX - tank.x);
+    if (actualStep <= 0.01) return false;
+
+    tank.x = targetX;
+    tank.y = terrainSystem.getHeightAtX(terrainData, tank.x) - GAME_CONFIG.tank.placementOffsetY;
+    tank.moveRemaining = Math.max(0, tank.moveRemaining - actualStep);
+
+    return true;
+  }
+
+  settleTanksAfterTerrainChange(
+    tanks: TankState[],
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData
+  ): FallEvent[] {
+    const events: FallEvent[] = [];
+
     tanks.forEach((tank) => {
-      tank.y = terrainSystem.getHeightAtX(terrainData, tank.x) - GAME_CONFIG.tank.placementOffsetY;
+      if (!tank.alive) return;
+
+      const groundY = terrainSystem.getHeightAtX(terrainData, tank.x) - GAME_CONFIG.tank.placementOffsetY;
+      const fallDistance = groundY - tank.y;
+
+      if (fallDistance > GAME_CONFIG.fall.threshold) {
+        let damage = 0;
+        let usedParachute = false;
+
+        if (tank.parachutes > 0) {
+          tank.parachutes -= 1;
+          usedParachute = true;
+        } else {
+          damage = Math.min(
+            GAME_CONFIG.fall.maxDamage,
+            Math.round(fallDistance * GAME_CONFIG.fall.damagePerPixel)
+          );
+          this.applyDamage(tank, damage);
+        }
+
+        events.push({ tankId: tank.id, distance: fallDistance, damage, usedParachute });
+      }
+
+      tank.y = groundY;
     });
+
+    return events;
   }
 
   draw(graphics: Phaser.GameObjects.Graphics, tanks: TankState[], activePlayerId: PlayerId): void {
     graphics.clear();
 
     tanks.forEach((tank) => {
-      const isActive = tank.id === activePlayerId && tank.alive;
+      if (!tank.alive) return;
+      const isActive = tank.id === activePlayerId;
       const bodyX = tank.x - GAME_CONFIG.tank.width / 2;
       const bodyY = tank.y - GAME_CONFIG.tank.height;
       const turretStart = this.getTurretStart(tank);
@@ -63,6 +158,11 @@ export class TankSystem {
       graphics.strokePath();
       graphics.lineStyle(1, GAME_CONFIG.colors.black, 1);
       graphics.strokeRect(bodyX + 4, bodyY + 4, GAME_CONFIG.tank.width - 8, 4);
+
+      if (tank.parachutes > 0) {
+        graphics.fillStyle(GAME_CONFIG.colors.yellow, 1);
+        graphics.fillRect(bodyX - 8, bodyY - 9, 4, 4);
+      }
     });
   }
 

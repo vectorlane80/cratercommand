@@ -1,4 +1,12 @@
-import { GAME_CONFIG, type PlayerId, type TankState, type TurnState, type WindState } from '../types/GameTypes';
+import {
+  GAME_CONFIG,
+  type MatchState,
+  type PlayerId,
+  type PlayerProfile,
+  type TankState,
+  type TurnState,
+  type WindState
+} from '../types/GameTypes';
 
 export class TurnSystem {
   createInitialState(): TurnState {
@@ -8,6 +16,37 @@ export class TurnSystem {
       winnerId: null,
       wind: this.rollWind()
     };
+  }
+
+  createMatchState(): MatchState {
+    return {
+      round: 1,
+      roundsToWin: GAME_CONFIG.match.roundsToWin,
+      profiles: [this.createInitialProfile(), this.createInitialProfile()],
+      shoppingPlayerId: null,
+      shopVisitsRemaining: 0,
+      matchWinnerId: null
+    };
+  }
+
+  createInitialProfile(): PlayerProfile {
+    const ammo: Record<string, number> = {};
+    GAME_CONFIG.weapons.forEach((w) => {
+      ammo[w.id] = w.startingAmmo;
+    });
+    return {
+      cash: GAME_CONFIG.match.startingCash,
+      wins: 0,
+      ammo,
+      parachutes: GAME_CONFIG.match.startingParachutes
+    };
+  }
+
+  saveTanksToProfiles(tanks: TankState[], match: MatchState): void {
+    tanks.forEach((tank) => {
+      match.profiles[tank.id].ammo = { ...tank.ammo };
+      match.profiles[tank.id].parachutes = tank.parachutes;
+    });
   }
 
   rollWind(): WindState {
