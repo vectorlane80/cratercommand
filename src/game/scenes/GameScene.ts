@@ -33,6 +33,7 @@ export class GameScene extends Phaser.Scene {
   // Retro-mode image layers (created once, shown only when visualSystem === 'retroPixel').
   private retroBackdrop!: Phaser.GameObjects.Image;
   private retroCacti: Phaser.GameObjects.Image[] = [];
+  private retroTankBodies: Phaser.GameObjects.Image[] = [];
 
   private terrainSystem!: TerrainSystem;
   private tankSystem!: TankSystem;
@@ -82,6 +83,13 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.tankGraphics = this.add.graphics();
+
+    // Retro tank body sprites (gun is drawn procedurally on top by tankGraphics).
+    this.retroTankBodies = [
+      this.add.image(0, 0, 'retro-tank-blue').setOrigin(0.5, 1).setScale(0.55),
+      this.add.image(0, 0, 'retro-tank-red').setOrigin(0.5, 1).setScale(0.55)
+    ];
+
     this.projectileGraphics = this.add.graphics();
 
     this.terrainSystem = new TerrainSystem();
@@ -478,6 +486,7 @@ export class GameScene extends Phaser.Scene {
     const retro = this.visualSystem === 'retroPixel';
     this.retroBackdrop.visible = retro;
     this.retroCacti.forEach((cactus) => (cactus.visible = retro));
+    this.retroTankBodies.forEach((tankImg) => (tankImg.visible = retro));
 
     if (retro && this.terrainData) {
       RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
@@ -491,6 +500,17 @@ export class GameScene extends Phaser.Scene {
         const x = t * GAME_CONFIG.width;
         const y = this.terrainSystem.getHeightAtX(this.terrainData, x);
         cactus.setPosition(Math.round(x), Math.round(y) + 2);
+      });
+
+      // Position tank sprites at each tank's current position.
+      this.tanks.forEach((tank, idx) => {
+        const tankImg = this.retroTankBodies[idx];
+        if (!tankImg) return;
+        if (!tank.alive) {
+          tankImg.visible = false;
+          return;
+        }
+        tankImg.setPosition(Math.round(tank.x), Math.round(tank.y) + 2);
       });
     }
   }

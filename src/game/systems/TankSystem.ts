@@ -208,13 +208,13 @@ export class TankSystem {
     isActive: boolean,
     palette: PlayerPalette
   ): void {
+    // The tank BODY is now rendered by a sprite Image game object (placed by
+    // GameScene), so this routine only draws the active-player marker, the
+    // aim turret/gun, and the parachute pip on top of the sprite.
     const colors = GAME_CONFIG.colors;
-    const facing = tank.id === 0 ? 1 : -1;
     const baseColor = palette.primary;
-    const darkColor = palette.dark;
     const lightColor = palette.accent;
-    const bodyX = Math.round(tank.x - 20);
-    const bodyY = Math.round(tank.y - 19);
+    const bodyY = Math.round(tank.y - 32);
     const turretStart = this.getTurretStart(tank);
     const turretTip = this.getTurretTip(tank);
 
@@ -232,18 +232,6 @@ export class TankSystem {
       graphics.strokeTriangle(markerX, markerY, markerX - 8, markerY - 16, markerX + 8, markerY - 16);
     }
 
-    graphics.fillStyle(darkColor, 1);
-    graphics.fillRect(bodyX + 2, bodyY + 16, 38, 8);
-    graphics.fillStyle(baseColor, 1);
-    graphics.fillRect(bodyX + 7, bodyY + 7, 28, 10);
-    graphics.fillRect(bodyX + 13, bodyY + 1, 14, 8);
-    graphics.fillStyle(lightColor, 1);
-    graphics.fillRect(bodyX + 10, bodyY + 9, 20, 3);
-    graphics.fillStyle(colors.black, 1);
-    for (let i = 0; i < 5; i += 1) {
-      graphics.fillRect(bodyX + 6 + i * 7, bodyY + 18, 4, 4);
-    }
-
     graphics.lineStyle(4, baseColor, 1);
     graphics.beginPath();
     graphics.moveTo(turretStart.x, turretStart.y);
@@ -251,13 +239,13 @@ export class TankSystem {
     graphics.strokePath();
     graphics.lineStyle(2, lightColor, 1);
     graphics.beginPath();
-    graphics.moveTo(turretStart.x + facing * 1, turretStart.y - 1);
+    graphics.moveTo(turretStart.x, turretStart.y - 1);
     graphics.lineTo(turretTip.x, turretTip.y - 1);
     graphics.strokePath();
 
     if (tank.parachutes > 0) {
       graphics.fillStyle(colors.yellow, 1);
-      graphics.fillRect(bodyX - 8, bodyY + 2, 5, 5);
+      graphics.fillRect(Math.round(tank.x) - 26, bodyY + 8, 5, 5);
     }
   }
 
