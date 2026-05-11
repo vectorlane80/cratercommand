@@ -18,19 +18,23 @@ import {
 } from '../types/GameTypes';
 
 // Retro pixel backdrop layout (within the 356 px battlefield height).
+// Strips are drawn at sizes chosen to layer with slight overlap so their
+// gradient edges blend, and so the sun (centered behind the far mountains)
+// pokes above the mid mountain peaks like in the reference scene.
 const RETRO_LAYOUT = {
   skyY: 0,
-  skyHeight: 162,
-  farMountainsY: 162,
-  farMountainsHeight: 96,
-  midMountainsY: 230,
-  midMountainsHeight: 126,
+  skyHeight: 130,
+  farMountainsY: 110,
+  farMountainsHeight: 90,
+  midMountainsY: 178,
+  midMountainsHeight: 178,
   sunX: 480,
-  sunY: 100,
-  sunScale: 1.4
+  sunY: 130,
+  sunScale: 1.0
 };
 
-const RETRO_CACTUS_POSITIONS = [0.06, 0.27, 0.42, 0.58, 0.72, 0.94] as const;
+const RETRO_CACTUS_POSITIONS = [0.07, 0.28, 0.43, 0.58, 0.72, 0.93] as const;
+const RETRO_CACTUS_SCALE = 0.5;
 
 export class GameScene extends Phaser.Scene {
   private backgroundGraphics!: Phaser.GameObjects.Graphics;
@@ -80,9 +84,10 @@ export class GameScene extends Phaser.Scene {
 
     // Retro layers sit between background fill and procedural terrain. They
     // are only made visible when visualSystem === 'retroPixel'.
-    this.retroSky = this.add.image(GAME_CONFIG.width / 2, RETRO_LAYOUT.skyY, 'retro-sky').setOrigin(0.5, 0);
-    this.retroSky.displayWidth = GAME_CONFIG.width;
-    this.retroSky.displayHeight = RETRO_LAYOUT.skyHeight;
+    this.retroSky = this.add
+      .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.skyY, 'retro-sky')
+      .setOrigin(0.5, 0);
+    this.retroSky.setDisplaySize(GAME_CONFIG.width, RETRO_LAYOUT.skyHeight);
 
     this.retroSun = this.add.image(RETRO_LAYOUT.sunX, RETRO_LAYOUT.sunY, 'retro-sun').setOrigin(0.5, 0.5);
     this.retroSun.setScale(RETRO_LAYOUT.sunScale);
@@ -90,20 +95,18 @@ export class GameScene extends Phaser.Scene {
     this.retroFarMountains = this.add
       .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.farMountainsY, 'retro-far-mountains')
       .setOrigin(0.5, 0);
-    this.retroFarMountains.displayWidth = GAME_CONFIG.width;
-    this.retroFarMountains.displayHeight = RETRO_LAYOUT.farMountainsHeight;
+    this.retroFarMountains.setDisplaySize(GAME_CONFIG.width, RETRO_LAYOUT.farMountainsHeight);
 
     this.retroMidMountains = this.add
       .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.midMountainsY, 'retro-mid-mountains')
       .setOrigin(0.5, 0);
-    this.retroMidMountains.displayWidth = GAME_CONFIG.width;
-    this.retroMidMountains.displayHeight = RETRO_LAYOUT.midMountainsHeight;
+    this.retroMidMountains.setDisplaySize(GAME_CONFIG.width, RETRO_LAYOUT.midMountainsHeight);
 
     this.terrainGraphics = this.add.graphics();
 
     // Cacti sit above terrain but below tanks/projectiles.
     this.retroCacti = RETRO_CACTUS_POSITIONS.map(() =>
-      this.add.image(0, 0, 'retro-cactus').setOrigin(0.5, 1).setScale(1)
+      this.add.image(0, 0, 'retro-cactus').setOrigin(0.5, 1).setScale(RETRO_CACTUS_SCALE)
     );
 
     this.tankGraphics = this.add.graphics();
