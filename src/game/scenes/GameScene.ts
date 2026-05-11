@@ -498,40 +498,53 @@ export class GameScene extends Phaser.Scene {
     const width = GAME_CONFIG.width;
     const height = GAME_CONFIG.layout.battlefieldHeight;
 
-    const bands = [
-      colors.black,
-      0x05061a,
-      colors.sunsetPurple,
-      0x4b1952,
-      colors.sunsetRed,
-      colors.sunsetOrange,
-      colors.sunsetYellow
+    // Smooth sunset gradient: interpolate per-row between color stops.
+    const stops: Array<{ y: number; color: number }> = [
+      { y: 0, color: 0x0a0820 },
+      { y: 72, color: 0x2a1148 },
+      { y: 140, color: 0x5e1c5a },
+      { y: 198, color: 0x9d2848 },
+      { y: 248, color: 0xd14d2a },
+      { y: 290, color: 0xf28d1a },
+      { y: 326, color: 0xffd15c },
+      { y: height, color: 0xfdba3a }
     ];
-    const bandHeight = Math.ceil(height / bands.length);
-    bands.forEach((color, index) => {
+    for (let y = 0; y < height; y += 1) {
+      const color = sampleGradient(stops, y);
       this.backgroundGraphics.fillStyle(color, 1);
-      this.backgroundGraphics.fillRect(0, index * bandHeight, width, bandHeight + 1);
-    });
-
-    this.backgroundGraphics.fillStyle(colors.sunsetYellow, 1);
-    this.backgroundGraphics.fillCircle(width / 2, 292, 18);
-
-    this.drawMountainLayer(0x1b1644, 248, 0.55, 36, 7);
-    this.drawMountainLayer(0x39205b, 278, 0.65, 42, 11);
-    this.drawMountainLayer(0x5a2544, 306, 0.75, 48, 17);
-
-    // Starfield twinkles, deterministic.
-    this.backgroundGraphics.fillStyle(colors.retroBlue, 0.9);
-    for (let i = 0; i < 62; i += 1) {
-      const x = (i * 73) % width;
-      const y = 18 + ((i * 41) % 92);
-      const size = i % 11 === 0 ? 3 : 2;
-      this.backgroundGraphics.fillRect(x, y, size, size);
-      if (i % 17 === 0) {
-        this.backgroundGraphics.fillRect(x - 3, y + 1, size + 6, 1);
-        this.backgroundGraphics.fillRect(x + 1, y - 3, 1, size + 6);
-      }
+      this.backgroundGraphics.fillRect(0, y, width, 1);
     }
+
+    // Sparse starfield in the upper sky.
+    this.backgroundGraphics.fillStyle(colors.white, 0.9);
+    for (let i = 0; i < 38; i += 1) {
+      const x = (i * 173 + 91) % width;
+      const y = ((i * 47 + 23) % 110) + 8;
+      const size = i % 9 === 0 ? 2 : 1;
+      this.backgroundGraphics.fillRect(x, y, size, size);
+    }
+
+    // Synthwave sun: yellow disc with horizontal dark cuts on the lower half.
+    const sunX = width / 2;
+    const sunY = 298;
+    const sunR = 26;
+    this.backgroundGraphics.fillStyle(0xffe06a, 1);
+    this.backgroundGraphics.fillCircle(sunX, sunY, sunR);
+    this.backgroundGraphics.fillStyle(0xffb347, 1);
+    this.backgroundGraphics.fillCircle(sunX, sunY + 4, sunR - 6);
+    // dark cuts
+    this.backgroundGraphics.fillStyle(0x8a2a26, 1);
+    for (let i = 0; i < 5; i += 1) {
+      const cutY = sunY + 4 + i * 4;
+      const cutHalfWidth = Math.sqrt(Math.max(0, sunR * sunR - (cutY - sunY) * (cutY - sunY))) - 1;
+      if (cutHalfWidth <= 0) continue;
+      this.backgroundGraphics.fillRect(sunX - cutHalfWidth, cutY, cutHalfWidth * 2, 2);
+    }
+
+    // Mountain silhouettes (back to front, darkest to lightest).
+    this.drawMountainLayer(0x1c1438, 232, 0.95, 40, 9, 7);
+    this.drawMountainLayer(0x2d1d4a, 264, 0.95, 36, 11, 14);
+    this.drawMountainLayer(0x4a2152, 296, 0.95, 30, 13, 22);
 
     this.backgroundGraphics.lineStyle(2, colors.steelLight, 1);
     this.backgroundGraphics.beginPath();
@@ -540,18 +553,74 @@ export class GameScene extends Phaser.Scene {
     this.backgroundGraphics.strokePath();
   }
 
-  private drawMountainLayer(color: number, baseY: number, alpha: number, amplitude: number, seed: number): void {
+  /**
+   * Sharp triangular mountain range. Peaks are placed deterministically from
+   * the seed so the silhouette is stable per layer, and each layer offsets
+   * its peaks to break up the overlap.
+   */
+  private drawMountainLayer(
+    color: number,
+    baseY: number,
+    alpha: number,
+    amplitude: number,
+    peakCount: number,
+    seed: number
+  ): void {
+    const width = GAME_CONFIG.width;
+    const battlefieldBottom = GAME_CONFIG.layout.battlefieldHeight;
+    const peakSpacing = width / peakCount;
+
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= peakCount; i += 1) {
+      const jitter = ((i * 919 + seed * 71) % 41) - 20;
+      const peakHeightVariance = ((i * 313 + seed * 53) % amplitude) - amplitude * 0.25;
+      points.push({
+        x: i * peakSpacing + jitter,
+        y: baseY - amplitude + peakHeightVariance
+      });
+    }
+
     this.backgroundGraphics.fillStyle(color, alpha);
     this.backgroundGraphics.beginPath();
-    this.backgroundGraphics.moveTo(0, GAME_CONFIG.layout.battlefieldHeight);
-    for (let x = 0; x <= GAME_CONFIG.width; x += 24) {
-      const wave =
-        Math.sin((x + seed * 11) / 52) * amplitude +
-        Math.sin((x + seed * 29) / 29) * amplitude * 0.36;
-      this.backgroundGraphics.lineTo(x, baseY + wave);
+    this.backgroundGraphics.moveTo(-12, battlefieldBottom);
+    for (let i = 0; i < points.length; i += 1) {
+      const peak = points[i];
+      if (i > 0) {
+        // Valley between peaks at the layer's base elevation.
+        const prev = points[i - 1];
+        const valleyX = (prev.x + peak.x) / 2;
+        const valleyDip = ((i * 199 + seed * 37) % 8) + 2;
+        this.backgroundGraphics.lineTo(valleyX, baseY + valleyDip);
+      }
+      this.backgroundGraphics.lineTo(peak.x, peak.y);
     }
-    this.backgroundGraphics.lineTo(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
+    this.backgroundGraphics.lineTo(width + 12, battlefieldBottom);
     this.backgroundGraphics.closePath();
     this.backgroundGraphics.fillPath();
   }
+}
+
+/**
+ * Linear-interpolate between adjacent color stops sorted by y. Returns a
+ * packed 24-bit RGB int suitable for Phaser fillStyle.
+ */
+function sampleGradient(stops: Array<{ y: number; color: number }>, y: number): number {
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    const a = stops[i];
+    const b = stops[i + 1];
+    if (y >= a.y && y <= b.y) {
+      const t = b.y === a.y ? 0 : (y - a.y) / (b.y - a.y);
+      const ar = (a.color >> 16) & 0xff;
+      const ag = (a.color >> 8) & 0xff;
+      const ab = a.color & 0xff;
+      const br = (b.color >> 16) & 0xff;
+      const bg = (b.color >> 8) & 0xff;
+      const bb = b.color & 0xff;
+      const r = Math.round(ar + (br - ar) * t);
+      const g = Math.round(ag + (bg - ag) * t);
+      const bl = Math.round(ab + (bb - ab) * t);
+      return (r << 16) | (g << 8) | bl;
+    }
+  }
+  return stops[stops.length - 1].color;
 }
