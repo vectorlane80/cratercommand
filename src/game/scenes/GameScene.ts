@@ -770,14 +770,40 @@ export class GameScene extends Phaser.Scene {
     if (this.match.shoppingPlayerId === null) return;
     const profile = this.match.profiles[this.match.shoppingPlayerId];
 
-    // Row keys IN ORDER, matching HudSystem.drawShopOverlay's render order.
+    // FINISH button (top-right corner of the panel).
+    if (
+      x >= SHOP_LAYOUT.finishX &&
+      x < SHOP_LAYOUT.finishX + SHOP_LAYOUT.finishW &&
+      y >= SHOP_LAYOUT.finishY &&
+      y < SHOP_LAYOUT.finishY + SHOP_LAYOUT.finishH
+    ) {
+      this.commitPendingShop(profile);
+      soundSystem.playUiClick();
+      this.finishShoppingForCurrentPlayer();
+      return;
+    }
+
+    // UNDO button (bottom of the left sidebar; only rendered when there's
+    // something to undo — but the hitbox is cheap regardless).
+    if (
+      x >= SHOP_LAYOUT.undoX &&
+      x < SHOP_LAYOUT.undoX + SHOP_LAYOUT.undoW &&
+      y >= SHOP_LAYOUT.undoY &&
+      y < SHOP_LAYOUT.undoY + SHOP_LAYOUT.undoH
+    ) {
+      if (this.undoLastShopBuy()) {
+        soundSystem.playUiClick();
+        this.renderAll();
+      }
+      return;
+    }
+
+    // Item rows. Order matches HudSystem.drawShopOverlay's render order.
     const rowKeys = [
       ...GAME_CONFIG.weapons.map((w) => w.id),
       'parachute',
       'shield'
     ];
-
-    // Compute row y-positions
     const weaponRowY = (i: number) => SHOP_LAYOUT.listYStart + i * SHOP_LAYOUT.rowH;
     const chuteRowY = SHOP_LAYOUT.listYStart + GAME_CONFIG.weapons.length * SHOP_LAYOUT.rowH + SHOP_LAYOUT.parachuteGap;
     const shieldRowY = chuteRowY + SHOP_LAYOUT.rowH;
@@ -787,14 +813,12 @@ export class GameScene extends Phaser.Scene {
       shieldRowY
     ];
 
-    // For each row: check minus button, plus button, then rest-of-row (which
-    // also acts as a plus shortcut for big touch targets).
     for (let i = 0; i < rowKeys.length; i += 1) {
       const rowY = rowYs[i];
-      const inRowYBounds = y >= rowY - 4 && y < rowY + SHOP_LAYOUT.rowH - 4;
+      const inRowYBounds = y >= rowY - 6 && y < rowY + SHOP_LAYOUT.rowH - 4;
       if (!inRowYBounds) continue;
 
-      // Minus button hitbox
+      // Minus button
       if (x >= SHOP_LAYOUT.colMinus && x < SHOP_LAYOUT.colMinus + SHOP_LAYOUT.buttonW) {
         if (this.removeFromCart(rowKeys[i])) {
           soundSystem.playUiClick();
@@ -802,7 +826,7 @@ export class GameScene extends Phaser.Scene {
         }
         return;
       }
-      // Plus button hitbox
+      // Plus button
       if (x >= SHOP_LAYOUT.colPlus && x < SHOP_LAYOUT.colPlus + SHOP_LAYOUT.buttonW) {
         if (this.tryQueueShopBuy(profile, rowKeys[i])) {
           soundSystem.playUiSelect();
@@ -810,9 +834,7 @@ export class GameScene extends Phaser.Scene {
         }
         return;
       }
-      // Rest-of-row (left of minus) = quick-add. Keeps the old "click the
-      // row name to buy" feel as well, just doesn't conflict with the
-      // dedicated minus button.
+      // Quick-add for taps on the row's left half (name/price area).
       if (x >= SHOP_LAYOUT.rowClickX && x < SHOP_LAYOUT.colMinus - 4) {
         if (this.tryQueueShopBuy(profile, rowKeys[i])) {
           soundSystem.playUiSelect();
@@ -821,23 +843,8 @@ export class GameScene extends Phaser.Scene {
         return;
       }
     }
-
-    // Footer buttons (UNDO LAST + FINISH) at panelY + panelH - 50.
-    const footerY = SHOP_LAYOUT.panelY + SHOP_LAYOUT.panelH - 50;
-    if (y >= footerY) {
-      if (x >= SHOP_LAYOUT.panelX + 24 && x < SHOP_LAYOUT.panelX + 184) {
-        if (this.undoLastShopBuy()) {
-          soundSystem.playUiClick();
-          this.renderAll();
-        }
-        return;
-      }
-      // FINISH covers the rest of the footer width
-      this.commitPendingShop(profile);
-      soundSystem.playUiClick();
-      this.finishShoppingForCurrentPlayer();
-    }
   }
+
 
   /**
    * Decrement the cart count for the given item. Used by the "-" rocker

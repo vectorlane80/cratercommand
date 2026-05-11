@@ -16,21 +16,38 @@ import { getPlayerPalette } from './TankSystem';
  * Shop overlay layout constants. Click hit-tests in GameScene must match
  * these so the rocker (+/-) buttons line up with their drawn graphics.
  */
+// Near-fullscreen shop panel with a left sidebar (INVENTORY summary + UNDO)
+// and a wide right-hand table (KEY / ITEM / PRICE / YOU OWN / [- N +] / COST).
+// All coordinates are in 960x540 game-world pixels.
 export const SHOP_LAYOUT = {
-  panelX: 80,
-  panelY: 40,
-  panelW: 800,
-  panelH: 460,
-  listYStart: 40 + 130 + 26, // panelY + 130 (header) + 26 (column-header row gap)
-  rowH: 24,
+  panelX: 20,
+  panelY: 20,
+  panelW: 920,
+  panelH: 500,
+  // Table region (right of sidebar)
+  tableX: 204,
+  tableY: 110,
+  listYStart: 150,        // tableY + 40 (column-header strip)
+  rowH: 28,
   weaponCount: 8,
-  parachuteGap: 6,
-  colMinus: 80 + 500,
-  colPlus: 80 + 610,
-  buttonW: 32,
-  buttonH: 22,
-  rowClickX: 80 + 24,
-  rowClickW: 460
+  parachuteGap: 10,
+  // Rocker buttons (absolute x)
+  colMinus: 624,
+  colPlus: 716,
+  buttonW: 36,
+  buttonH: 24,
+  // Quick-add hitbox covers the row left of the minus button
+  rowClickX: 218,
+  rowClickW: 400,
+  // Footer / sidebar buttons (for pointer hit-test)
+  finishX: 800,
+  finishY: 34,
+  finishW: 120,
+  finishH: 44,
+  undoX: 46,
+  undoY: 460,
+  undoW: 138,
+  undoH: 36
 };
 
 export interface ShopPending {
@@ -569,78 +586,103 @@ export class HudSystem {
     const colors = GAME_CONFIG.colors;
     const pending = this.currentPendingShop;
     const effectiveCash = pending.effectiveCash(profile);
+    const totalCost = profile.cash - effectiveCash;
     const hasPending = pending.hasPending();
-
-    this.graphics.fillStyle(colors.black, 0.86);
-    this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
-
-    const panelX = 80;
-    const panelY = 40;
-    const panelW = GAME_CONFIG.width - 160;
-    const panelH = GAME_CONFIG.height - 80;
-    this.graphics.fillStyle(colors.panelGray, 1);
-    this.graphics.fillRect(panelX, panelY, panelW, panelH);
-    this.graphics.lineStyle(4, colors.yellow, 1);
-    this.graphics.strokeRect(panelX, panelY, panelW, panelH);
-
-    this.addText(panelX + 24, panelY + 18, `ROUND ${match.round} SHOP`, colors.magenta, GAME_CONFIG.font.title);
-    this.addText(
-      panelX + 24,
-      panelY + 56,
-      `${profile.displayName ?? `PLAYER ${shopperId + 1}`} SHOPPING`,
-      shopperId === 0 ? colors.magenta : colors.cyan,
-      GAME_CONFIG.font.large
-    );
-    // Cash readout reflects pending purchases. When something is in the cart
-    // we show "balance / total" with the post-checkout figure in white and
-    // the pre-checkout figure in dim gray for context.
-    const cashText = hasPending ? `CASH $${effectiveCash} / $${profile.cash}` : `CASH $${profile.cash}`;
-    this.addText(panelX + 24, panelY + 90, cashText, colors.green, GAME_CONFIG.font.large);
-    this.addText(
-      panelX + 320,
-      panelY + 90,
-      `CHUTES ${profile.parachutes + pending.pendingFor('parachute')}${pending.pendingFor('parachute') ? ` (+${pending.pendingFor('parachute')})` : ''}`,
-      colors.yellow,
-      GAME_CONFIG.font.large
-    );
-    this.addText(
-      panelX + 600,
-      panelY + 90,
-      `SHIELDS ${profile.shields + pending.pendingFor('shield')}${pending.pendingFor('shield') ? ` (+${pending.pendingFor('shield')})` : ''}`,
-      colors.cyan,
-      GAME_CONFIG.font.large
-    );
-
-    // Column layout — each row is rendered as discrete text spans plus the
-    // graphical +/- "rocker" buttons. Click hitboxes in GameScene must use
-    // the same column x values (see SHOP_COL_* below).
-    const colKey = panelX + 24;
-    const colName = panelX + 60;
-    const colPrice = panelX + 280;
-    const colSale = panelX + 380;
-    const colMinus = panelX + 500;
-    const colCount = panelX + 542;
-    const colPlus = panelX + 610;
-
-    let listY = panelY + 130;
-    this.addText(colKey, listY, 'KEY', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(colName, listY, 'WEAPON', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(colPrice, listY, 'PRICE', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(colCount, listY, 'OWNED', colors.cyan, GAME_CONFIG.font.medium);
-    listY += 26;
-
     const saleKey = pending.saleItem();
     const saleDiscountPct = Math.round(pending.saleDiscount() * 100);
-    const rowH = SHOP_LAYOUT.rowH;
 
+    const panelX = SHOP_LAYOUT.panelX;
+    const panelY = SHOP_LAYOUT.panelY;
+    const panelW = SHOP_LAYOUT.panelW;
+    const panelH = SHOP_LAYOUT.panelH;
+
+    // Dim full-screen backdrop, then the panel itself.
+    this.graphics.fillStyle(colors.black, 0.86);
+    this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+    this.graphics.fillStyle(colors.panelGray, 1);
+    this.graphics.fillRect(panelX, panelY, panelW, panelH);
+    this.graphics.lineStyle(3, colors.yellow, 1);
+    this.graphics.strokeRect(panelX, panelY, panelW, panelH);
+
+    // ----- HEADER -----
+    // ROUND N SHOP (title) + player name on the left, CASH centered,
+    // FINISH button on the right.
+    const playerName = profile.displayName ?? `PLAYER ${shopperId + 1}`;
+    const playerColor = getPlayerPalette(shopperId, 'classic').primary;
+    this.addText(panelX + 20, panelY + 10, `ROUND ${match.round} SHOP`, colors.magenta, GAME_CONFIG.font.large);
+    this.addText(panelX + 20, panelY + 48, playerName, playerColor, GAME_CONFIG.font.large);
+
+    this.addText(panelX + 380, panelY + 18, 'CASH', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(panelX + 380, panelY + 48, `$${effectiveCash}`, colors.green, GAME_CONFIG.font.large);
+
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH);
+    this.graphics.lineStyle(2, colors.yellow, 1);
+    this.graphics.strokeRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH);
+    this.addText(SHOP_LAYOUT.finishX + 16, SHOP_LAYOUT.finishY + 12, 'FINISH ⏎', colors.yellow, GAME_CONFIG.font.medium);
+
+    // ----- LEFT SIDEBAR (INVENTORY summary + UNDO) -----
+    const sideX = panelX + 14;
+    const sideY = panelY + 90;
+    const sideW = 168;
+    const sideH = panelH - 100;
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(sideX, sideY, sideW, sideH);
+    this.graphics.lineStyle(1, colors.panelLight, 1);
+    this.graphics.strokeRect(sideX, sideY, sideW, sideH);
+
+    this.addText(sideX + 12, sideY + 10, 'INVENTORY', colors.white, GAME_CONFIG.font.medium);
+
+    const totalWeapons = GAME_CONFIG.weapons.reduce((sum, w) => {
+      const owned = profile.ammo[w.id] ?? 0;
+      if (owned === -1) return sum; // skip unlimited (Small Missile)
+      return sum + owned + pending.pendingFor(w.id);
+    }, 0);
+    const totalChutes = profile.parachutes + pending.pendingFor('parachute');
+    const totalShields = profile.shields + pending.pendingFor('shield');
+
+    this.addText(sideX + 12, sideY + 46, 'WEAPONS', colors.magenta, GAME_CONFIG.font.small);
+    this.addText(sideX + sideW - 40, sideY + 46, `${totalWeapons}`, colors.white, GAME_CONFIG.font.small);
+    this.addText(sideX + 12, sideY + 72, 'PARACHUTES', colors.yellow, GAME_CONFIG.font.small);
+    this.addText(sideX + sideW - 30, sideY + 72, `${totalChutes}`, colors.white, GAME_CONFIG.font.small);
+    this.addText(sideX + 12, sideY + 98, 'SHIELDS', colors.cyan, GAME_CONFIG.font.small);
+    this.addText(sideX + sideW - 30, sideY + 98, `${totalShields}`, colors.white, GAME_CONFIG.font.small);
+
+    // UNDO button at the bottom of the sidebar (only when something to undo).
+    if (hasPending) {
+      this.graphics.fillStyle(colors.panelDark, 1);
+      this.graphics.fillRect(SHOP_LAYOUT.undoX, SHOP_LAYOUT.undoY, SHOP_LAYOUT.undoW, SHOP_LAYOUT.undoH);
+      this.graphics.lineStyle(2, colors.red, 1);
+      this.graphics.strokeRect(SHOP_LAYOUT.undoX, SHOP_LAYOUT.undoY, SHOP_LAYOUT.undoW, SHOP_LAYOUT.undoH);
+      this.addText(SHOP_LAYOUT.undoX + 32, SHOP_LAYOUT.undoY + 8, 'UNDO ⌫', colors.red, GAME_CONFIG.font.medium);
+    }
+
+    // ----- MAIN TABLE -----
+    const tableX = SHOP_LAYOUT.tableX;
+    const tableY = SHOP_LAYOUT.tableY;
+    const tableW = panelX + panelW - tableX - 14;
+
+    const colKey = tableX + 16;
+    const colName = tableX + 52;
+    const colPrice = tableX + 256;
+    const colOwn = tableX + 376;
+    const colCost = tableX + 590;
+
+    // Column header
+    this.addText(colName, tableY + 8, 'ITEM', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colPrice, tableY + 8, 'PRICE', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colOwn, tableY + 8, 'YOU OWN', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(SHOP_LAYOUT.colMinus + 24, tableY + 8, 'BUY', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colCost, tableY + 8, 'COST', colors.cyan, GAME_CONFIG.font.medium);
+
+    let rowY = SHOP_LAYOUT.listYStart;
     const drawRow = (
       keyLabel: string,
       itemKey: string,
       itemName: string,
       basePrice: number,
       ownedDisplay: number,
-      tint: number,
-      y: number
+      tint: number
     ) => {
       const pendingQty = pending.pendingFor(itemKey);
       const price = pending.effectivePrice(basePrice, itemKey);
@@ -653,60 +695,62 @@ export class HudSystem {
           ? tint
           : colors.dimGray;
 
-      this.addText(colKey, y, keyLabel, rowColor, GAME_CONFIG.font.medium);
-      this.addText(colName, y, itemName, rowColor, GAME_CONFIG.font.medium);
-      this.addText(colPrice, y, buyable ? `$${price}` : 'FREE', rowColor, GAME_CONFIG.font.medium);
+      this.addText(colKey, rowY, keyLabel, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colName, rowY, itemName, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colPrice, rowY, buyable ? `$${price}` : 'FREE', rowColor, GAME_CONFIG.font.medium);
       if (onSale) {
-        this.addText(colSale, y + 2, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+        this.addText(colPrice + 76, rowY + 2, `-${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
       }
-      // Minus button — dim when nothing in cart for this item.
+      const ownedText = ownedDisplay === -1 ? '--' : `${ownedDisplay}`;
+      this.addText(colOwn + 20, rowY, ownedText, rowColor, GAME_CONFIG.font.medium);
+
+      // Rocker buttons + pending count between them.
       const minusActive = pendingQty > 0;
-      this.drawRockerButton(colMinus, y, '-', minusActive ? colors.red : colors.dimGray);
-      const ownedText = ownedDisplay === -1 ? '--' : `${ownedDisplay + pendingQty}`;
-      const countLabel = pendingQty > 0 ? `${ownedText} (+${pendingQty})` : ownedText;
-      this.addText(colCount, y, countLabel, rowColor, GAME_CONFIG.font.medium);
-      // Plus button — dim when not affordable.
-      this.drawRockerButton(colPlus, y, '+', canAfford ? colors.green : colors.dimGray);
+      this.drawRockerButton(SHOP_LAYOUT.colMinus, rowY, '-', minusActive ? colors.red : colors.dimGray);
+      this.addText(SHOP_LAYOUT.colMinus + 50, rowY, `${pendingQty}`, colors.white, GAME_CONFIG.font.medium);
+      this.drawRockerButton(SHOP_LAYOUT.colPlus, rowY, '+', canAfford ? colors.green : colors.dimGray);
+
+      // Cost cell
+      const cost = pendingQty * price;
+      this.addText(colCost + 4, rowY, `$${cost}`, cost > 0 ? colors.green : colors.dimGray, GAME_CONFIG.font.medium);
+
+      // Subtle row divider
+      this.graphics.lineStyle(1, colors.panelLight, 0.25);
+      this.graphics.beginPath();
+      this.graphics.moveTo(tableX + 8, rowY + SHOP_LAYOUT.rowH - 4);
+      this.graphics.lineTo(tableX + tableW - 8, rowY + SHOP_LAYOUT.rowH - 4);
+      this.graphics.strokePath();
+
+      rowY += SHOP_LAYOUT.rowH;
     };
 
     GAME_CONFIG.weapons.forEach((weapon, index) => {
-      drawRow(
-        String(index + 1),
-        weapon.id,
-        weapon.name,
-        weapon.price,
-        profile.ammo[weapon.id],
-        colors.white,
-        listY
-      );
-      listY += rowH;
+      drawRow(String(index + 1), weapon.id, weapon.name, weapon.price, profile.ammo[weapon.id], colors.white);
     });
 
-    listY += 6;
-    drawRow('P', 'parachute', 'Parachute', GAME_CONFIG.match.parachutePrice, profile.parachutes, colors.yellow, listY);
-    listY += rowH;
-    drawRow('S', 'shield', 'Shield', GAME_CONFIG.match.shieldPrice, profile.shields, colors.cyan, listY);
-
-    // Footer buttons: UNDO LAST (left, only when something to undo) and FINISH.
-    const footerListX = panelX + 24;
-    const footerY = panelY + panelH - 50;
-    if (hasPending) {
-      this.graphics.fillStyle(colors.panelDark, 1);
-      this.graphics.fillRect(footerListX, footerY, 160, 36);
-      this.graphics.lineStyle(2, colors.red, 1);
-      this.graphics.strokeRect(footerListX, footerY, 160, 36);
-      this.addText(footerListX + 14, footerY + 6, 'UNDO ⌫', colors.red, GAME_CONFIG.font.medium);
+    // Dashed divider before specials
+    rowY += SHOP_LAYOUT.parachuteGap;
+    this.graphics.lineStyle(1, colors.panelLight, 0.6);
+    for (let dx = tableX + 8; dx < tableX + tableW - 8; dx += 12) {
+      this.graphics.beginPath();
+      this.graphics.moveTo(dx, rowY - 4);
+      this.graphics.lineTo(dx + 6, rowY - 4);
+      this.graphics.strokePath();
     }
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(panelX + panelW - 184, footerY, 160, 36);
-    this.graphics.lineStyle(2, colors.yellow, 1);
-    this.graphics.strokeRect(panelX + panelW - 184, footerY, 160, 36);
-    this.addText(panelX + panelW - 174, footerY + 6, 'FINISH ⏎', colors.yellow, GAME_CONFIG.font.medium);
 
+    drawRow('P', 'parachute', 'Parachute', GAME_CONFIG.match.parachutePrice, profile.parachutes, colors.yellow);
+    drawRow('S', 'shield', 'Shield', GAME_CONFIG.match.shieldPrice, profile.shields, colors.cyan);
+
+    // ----- FOOTER -----
+    const footerY = panelY + panelH - 38;
+    this.addText(colOwn, footerY, 'TOTAL COST', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colCost, footerY, `$${totalCost}`, totalCost > 0 ? colors.green : colors.dimGray, GAME_CONFIG.font.large);
+
+    // Hint sits below the table, centered.
     this.addText(
-      footerListX + 200,
-      footerY + 8,
-      'TAP +/- TO ADJUST · ENTER FINISHES',
+      panelX + panelW / 2 - 220,
+      panelY + panelH - 16,
+      'TAP + / - TO ADJUST  ·  ENTER TO CONFIRM',
       colors.white,
       GAME_CONFIG.font.small
     );
