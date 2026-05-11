@@ -6,11 +6,10 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image('retro-sky', 'assets/retro/sky.png');
-    this.load.image('retro-far-mountains', 'assets/retro/far_mountains.png');
-    this.load.image('retro-mid-mountains', 'assets/retro/mid_mountains.png');
-    this.load.image('retro-sun', 'assets/retro/sun.png');
+    this.load.image('retro-backdrop', 'assets/retro/backdrop.png');
     this.load.image('retro-cactus', 'assets/retro/cactus.png');
+    this.load.image('retro-tank-blue', 'assets/retro/tank_blue.png');
+    this.load.image('retro-tank-red', 'assets/retro/tank_red.png');
   }
 
   create(): void {

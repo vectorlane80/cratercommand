@@ -17,24 +17,12 @@ import {
   type WeaponDefinition
 } from '../types/GameTypes';
 
-// Retro pixel backdrop layout (within the 356 px battlefield height).
-// Strips are drawn at sizes chosen to layer with slight overlap so their
-// gradient edges blend, and so the sun (centered behind the far mountains)
-// pokes above the mid mountain peaks like in the reference scene.
-const RETRO_LAYOUT = {
-  skyY: 0,
-  skyHeight: 130,
-  farMountainsY: 110,
-  farMountainsHeight: 90,
-  midMountainsY: 178,
-  midMountainsHeight: 178,
-  sunX: 480,
-  sunY: 130,
-  sunScale: 1.0
-};
-
-const RETRO_CACTUS_POSITIONS = [0.07, 0.28, 0.43, 0.58, 0.72, 0.93] as const;
-const RETRO_CACTUS_SCALE = 0.5;
+// Retro pixel backdrop: the single full-width panorama from Sprites 2,
+// scaled to cover the battlefield. Cacti sit on the procedural terrain.
+const RETRO_BACKDROP_Y = 0;
+const RETRO_BACKDROP_HEIGHT = 260;
+const RETRO_CACTUS_POSITIONS = [0.08, 0.3, 0.45, 0.6, 0.74, 0.93] as const;
+const RETRO_CACTUS_SCALE = 0.6;
 
 export class GameScene extends Phaser.Scene {
   private backgroundGraphics!: Phaser.GameObjects.Graphics;
@@ -43,10 +31,7 @@ export class GameScene extends Phaser.Scene {
   private projectileGraphics!: Phaser.GameObjects.Graphics;
 
   // Retro-mode image layers (created once, shown only when visualSystem === 'retroPixel').
-  private retroSky!: Phaser.GameObjects.Image;
-  private retroSun!: Phaser.GameObjects.Image;
-  private retroFarMountains!: Phaser.GameObjects.Image;
-  private retroMidMountains!: Phaser.GameObjects.Image;
+  private retroBackdrop!: Phaser.GameObjects.Image;
   private retroCacti: Phaser.GameObjects.Image[] = [];
 
   private terrainSystem!: TerrainSystem;
@@ -84,23 +69,10 @@ export class GameScene extends Phaser.Scene {
 
     // Retro layers sit between background fill and procedural terrain. They
     // are only made visible when visualSystem === 'retroPixel'.
-    this.retroSky = this.add
-      .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.skyY, 'retro-sky')
+    this.retroBackdrop = this.add
+      .image(GAME_CONFIG.width / 2, RETRO_BACKDROP_Y, 'retro-backdrop')
       .setOrigin(0.5, 0);
-    this.retroSky.setDisplaySize(GAME_CONFIG.width, RETRO_LAYOUT.skyHeight);
-
-    this.retroSun = this.add.image(RETRO_LAYOUT.sunX, RETRO_LAYOUT.sunY, 'retro-sun').setOrigin(0.5, 0.5);
-    this.retroSun.setScale(RETRO_LAYOUT.sunScale);
-
-    this.retroFarMountains = this.add
-      .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.farMountainsY, 'retro-far-mountains')
-      .setOrigin(0.5, 0);
-    this.retroFarMountains.setDisplaySize(GAME_CONFIG.width, RETRO_LAYOUT.farMountainsHeight);
-
-    this.retroMidMountains = this.add
-      .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.midMountainsY, 'retro-mid-mountains')
-      .setOrigin(0.5, 0);
-    this.retroMidMountains.setDisplaySize(GAME_CONFIG.width, RETRO_LAYOUT.midMountainsHeight);
+    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
 
     this.terrainGraphics = this.add.graphics();
 
@@ -504,10 +476,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateRetroLayerVisibility(): void {
     const retro = this.visualSystem === 'retroPixel';
-    this.retroSky.visible = retro;
-    this.retroSun.visible = retro;
-    this.retroFarMountains.visible = retro;
-    this.retroMidMountains.visible = retro;
+    this.retroBackdrop.visible = retro;
     this.retroCacti.forEach((cactus) => (cactus.visible = retro));
 
     if (retro && this.terrainData) {
