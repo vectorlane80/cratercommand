@@ -60,6 +60,7 @@ export class TankSystem {
         selectedWeaponIndex: this.firstAvailableWeapon(profile.ammo),
         moveRemaining: GAME_CONFIG.movement.perTurn,
         parachutes: profile.parachutes,
+        shields: profile.shields,
         damageDealt: 0
       };
     });
@@ -199,6 +200,15 @@ export class TankSystem {
         graphics.fillStyle(GAME_CONFIG.colors.yellow, 1);
         graphics.fillRect(bodyX - 8, bodyY - 9, 4, 4);
       }
+      if (tank.shields > 0) {
+        // Faint cyan arc above the tank, plus a chip next to the chute pip.
+        graphics.fillStyle(GAME_CONFIG.colors.cyan, 1);
+        graphics.fillRect(bodyX - 2, bodyY - 9, 4, 4);
+        graphics.lineStyle(2, GAME_CONFIG.colors.cyan, 0.55);
+        graphics.beginPath();
+        graphics.arc(tank.x, tank.y - GAME_CONFIG.tank.height / 2, GAME_CONFIG.tank.hitRadius + 4, Math.PI, 0);
+        graphics.strokePath();
+      }
     });
   }
 
@@ -266,11 +276,13 @@ export class TankSystem {
     };
   }
 
-  findHitTank(tanks: TankState[], projectileX: number, projectileY: number, ownerId: PlayerId): TankState | null {
+  findHitTank(tanks: TankState[], projectileX: number, projectileY: number, _ownerId: PlayerId): TankState | null {
+    // Self-damage is allowed — if a shot arcs back down onto the shooter, it
+    // hits. The turret tip launch position is already well outside the hit
+    // radius so the projectile doesn't auto-collide on spawn.
     return (
       tanks.find((tank) => {
-        if (!tank.alive || tank.id === ownerId) return false;
-
+        if (!tank.alive) return false;
         return Phaser.Math.Distance.Between(projectileX, projectileY, tank.x, tank.y - GAME_CONFIG.tank.height / 2) <= GAME_CONFIG.tank.hitRadius;
       }) ?? null
     );

@@ -76,6 +76,7 @@ export class GameScene extends Phaser.Scene {
   private moveLeftKey!: Phaser.Input.Keyboard.Key;
   private moveRightKey!: Phaser.Input.Keyboard.Key;
   private parachuteBuyKey!: Phaser.Input.Keyboard.Key;
+  private shieldBuyKey!: Phaser.Input.Keyboard.Key;
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
 
   constructor() {
@@ -132,6 +133,7 @@ export class GameScene extends Phaser.Scene {
     this.moveLeftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.moveRightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.parachuteBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+    this.shieldBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     const numberKeyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
       Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -153,6 +155,7 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.A,
       Phaser.Input.Keyboard.KeyCodes.D,
       Phaser.Input.Keyboard.KeyCodes.P,
+      Phaser.Input.Keyboard.KeyCodes.S,
       Phaser.Input.Keyboard.KeyCodes.V,
       ...numberKeyCodes
     ]);
@@ -449,6 +452,15 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    if (Phaser.Input.Keyboard.JustDown(this.shieldBuyKey)) {
+      const price = GAME_CONFIG.match.shieldPrice;
+      if (profile.cash >= price) {
+        profile.cash -= price;
+        profile.shields += 1;
+        changed = true;
+      }
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
       this.finishShoppingForCurrentPlayer();
       return true;
@@ -573,6 +585,18 @@ export class GameScene extends Phaser.Scene {
       if (profile.cash >= price) {
         profile.cash -= price;
         profile.parachutes += 1;
+        this.renderAll();
+      }
+      return;
+    }
+
+    // Shield row (after parachute)
+    const shieldY = chuteY + rowH;
+    if (x >= listX && x <= listX + 500 && y >= shieldY - 4 && y < shieldY + rowH - 4) {
+      const price = GAME_CONFIG.match.shieldPrice;
+      if (profile.cash >= price) {
+        profile.cash -= price;
+        profile.shields += 1;
         this.renderAll();
       }
       return;
@@ -706,9 +730,21 @@ export class GameScene extends Phaser.Scene {
 
     if (impact.kind === 'tank' && impact.targetTankId !== undefined && weapon.damage > 0) {
       const target = this.tanks[impact.targetTankId];
-      const damageDealt = Math.min(weapon.damage, target.health);
-      this.tankSystem.applyDamage(target, weapon.damage);
-      shooter.damageDealt += damageDealt;
+
+      // Shield absorbs up to shieldAbsorbAmount and is consumed on any hit.
+      let incoming = weapon.damage;
+      if (target.shields > 0) {
+        const absorbed = Math.min(incoming, GAME_CONFIG.match.shieldAbsorbAmount);
+        incoming -= absorbed;
+        target.shields -= 1;
+      }
+
+      const damageDealt = Math.min(incoming, target.health);
+      this.tankSystem.applyDamage(target, incoming);
+      // Don't credit the shooter for damaging themselves.
+      if (target.id !== shooter.id) {
+        shooter.damageDealt += damageDealt;
+      }
     }
 
     if (terrainChanged) {

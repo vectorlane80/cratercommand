@@ -31,6 +31,7 @@ export interface TankState {
   selectedWeaponIndex: number;
   moveRemaining: number;
   parachutes: number;
+  shields: number;
   damageDealt: number;
 }
 
@@ -60,6 +61,7 @@ export interface PlayerProfile {
   wins: number;
   ammo: Record<string, number>;
   parachutes: number;
+  shields: number;
   controller: ControllerKind;
 }
 
@@ -242,7 +244,10 @@ export const GAME_CONFIG = {
     roundsToWin: 2,
     startingCash: 1500,
     startingParachutes: 1,
+    startingShields: 0,
     parachutePrice: 250,
+    shieldPrice: 300,
+    shieldAbsorbAmount: 40,
     damageCashMultiplier: 3,
     roundWinBonus: 500,
     survivalBonus: 150

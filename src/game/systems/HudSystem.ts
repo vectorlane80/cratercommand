@@ -433,21 +433,22 @@ export class HudSystem {
   }
 
   private drawStatusPanel(activeTank: TankState, match: MatchState, top: number): void {
-    this.addText(728, top + 24, 'STATUS', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.medium);
-    this.addText(728, top + 50, `P${activeTank.id + 1} TURN`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
-    this.addText(728, top + 66, `HP   ${activeTank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
-    this.addText(728, top + 80, `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
-    this.addText(728, top + 94, `CHUTES ${activeTank.parachutes}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
+    this.addText(728, top + 22, 'STATUS', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.medium);
+    this.addText(728, top + 46, `P${activeTank.id + 1} TURN`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+    this.addText(728, top + 60, `HP   ${activeTank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+    this.addText(728, top + 74, `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+    this.addText(728, top + 88, `CHUTES  ${activeTank.parachutes}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
+    this.addText(728, top + 102, `SHIELDS ${activeTank.shields}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
     this.addText(
       728,
-      top + 108,
+      top + 116,
       `CASH $${match.profiles[activeTank.id].cash}`,
       GAME_CONFIG.colors.green,
       GAME_CONFIG.font.small
     );
     this.addText(
       728,
-      top + 122,
+      top + 130,
       `ROUND ${match.round}  W ${match.profiles[0].wins}-${match.profiles[1].wins}`,
       GAME_CONFIG.colors.cyan,
       GAME_CONFIG.font.small
@@ -494,10 +495,17 @@ export class HudSystem {
     );
     this.addText(panelX + 24, panelY + 90, `CASH $${profile.cash}`, colors.green, GAME_CONFIG.font.large);
     this.addText(
-      panelX + 360,
+      panelX + 320,
       panelY + 90,
-      `PARACHUTES ${profile.parachutes}`,
+      `CHUTES ${profile.parachutes}`,
       colors.yellow,
+      GAME_CONFIG.font.large
+    );
+    this.addText(
+      panelX + 540,
+      panelY + 90,
+      `SHIELDS ${profile.shields}`,
+      colors.cyan,
       GAME_CONFIG.font.large
     );
 
@@ -536,10 +544,20 @@ export class HudSystem {
       GAME_CONFIG.font.medium
     );
 
+    listY += 24;
+    const shieldAfford = profile.cash >= GAME_CONFIG.match.shieldPrice;
+    this.addText(
+      listX,
+      listY,
+      `S    Shield              $${GAME_CONFIG.match.shieldPrice}      ${profile.shields}`,
+      shieldAfford ? GAME_CONFIG.colors.cyan : GAME_CONFIG.colors.dimGray,
+      GAME_CONFIG.font.medium
+    );
+
     this.addText(
       panelX + 24,
       panelY + panelH - 42,
-      'PRESS 1-8 OR P TO BUY    ENTER TO FINISH',
+      'PRESS 1-8 / P / S TO BUY    ENTER TO FINISH',
       colors.white,
       GAME_CONFIG.font.medium
     );

@@ -43,6 +43,7 @@ export class TurnSystem {
       wins: 0,
       ammo,
       parachutes: GAME_CONFIG.match.startingParachutes,
+      shields: GAME_CONFIG.match.startingShields,
       controller
     };
   }
@@ -51,6 +52,7 @@ export class TurnSystem {
     tanks.forEach((tank) => {
       match.profiles[tank.id].ammo = { ...tank.ammo };
       match.profiles[tank.id].parachutes = tank.parachutes;
+      match.profiles[tank.id].shields = tank.shields;
     });
   }
 
