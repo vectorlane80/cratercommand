@@ -12,9 +12,22 @@ import {
 import { soundSystem } from './SoundSystem';
 import { getPlayerPalette } from './TankSystem';
 
+export interface ShopPending {
+  pendingFor: (key: string) => number;
+  effectiveCash: (profile: { cash: number }) => number;
+  hasPending: () => boolean;
+}
+
+export const EMPTY_SHOP_PENDING: ShopPending = {
+  pendingFor: () => 0,
+  effectiveCash: (p) => p.cash,
+  hasPending: () => false
+};
+
 export class HudSystem {
   private graphics: Phaser.GameObjects.Graphics;
   private texts: Phaser.GameObjects.Text[] = [];
+  private currentPendingShop: ShopPending = EMPTY_SHOP_PENDING;
 
   constructor(private readonly scene: Phaser.Scene) {
     this.graphics = scene.add.graphics();
@@ -26,8 +39,10 @@ export class HudSystem {
     weapon: WeaponDefinition,
     match: MatchState,
     statusMessage: string | null,
-    visualSystem: VisualSystem = 'classic'
+    visualSystem: VisualSystem = 'classic',
+    pendingShop: ShopPending = EMPTY_SHOP_PENDING
   ): void {
+    this.currentPendingShop = pendingShop;
     this.clearTexts();
     this.graphics.clear();
 
@@ -159,7 +174,13 @@ export class HudSystem {
     this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 26);
     this.addText(20, stripY + 4, '←→/↑↓ Aim·Power   A/D Move   SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
     const soundLabel = `F10 SOUND: ${soundSystem.enabled ? 'ON' : 'OFF'}`;
-    this.addText(660, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.medium);
+    this.addText(560, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.small);
+    // ESC quit button — fixed position so pointer routing in GameScene can hit-test it.
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(820, stripY + 2, 130, 22);
+    this.graphics.lineStyle(1, colors.red, 1);
+    this.graphics.strokeRect(820, stripY + 2, 130, 22);
+    this.addText(830, stripY + 6, 'ESC: MENU', colors.red, GAME_CONFIG.font.small);
   }
 
   private drawRetroPixelHud(
@@ -498,6 +519,9 @@ export class HudSystem {
     const shopperId = match.shoppingPlayerId as PlayerId;
     const profile = match.profiles[shopperId];
     const colors = GAME_CONFIG.colors;
+    const pending = this.currentPendingShop;
+    const effectiveCash = pending.effectiveCash(profile);
+    const hasPending = pending.hasPending();
 
     this.graphics.fillStyle(colors.black, 0.86);
     this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
@@ -519,18 +543,22 @@ export class HudSystem {
       shopperId === 0 ? colors.magenta : colors.cyan,
       GAME_CONFIG.font.large
     );
-    this.addText(panelX + 24, panelY + 90, `CASH $${profile.cash}`, colors.green, GAME_CONFIG.font.large);
+    // Cash readout reflects pending purchases. When something is in the cart
+    // we show "balance / total" with the post-checkout figure in white and
+    // the pre-checkout figure in dim gray for context.
+    const cashText = hasPending ? `CASH $${effectiveCash} / $${profile.cash}` : `CASH $${profile.cash}`;
+    this.addText(panelX + 24, panelY + 90, cashText, colors.green, GAME_CONFIG.font.large);
     this.addText(
       panelX + 320,
       panelY + 90,
-      `CHUTES ${profile.parachutes}`,
+      `CHUTES ${profile.parachutes + pending.pendingFor('parachute')}${pending.pendingFor('parachute') ? ` (+${pending.pendingFor('parachute')})` : ''}`,
       colors.yellow,
       GAME_CONFIG.font.large
     );
     this.addText(
-      panelX + 540,
+      panelX + 600,
       panelY + 90,
-      `SHIELDS ${profile.shields}`,
+      `SHIELDS ${profile.shields + pending.pendingFor('shield')}${pending.pendingFor('shield') ? ` (+${pending.pendingFor('shield')})` : ''}`,
       colors.cyan,
       GAME_CONFIG.font.large
     );
@@ -542,14 +570,16 @@ export class HudSystem {
 
     GAME_CONFIG.weapons.forEach((weapon, index) => {
       const owned = profile.ammo[weapon.id];
-      const canAfford = weapon.price > 0 && profile.cash >= weapon.price;
+      const pendingQty = pending.pendingFor(weapon.id);
+      const canAfford = weapon.price > 0 && effectiveCash >= weapon.price;
       const labelColor = weapon.price === 0
         ? colors.dimGray
         : canAfford
           ? colors.white
           : colors.dimGray;
       const priceText = weapon.price === 0 ? 'FREE' : `$${weapon.price}`;
-      const ownedText = owned === -1 ? '--' : `${owned}`;
+      const totalCount = owned === -1 ? '--' : `${owned + pendingQty}`;
+      const ownedText = pendingQty > 0 ? `${totalCount} (+${pendingQty})` : totalCount;
       this.addText(
         listX,
         listY,
@@ -561,31 +591,50 @@ export class HudSystem {
     });
 
     listY += 8;
-    const chuteAfford = profile.cash >= GAME_CONFIG.match.parachutePrice;
+    const chutePending = pending.pendingFor('parachute');
+    const chuteAfford = effectiveCash >= GAME_CONFIG.match.parachutePrice;
+    const chuteCount = `${profile.parachutes + chutePending}${chutePending ? ` (+${chutePending})` : ''}`;
     this.addText(
       listX,
       listY,
-      `P    Parachute           $${GAME_CONFIG.match.parachutePrice}      ${profile.parachutes}`,
+      `P    Parachute           $${GAME_CONFIG.match.parachutePrice}      ${chuteCount}`,
       chuteAfford ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.dimGray,
       GAME_CONFIG.font.medium
     );
 
     listY += 24;
-    const shieldAfford = profile.cash >= GAME_CONFIG.match.shieldPrice;
+    const shieldPending = pending.pendingFor('shield');
+    const shieldAfford = effectiveCash >= GAME_CONFIG.match.shieldPrice;
+    const shieldCount = `${profile.shields + shieldPending}${shieldPending ? ` (+${shieldPending})` : ''}`;
     this.addText(
       listX,
       listY,
-      `S    Shield              $${GAME_CONFIG.match.shieldPrice}      ${profile.shields}`,
+      `S    Shield              $${GAME_CONFIG.match.shieldPrice}      ${shieldCount}`,
       shieldAfford ? GAME_CONFIG.colors.cyan : GAME_CONFIG.colors.dimGray,
       GAME_CONFIG.font.medium
     );
 
+    // Footer buttons: UNDO (left, only when something to undo) and FINISH
+    const footerY = panelY + panelH - 50;
+    if (hasPending) {
+      this.graphics.fillStyle(colors.panelDark, 1);
+      this.graphics.fillRect(listX, footerY, 160, 36);
+      this.graphics.lineStyle(2, colors.red, 1);
+      this.graphics.strokeRect(listX, footerY, 160, 36);
+      this.addText(listX + 14, footerY + 6, 'UNDO ⌫', colors.red, GAME_CONFIG.font.medium);
+    }
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(panelX + panelW - 184, footerY, 160, 36);
+    this.graphics.lineStyle(2, colors.yellow, 1);
+    this.graphics.strokeRect(panelX + panelW - 184, footerY, 160, 36);
+    this.addText(panelX + panelW - 174, footerY + 6, 'FINISH ⏎', colors.yellow, GAME_CONFIG.font.medium);
+
     this.addText(
-      panelX + 24,
-      panelY + panelH - 42,
-      'PRESS 1-8 / P / S TO BUY    ENTER TO FINISH',
+      listX + 200,
+      footerY + 8,
+      'TAP TO BUY · BACKSPACE undoes',
       colors.white,
-      GAME_CONFIG.font.medium
+      GAME_CONFIG.font.small
     );
   }
 

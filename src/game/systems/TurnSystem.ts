@@ -25,11 +25,14 @@ export class TurnSystem {
    * actual participants. The menu guarantees at least 2 participants and at
    * least one human.
    */
-  createMatchState(controllers: ControllerKind[] = ['human', 'cpu-veteran']): MatchState {
+  createMatchState(
+    controllers: ControllerKind[] = ['human', 'cpu-veteran'],
+    roundsToWin: number = GAME_CONFIG.match.roundsToWin
+  ): MatchState {
     const active = controllers.filter((c): c is ControllerKind => !!c);
     return {
       round: 1,
-      roundsToWin: GAME_CONFIG.match.roundsToWin,
+      roundsToWin,
       profiles: active.map((c) => this.createInitialProfile(c)),
       shoppingPlayerId: null,
       shopVisitsRemaining: 0,

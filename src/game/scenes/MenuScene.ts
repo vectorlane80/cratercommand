@@ -13,19 +13,28 @@ type Slot = ControllerKind | undefined;
 
 export interface MenuResult {
   controllers: ControllerKind[];
+  roundsToWin: number;
 }
+
+const MATCH_LENGTHS: Array<{ label: string; roundsToWin: number }> = [
+  { label: 'BEST OF 3', roundsToWin: 2 },
+  { label: 'BEST OF 5', roundsToWin: 3 },
+  { label: 'BEST OF 7', roundsToWin: 4 }
+];
 
 const SLOT_CYCLE_REQUIRED: ControllerKind[] = CONTROLLER_CYCLE; // human + 3 CPU tiers
 const SLOT_CYCLE_OPTIONAL: Array<ControllerKind | undefined> = [undefined, ...CONTROLLER_CYCLE];
 
 export class MenuScene extends Phaser.Scene {
   private slots: Slot[] = ['human', 'cpu-veteran', undefined, undefined];
+  private matchLengthIndex = 0; // index into MATCH_LENGTHS, default first
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
 
   private slotKeys: Phaser.Input.Keyboard.Key[] = [];
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
+  private bKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('MenuScene');
@@ -44,10 +53,12 @@ export class MenuScene extends Phaser.Scene {
     this.slotKeys = keyCodes.map((c) => this.input.keyboard!.addKey(c));
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.bKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     this.input.keyboard!.addCapture([
       ...keyCodes,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
-      Phaser.Input.Keyboard.KeyCodes.ENTER
+      Phaser.Input.Keyboard.KeyCodes.ENTER,
+      Phaser.Input.Keyboard.KeyCodes.B
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
@@ -65,10 +76,19 @@ export class MenuScene extends Phaser.Scene {
         this.render();
       }
     }
+    if (Phaser.Input.Keyboard.JustDown(this.bKey)) {
+      this.cycleMatchLength();
+      soundSystem.playUiClick();
+      this.render();
+    }
     if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
     }
+  }
+
+  private cycleMatchLength(): void {
+    this.matchLengthIndex = (this.matchLengthIndex + 1) % MATCH_LENGTHS.length;
   }
 
   private handlePointerDown(x: number, y: number): void {
@@ -82,13 +102,25 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
     }
+    // Match length selector — see drawMatchLength for geometry
+    const mlBtn = this.matchLengthRect();
+    if (x >= mlBtn.x && x <= mlBtn.x + mlBtn.w && y >= mlBtn.y && y <= mlBtn.y + mlBtn.h) {
+      this.cycleMatchLength();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
     // Start button hitbox — see render() for matching geometry.
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 470;
+    const btnY = 500;
     if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 46 && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
     }
+  }
+
+  private matchLengthRect() {
+    return { x: GAME_CONFIG.width / 2 - 130, y: 450, w: 260, h: 36 };
   }
 
   /**
@@ -124,7 +156,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startMatch(): void {
-    const result: MenuResult = { controllers: this.participants() };
+    const result: MenuResult = {
+      controllers: this.participants(),
+      roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin
+    };
     this.scene.start('GameScene', result);
   }
 
@@ -149,19 +184,28 @@ export class MenuScene extends Phaser.Scene {
       this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i], i >= 2);
     }
 
+    // Match length button (B to cycle, also clickable)
+    const ml = this.matchLengthRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(ml.x, ml.y, ml.w, ml.h);
+    this.graphics.lineStyle(2, colors.cyan, 1);
+    this.graphics.strokeRect(ml.x, ml.y, ml.w, ml.h);
+    const mlLabel = MATCH_LENGTHS[this.matchLengthIndex].label;
+    this.addText(ml.x + 60, ml.y + 8, mlLabel, colors.cyan, GAME_CONFIG.font.large);
+
     // Hint
     this.addText(
       GAME_CONFIG.width / 2 - 254,
-      438,
-      'Click a row or press 1-4 to cycle controllers',
+      430,
+      '1-4 cycles controllers   ·   B cycles match length',
       colors.white,
-      GAME_CONFIG.font.medium
+      GAME_CONFIG.font.small
     );
 
     // Start button (gated on canStart())
     const enabled = this.canStart();
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 470;
+    const btnY = 500;
     const btnW = 260;
     const btnH = 46;
     this.graphics.fillStyle(colors.panelDark, 1);
@@ -173,7 +217,7 @@ export class MenuScene extends Phaser.Scene {
     if (!enabled) {
       this.addText(
         GAME_CONFIG.width / 2 - 222,
-        524,
+        554,
         'Need at least 2 participants and 1 human.',
         colors.red,
         GAME_CONFIG.font.small

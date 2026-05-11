@@ -9,6 +9,7 @@ import { TurnSystem } from '../systems/TurnSystem';
 import {
   GAME_CONFIG,
   type ControllerKind,
+  type PlayerProfile,
   type ImpactResult,
   type MatchState,
   type PlayerId,
@@ -69,6 +70,12 @@ export class GameScene extends Phaser.Scene {
   private aiHasFired = false;
   private aiShopElapsedMs = 0;
   private pendingControllers: ControllerKind[] = ['human', 'cpu-veteran'];
+  private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
+
+  // Tentative shop purchases for the current shopper. Committed on ENTER,
+  // discarded on ESC. Keys: weapon ids + 'parachute' + 'shield'.
+  private pendingShopBuys: Record<string, number> = {};
+  private pendingShopHistory: string[] = [];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -79,15 +86,20 @@ export class GameScene extends Phaser.Scene {
   private parachuteBuyKey!: Phaser.Input.Keyboard.Key;
   private shieldBuyKey!: Phaser.Input.Keyboard.Key;
   private soundToggleKey!: Phaser.Input.Keyboard.Key;
+  private escapeKey!: Phaser.Input.Keyboard.Key;
+  private backspaceKey!: Phaser.Input.Keyboard.Key;
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
 
   constructor() {
     super('GameScene');
   }
 
-  init(data: { controllers?: ControllerKind[] }): void {
+  init(data: { controllers?: ControllerKind[]; roundsToWin?: number }): void {
     if (data?.controllers && data.controllers.length >= 2) {
       this.pendingControllers = data.controllers;
+    }
+    if (typeof data?.roundsToWin === 'number' && data.roundsToWin >= 1) {
+      this.pendingRoundsToWin = data.roundsToWin;
     }
   }
 
@@ -127,7 +139,7 @@ export class GameScene extends Phaser.Scene {
     this.hudSystem = new HudSystem(this);
     this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState(this.pendingControllers);
+    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin);
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -139,6 +151,8 @@ export class GameScene extends Phaser.Scene {
     this.parachuteBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     this.shieldBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.soundToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F10);
+    this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.backspaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.BACKSPACE);
     const numberKeyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
       Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -163,6 +177,8 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.S,
       Phaser.Input.Keyboard.KeyCodes.V,
       Phaser.Input.Keyboard.KeyCodes.F10,
+      Phaser.Input.Keyboard.KeyCodes.ESC,
+      Phaser.Input.Keyboard.KeyCodes.BACKSPACE,
       ...numberKeyCodes
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
@@ -178,6 +194,13 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.soundToggleKey)) {
       soundSystem.toggle();
       this.renderTanksAndHud();
+    }
+
+    // Escape hatch: ESC returns to the main menu from any phase. Pending
+    // shop purchases (if any) are discarded.
+    if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
+      this.returnToMenu();
+      return;
     }
 
     if (this.turn.phase === 'matchOver') {
@@ -367,10 +390,93 @@ export class GameScene extends Phaser.Scene {
     this.match.shopVisitsRemaining = this.match.profiles.length;
     this.turn.phase = 'shopping';
     this.statusMessage = null;
+    this.clearPendingShop();
     this.renderAll();
   }
 
+  private returnToMenu(): void {
+    soundSystem.playUiClick();
+    this.scene.start('MenuScene');
+  }
+
+  // -------- PENDING SHOP HELPERS --------
+
+  private pendingPriceFor(key: string): number {
+    if (key === 'parachute') return GAME_CONFIG.match.parachutePrice;
+    if (key === 'shield') return GAME_CONFIG.match.shieldPrice;
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === key);
+    return weapon?.price ?? 0;
+  }
+
+  private totalPendingCost(): number {
+    let total = 0;
+    for (const [k, qty] of Object.entries(this.pendingShopBuys)) {
+      total += qty * this.pendingPriceFor(k);
+    }
+    return total;
+  }
+
+  /**
+   * Returns the player's "effective" cash — what's left after applying every
+   * pending purchase in the cart, so the shop overlay's running balance and
+   * affordability checks both stay consistent.
+   */
+  effectiveCash(profile: PlayerProfile): number {
+    return profile.cash - this.totalPendingCost();
+  }
+
+  /** Pending count of an item — what's in the cart but not yet committed. */
+  pendingFor(key: string): number {
+    return this.pendingShopBuys[key] ?? 0;
+  }
+
+  /**
+   * Try to add one unit to the shopping cart. Returns true if it fit within
+   * the shopper's remaining cash budget. Free items (price 0) are rejected
+   * because they aren't purchasable anyway (the unlimited Small Missile).
+   */
+  private tryQueueShopBuy(profile: PlayerProfile, key: string, price: number): boolean {
+    if (price <= 0) return false;
+    if (this.effectiveCash(profile) < price) return false;
+    this.pendingShopBuys[key] = (this.pendingShopBuys[key] ?? 0) + 1;
+    this.pendingShopHistory.push(key);
+    return true;
+  }
+
+  private undoLastShopBuy(): boolean {
+    const last = this.pendingShopHistory.pop();
+    if (!last) return false;
+    const next = (this.pendingShopBuys[last] ?? 0) - 1;
+    if (next <= 0) delete this.pendingShopBuys[last];
+    else this.pendingShopBuys[last] = next;
+    return true;
+  }
+
+  private clearPendingShop(): void {
+    this.pendingShopBuys = {};
+    this.pendingShopHistory = [];
+  }
+
+  private commitPendingShop(profile: PlayerProfile): void {
+    for (const [key, qty] of Object.entries(this.pendingShopBuys)) {
+      const cost = qty * this.pendingPriceFor(key);
+      profile.cash -= cost;
+      if (key === 'parachute') profile.parachutes += qty;
+      else if (key === 'shield') profile.shields += qty;
+      else {
+        if (profile.ammo[key] === -1) profile.ammo[key] = 0;
+        profile.ammo[key] = (profile.ammo[key] ?? 0) + qty;
+      }
+    }
+    this.clearPendingShop();
+  }
+
   private finishShoppingForCurrentPlayer(): void {
+    // Note: caller is responsible for either commitPendingShop or
+    // clearPendingShop BEFORE calling this. We always clear pending here
+    // after transitioning to make sure stale buys don't leak between
+    // shoppers.
+    this.clearPendingShop();
     this.match.shopVisitsRemaining -= 1;
     if (this.match.shopVisitsRemaining <= 0) {
       this.match.shoppingPlayerId = null;
@@ -452,10 +558,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
         const weapon = GAME_CONFIG.weapons[i];
-        if (weapon.price > 0 && profile.cash >= weapon.price) {
-          profile.cash -= weapon.price;
-          if (profile.ammo[weapon.id] === -1) profile.ammo[weapon.id] = 0;
-          profile.ammo[weapon.id] += 1;
+        if (this.tryQueueShopBuy(profile, weapon.id, weapon.price)) {
           soundSystem.playUiSelect();
           changed = true;
         }
@@ -463,26 +566,28 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.parachuteBuyKey)) {
-      const price = GAME_CONFIG.match.parachutePrice;
-      if (profile.cash >= price) {
-        profile.cash -= price;
-        profile.parachutes += 1;
+      if (this.tryQueueShopBuy(profile, 'parachute', GAME_CONFIG.match.parachutePrice)) {
         soundSystem.playUiSelect();
         changed = true;
       }
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.shieldBuyKey)) {
-      const price = GAME_CONFIG.match.shieldPrice;
-      if (profile.cash >= price) {
-        profile.cash -= price;
-        profile.shields += 1;
+      if (this.tryQueueShopBuy(profile, 'shield', GAME_CONFIG.match.shieldPrice)) {
         soundSystem.playUiSelect();
         changed = true;
       }
     }
 
+    if (Phaser.Input.Keyboard.JustDown(this.backspaceKey)) {
+      if (this.undoLastShopBuy()) {
+        soundSystem.playUiClick();
+        changed = true;
+      }
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.commitPendingShop(profile);
       soundSystem.playUiClick();
       this.finishShoppingForCurrentPlayer();
       return true;
@@ -521,6 +626,13 @@ export class GameScene extends Phaser.Scene {
   private handleAimingPointer(x: number, y: number): void {
     const top = GAME_CONFIG.layout.consoleTop;
     const activeTank = this.tanks[this.turn.activePlayerId];
+
+    // ESC: MENU button in bottom strip (820..950, stripY+2..+24)
+    const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+    if (x >= 820 && x <= 950 && y >= stripY + 2 && y <= stripY + 24) {
+      this.returnToMenu();
+      return;
+    }
 
     // FIRE button (drawn at x=386..496, y=top+8..top+44).
     if (x >= 386 && x <= 496 && y >= top + 8 && y <= top + 44) {
@@ -585,15 +697,12 @@ export class GameScene extends Phaser.Scene {
     const listYStart = panelY + 158; // header row at +130, first weapon row at +158
     const rowH = 24;
 
-    // Weapon rows (8 weapons)
+    // Weapon rows (8 weapons) — clicking adds to pending cart
     for (let i = 0; i < GAME_CONFIG.weapons.length; i += 1) {
       const rowY = listYStart + i * rowH;
       if (x >= listX && x <= listX + 500 && y >= rowY - 4 && y < rowY + rowH - 4) {
         const weapon = GAME_CONFIG.weapons[i];
-        if (weapon.price > 0 && profile.cash >= weapon.price) {
-          profile.cash -= weapon.price;
-          if (profile.ammo[weapon.id] === -1) profile.ammo[weapon.id] = 0;
-          profile.ammo[weapon.id] += 1;
+        if (this.tryQueueShopBuy(profile, weapon.id, weapon.price)) {
           soundSystem.playUiSelect();
           this.renderAll();
         }
@@ -604,10 +713,7 @@ export class GameScene extends Phaser.Scene {
     // Parachute row (next after weapons)
     const chuteY = listYStart + GAME_CONFIG.weapons.length * rowH + 8;
     if (x >= listX && x <= listX + 500 && y >= chuteY - 4 && y < chuteY + rowH - 4) {
-      const price = GAME_CONFIG.match.parachutePrice;
-      if (profile.cash >= price) {
-        profile.cash -= price;
-        profile.parachutes += 1;
+      if (this.tryQueueShopBuy(profile, 'parachute', GAME_CONFIG.match.parachutePrice)) {
         soundSystem.playUiSelect();
         this.renderAll();
       }
@@ -617,19 +723,26 @@ export class GameScene extends Phaser.Scene {
     // Shield row (after parachute)
     const shieldY = chuteY + rowH;
     if (x >= listX && x <= listX + 500 && y >= shieldY - 4 && y < shieldY + rowH - 4) {
-      const price = GAME_CONFIG.match.shieldPrice;
-      if (profile.cash >= price) {
-        profile.cash -= price;
-        profile.shields += 1;
+      if (this.tryQueueShopBuy(profile, 'shield', GAME_CONFIG.match.shieldPrice)) {
         soundSystem.playUiSelect();
         this.renderAll();
       }
       return;
     }
 
-    // Finish button (bottom-right area of the overlay)
-    const finishY = panelY + panelH - 50;
-    if (y >= finishY) {
+    // Undo button — small button left of Finish
+    const undoY = panelY + panelH - 50;
+    if (x >= listX && x <= listX + 160 && y >= undoY) {
+      if (this.undoLastShopBuy()) {
+        soundSystem.playUiClick();
+        this.renderAll();
+      }
+      return;
+    }
+
+    // Finish/checkout button (bottom-right area of the overlay)
+    if (y >= undoY) {
+      this.commitPendingShop(profile);
       soundSystem.playUiClick();
       this.finishShoppingForCurrentPlayer();
     }
@@ -868,7 +981,12 @@ export class GameScene extends Phaser.Scene {
       this.activeWeapon(),
       this.match,
       this.statusMessage,
-      this.visualSystem
+      this.visualSystem,
+      {
+        pendingFor: (key) => this.pendingFor(key),
+        effectiveCash: (p) => this.effectiveCash(p as PlayerProfile),
+        hasPending: () => Object.keys(this.pendingShopBuys).length > 0
+      }
     );
   }
 
