@@ -7,7 +7,11 @@ import { GAME_CONFIG } from './types/GameTypes';
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: document.body,
-  pixelArt: true,
+  // Anti-aliased rendering looks better at fractional CSS scales than the
+  // previous pixelArt: true nearest-neighbor upscale. The retro pixel
+  // sprite system (currently hidden) would need its own per-texture
+  // NEAREST filter if it ever comes back.
+  antialias: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
