@@ -9,6 +9,11 @@ export class TankSystem {
     return tankXs.map((x, index) => {
       const id = index as PlayerId;
 
+      const ammo: Record<string, number> = {};
+      GAME_CONFIG.weapons.forEach((weapon) => {
+        ammo[weapon.id] = weapon.startingAmmo;
+      });
+
       return {
         id,
         x,
@@ -19,7 +24,9 @@ export class TankSystem {
         health: GAME_CONFIG.tank.maxHealth,
         angle: GAME_CONFIG.aiming.initialAngles[id],
         power: GAME_CONFIG.aiming.initialPower,
-        alive: true
+        alive: true,
+        ammo,
+        selectedWeaponIndex: 0
       };
     });
   }

@@ -56,9 +56,9 @@ export class HudSystem {
     this.graphics.fillRect(710, top + 18, 238, 128);
 
     this.drawFireButton(top);
-    this.drawWeaponList(top);
+    this.drawWeaponList(top, activeTank);
     this.drawAimPowerPanel(activeTank, turn.phase, top);
-    this.drawSelectedWeapon(weapon, top);
+    this.drawSelectedWeapon(weapon, activeTank, top);
     this.drawLogo(top);
 
     const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
@@ -77,26 +77,29 @@ export class HudSystem {
     this.addText(406, top + 12, 'Fire', GAME_CONFIG.colors.red, GAME_CONFIG.font.title);
   }
 
-  private drawWeaponList(top: number): void {
-    const rows = [
-      ['1', 'Small Missile', '10'],
-      ['2', 'Big Missile', '20'],
-      ['3', 'Triple Missile', '30'],
-      ['4', 'Huge Missile', '40'],
-      ['5', 'Dirt Mover', '25'],
-      ['6', 'Bouncing Bomb', '30'],
-      ['7', 'Bullet', '10'],
-      ['8', 'Stream', '20']
-    ];
-
+  private drawWeaponList(top: number, activeTank: TankState): void {
     this.addText(20, top + 20, 'Weapon', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
-    this.addText(210, top + 20, 'Move  4', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
+    this.addText(210, top + 20, '1-8 Select', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
 
     const rowStep = 13;
-    rows.forEach(([key, name, ammo], index) => {
-      const color = index === 0 ? GAME_CONFIG.colors.white : 0x9c9c9c;
-      this.addText(20, top + 38 + index * rowStep, `${key} ${name}`, color, GAME_CONFIG.font.small);
-      this.addText(258, top + 38 + index * rowStep, ammo, color, GAME_CONFIG.font.small);
+    GAME_CONFIG.weapons.forEach((weapon, index) => {
+      const count = activeTank.ammo[weapon.id];
+      const isSelected = activeTank.selectedWeaponIndex === index;
+      const isEmpty = count === 0;
+      const labelColor = isSelected
+        ? GAME_CONFIG.colors.yellow
+        : isEmpty
+          ? GAME_CONFIG.colors.dimGray
+          : GAME_CONFIG.colors.white;
+
+      if (isSelected) {
+        this.graphics.fillStyle(GAME_CONFIG.colors.panelDark, 1);
+        this.graphics.fillRect(14, top + 36 + index * rowStep, 282, rowStep);
+      }
+
+      const ammoText = count === -1 ? '--' : `${count}`;
+      this.addText(20, top + 38 + index * rowStep, `${index + 1} ${weapon.name}`, labelColor, GAME_CONFIG.font.small);
+      this.addText(258, top + 38 + index * rowStep, ammoText, labelColor, GAME_CONFIG.font.small);
     });
   }
 
@@ -116,19 +119,41 @@ export class HudSystem {
     this.graphics.fillRect(346, top + 118, activeTank.power * 1.7, 8);
   }
 
-  private drawSelectedWeapon(weapon: WeaponDefinition, top: number): void {
+  private drawSelectedWeapon(weapon: WeaponDefinition, activeTank: TankState, top: number): void {
     this.addText(583, top + 46, 'Weapon', GAME_CONFIG.colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(562, top + 76, weapon.name, GAME_CONFIG.colors.white, GAME_CONFIG.font.tiny);
-    this.graphics.fillStyle(GAME_CONFIG.colors.magenta, 1);
-    this.graphics.fillRect(614, top + 96, 14, 24);
+
+    const nameX = 621 - Math.min(weapon.name.length, 16) * 3;
+    this.addText(nameX, top + 74, weapon.name, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+
+    const bodyColor = this.weaponIconBodyColor(weapon);
+    this.graphics.fillStyle(bodyColor, 1);
+    this.graphics.fillRect(614, top + 96, 14, 22);
     this.graphics.lineStyle(2, GAME_CONFIG.colors.white, 1);
     this.graphics.beginPath();
-    this.graphics.moveTo(614, top + 120);
-    this.graphics.lineTo(604, top + 130);
-    this.graphics.moveTo(628, top + 120);
-    this.graphics.lineTo(638, top + 130);
+    this.graphics.moveTo(614, top + 118);
+    this.graphics.lineTo(604, top + 128);
+    this.graphics.moveTo(628, top + 118);
+    this.graphics.lineTo(638, top + 128);
     this.graphics.strokePath();
-    this.addText(608, top + 132, weapon.ammoLabel, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.tiny);
+
+    const ammo = activeTank.ammo[weapon.id];
+    const ammoText = ammo === -1 ? 'UNLIMITED' : `AMMO ${ammo}`;
+    this.addText(580, top + 134, ammoText, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+  }
+
+  private weaponIconBodyColor(weapon: WeaponDefinition): number {
+    switch (weapon.behavior) {
+      case 'dirt':
+        return GAME_CONFIG.colors.darkGreen;
+      case 'bounce':
+        return GAME_CONFIG.colors.green;
+      case 'split':
+        return GAME_CONFIG.colors.cyan;
+      case 'salvo':
+        return GAME_CONFIG.colors.red;
+      default:
+        return GAME_CONFIG.colors.magenta;
+    }
   }
 
   private drawLogo(top: number): void {

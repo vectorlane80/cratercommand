@@ -79,6 +79,26 @@ export class TerrainSystem {
     }
   }
 
+  applyMound(terrainData: TerrainData, x: number, y: number, radius: number): void {
+    const { heights, segmentWidth } = terrainData;
+    const centerIndex = Math.round(x / segmentWidth);
+    const sampleRadius = Math.ceil(radius / segmentWidth);
+
+    for (let index = centerIndex - sampleRadius; index <= centerIndex + sampleRadius; index += 1) {
+      if (index < 0 || index >= heights.length) continue;
+
+      const sampleX = index * segmentWidth;
+      const dx = sampleX - x;
+      if (Math.abs(dx) > radius) continue;
+
+      const domeHeight = Math.sqrt(radius * radius - dx * dx);
+      const liftedY = y - domeHeight;
+      heights[index] = Phaser.Math.Clamp(Math.min(heights[index], liftedY), GAME_CONFIG.terrain.minY, GAME_CONFIG.terrain.craterMaxY);
+    }
+
+    this.relaxCraterEdges(terrainData, centerIndex, sampleRadius + 4);
+  }
+
   applyCrater(terrainData: TerrainData, x: number, y: number, radius: number): void {
     const { heights, segmentWidth } = terrainData;
     const centerIndex = Math.round(x / segmentWidth);

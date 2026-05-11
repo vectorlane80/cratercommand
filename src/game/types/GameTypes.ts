@@ -1,6 +1,7 @@
 export type PlayerId = 0 | 1;
 export type GamePhase = 'aiming' | 'projectileInFlight' | 'resolvingImpact' | 'gameOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo';
 
 export interface TerrainData {
   heights: number[];
@@ -20,15 +21,25 @@ export interface TankState {
   angle: number;
   power: number;
   alive: boolean;
+  ammo: Record<string, number>;
+  selectedWeaponIndex: number;
 }
 
 export interface WeaponDefinition {
   id: string;
   name: string;
-  ammoLabel: string;
+  startingAmmo: number; // -1 means unlimited
   damage: number;
   craterRadius: number;
   projectileSpeedScale: number;
+  behavior: WeaponBehavior;
+  splitCount?: number;
+  splitAngleSpread?: number;
+  bounceCount?: number;
+  salvoCount?: number;
+  salvoAngleSpread?: number;
+  salvoPowerSpread?: number;
+  moundRadius?: number;
 }
 
 export interface ProjectileState {
@@ -40,6 +51,8 @@ export interface ProjectileState {
   velocityY: number;
   trail: Array<{ x: number; y: number }>;
   ageMs: number;
+  bouncesLeft?: number;
+  hasSplit?: boolean;
 }
 
 export interface WindState {
@@ -85,7 +98,8 @@ export const GAME_CONFIG = {
     yellow: 0xffee33,
     red: 0xe43d21,
     blue: 0x0837ff,
-    purple: 0x79217d
+    purple: 0x79217d,
+    dimGray: 0x707070
   },
   font: {
     family: 'Courier New, monospace',
@@ -126,7 +140,7 @@ export const GAME_CONFIG = {
     gravity: 138,
     windAccelerationScale: 0.55,
     trailSpacingMs: 70,
-    maxAgeMs: 12000,
+    maxAgeMs: 14000,
     launchSpeedBase: 80
   },
   wind: {
@@ -137,10 +151,81 @@ export const GAME_CONFIG = {
     {
       id: 'small-missile',
       name: 'Small Missile',
-      ammoLabel: '10',
+      startingAmmo: -1,
       damage: 35,
       craterRadius: 25,
-      projectileSpeedScale: 1
+      projectileSpeedScale: 1,
+      behavior: 'single'
+    },
+    {
+      id: 'big-missile',
+      name: 'Big Missile',
+      startingAmmo: 8,
+      damage: 55,
+      craterRadius: 38,
+      projectileSpeedScale: 1,
+      behavior: 'single'
+    },
+    {
+      id: 'triple-missile',
+      name: 'Triple Missile',
+      startingAmmo: 6,
+      damage: 30,
+      craterRadius: 22,
+      projectileSpeedScale: 1,
+      behavior: 'split',
+      splitCount: 3,
+      splitAngleSpread: 18
+    },
+    {
+      id: 'huge-missile',
+      name: 'Huge Missile',
+      startingAmmo: 3,
+      damage: 90,
+      craterRadius: 60,
+      projectileSpeedScale: 1,
+      behavior: 'single'
+    },
+    {
+      id: 'dirt-mover',
+      name: 'Dirt Mover',
+      startingAmmo: 4,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'dirt',
+      moundRadius: 42
+    },
+    {
+      id: 'bouncing-bomb',
+      name: 'Bouncing Bomb',
+      startingAmmo: 5,
+      damage: 50,
+      craterRadius: 32,
+      projectileSpeedScale: 1,
+      behavior: 'bounce',
+      bounceCount: 1
+    },
+    {
+      id: 'bullet',
+      name: 'Bullet',
+      startingAmmo: 12,
+      damage: 22,
+      craterRadius: 12,
+      projectileSpeedScale: 1.7,
+      behavior: 'single'
+    },
+    {
+      id: 'stream',
+      name: 'Stream',
+      startingAmmo: 4,
+      damage: 18,
+      craterRadius: 14,
+      projectileSpeedScale: 0.95,
+      behavior: 'salvo',
+      salvoCount: 5,
+      salvoAngleSpread: 5,
+      salvoPowerSpread: 12
     }
   ] satisfies WeaponDefinition[]
 } as const;
