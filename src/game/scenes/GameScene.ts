@@ -140,11 +140,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (Phaser.Input.Keyboard.JustDown(this.visualToggleKey)) {
-      this.toggleVisualSystem();
-      return;
-    }
-
     if (this.turn.phase === 'matchOver') {
       if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
         this.scene.restart();
