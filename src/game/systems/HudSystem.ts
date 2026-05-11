@@ -131,9 +131,10 @@ export class HudSystem {
     }
 
     // Fall-event toast — sits at the top-center under the player cards so
-    // chute deployments and fall damage are unmissable. GameScene clears
-    // the toast when expired, so we render it whenever it's non-null.
-    if (topToast && !quitConfirm) {
+    // chute deployments and fall damage are unmissable. Suppressed during
+    // the shop and round-over screens (those have their own panels covering
+    // the area) and behind the forfeit-confirm modal.
+    if (topToast && !quitConfirm && !inShop && turn.phase !== 'roundOver' && !matchOver) {
       const labelW = topToast.text.length * 11;
       const x = (GAME_CONFIG.width - labelW) / 2;
       const y = 96;

@@ -433,6 +433,9 @@ export class GameScene extends Phaser.Scene {
     this.statusMessage = null;
     this.clearPendingShop();
     this.rollShopSale();
+    // Drop any lingering fall toast from the round that just ended so it
+    // doesn't bleed into the shop overlay.
+    this.topToast = null;
     this.renderAll();
   }
 
