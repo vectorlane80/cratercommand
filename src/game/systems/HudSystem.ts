@@ -88,7 +88,8 @@ export class HudSystem {
     statusMessage: string | null,
     visualSystem: VisualSystem = 'classic',
     pendingShop: ShopPending = EMPTY_SHOP_PENDING,
-    topToast: { text: string; color: number } | null = null
+    topToast: { text: string; color: number } | null = null,
+    quitConfirm = false
   ): void {
     this.currentPendingShop = pendingShop;
     this.clearTexts();
@@ -132,7 +133,7 @@ export class HudSystem {
     // Fall-event toast — sits at the top-center under the player cards so
     // chute deployments and fall damage are unmissable. GameScene clears
     // the toast when expired, so we render it whenever it's non-null.
-    if (topToast) {
+    if (topToast && !quitConfirm) {
       const labelW = topToast.text.length * 11;
       const x = (GAME_CONFIG.width - labelW) / 2;
       const y = 96;
@@ -142,6 +143,75 @@ export class HudSystem {
       this.graphics.strokeRect(x - 10, y - 4, labelW + 20, 26);
       this.addText(x, y, topToast.text, topToast.color, GAME_CONFIG.font.medium);
     }
+
+    // Forfeit-confirm modal — drawn LAST so it covers everything else.
+    if (quitConfirm) {
+      this.drawQuitConfirmModal();
+    }
+  }
+
+  /**
+   * Forfeit-to-menu modal. Full-screen dim backdrop with a centered card
+   * carrying the warning and YES/NO buttons. Geometry matches
+   * GameScene.handleQuitConfirmPointer.
+   */
+  private drawQuitConfirmModal(): void {
+    const colors = GAME_CONFIG.colors;
+    const W = GAME_CONFIG.width;
+    const H = GAME_CONFIG.height;
+
+    // Hard-dim everything behind so the modal demands attention.
+    this.graphics.fillStyle(colors.black, 0.85);
+    this.graphics.fillRect(0, 0, W, H);
+
+    // Centered card
+    const cardW = 620;
+    const cardH = 240;
+    const cardX = (W - cardW) / 2;
+    const cardY = (H - cardH) / 2;
+    this.graphics.fillStyle(colors.panelGray, 1);
+    this.graphics.fillRect(cardX, cardY, cardW, cardH);
+    this.graphics.lineStyle(4, colors.red, 1);
+    this.graphics.strokeRect(cardX, cardY, cardW, cardH);
+
+    // Heading
+    this.addText(cardX + 158, cardY + 20, 'FORFEIT MATCH?', colors.red, GAME_CONFIG.font.title);
+
+    // Body — two lines so the long sentence wraps cleanly.
+    this.addText(
+      cardX + 30,
+      cardY + 78,
+      'Are you sure you want to return to the menu?',
+      colors.white,
+      GAME_CONFIG.font.medium
+    );
+    this.addText(
+      cardX + 30,
+      cardY + 110,
+      'This will count as a forfeit.',
+      colors.yellow,
+      GAME_CONFIG.font.medium
+    );
+
+    // Buttons (must match handleQuitConfirmPointer geometry)
+    const cx = W / 2;
+    const btnY = 320;
+    const btnH = 48;
+    const btnW = 140;
+    const yesX = cx - btnW - 20;
+    const noX = cx + 20;
+
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(yesX, btnY, btnW, btnH);
+    this.graphics.lineStyle(3, colors.red, 1);
+    this.graphics.strokeRect(yesX, btnY, btnW, btnH);
+    this.addText(yesX + 28, btnY + 12, 'YES (Y)', colors.red, GAME_CONFIG.font.large);
+
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(noX, btnY, btnW, btnH);
+    this.graphics.lineStyle(3, colors.green, 1);
+    this.graphics.strokeRect(noX, btnY, btnW, btnH);
+    this.addText(noX + 36, btnY + 12, 'NO (N)', colors.green, GAME_CONFIG.font.large);
   }
 
   private drawFullScreenBackdrop(): void {

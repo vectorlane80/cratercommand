@@ -78,13 +78,15 @@ export class GameScene extends Phaser.Scene {
   private pendingShopBuys: Record<string, number> = {};
   private pendingShopHistory: string[] = [];
 
-  // Ephemeral top-banner toast for fall events and ESC confirmation prompts.
-  // Lives ~2s so the human can see it. Cleared lazily during render.
+  // Ephemeral top-banner toast for fall events. Lives ~2s so the human can
+  // see it. Cleared lazily during render.
   private topToast: { text: string; color: number; expiresAt: number } | null = null;
 
-  // Two-step ESC: first press primes; second press within ESC_PRIME_MS quits.
-  private escapePrimed = false;
-  private escapePrimeTimer: number | null = null;
+  // Forfeit-to-menu confirmation. When true, a full-screen modal blocks all
+  // other input until the player picks YES or NO.
+  private quitConfirmActive = false;
+  private yesKey!: Phaser.Input.Keyboard.Key;
+  private noKey!: Phaser.Input.Keyboard.Key;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -163,6 +165,8 @@ export class GameScene extends Phaser.Scene {
     this.soundToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F10);
     this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.backspaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.BACKSPACE);
+    this.yesKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
+    this.noKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.N);
     const numberKeyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
       Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -189,6 +193,8 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.F10,
       Phaser.Input.Keyboard.KeyCodes.ESC,
       Phaser.Input.Keyboard.KeyCodes.BACKSPACE,
+      Phaser.Input.Keyboard.KeyCodes.Y,
+      Phaser.Input.Keyboard.KeyCodes.N,
       ...numberKeyCodes
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
@@ -206,31 +212,33 @@ export class GameScene extends Phaser.Scene {
       this.renderTanksAndHud();
     }
 
-    // Escape hatch: two-step ESC to return to the main menu. First ESC
-    // arms the prompt for ~2s; a second ESC in that window commits.
-    // Pending shop purchases (if any) are discarded on commit.
-    if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
-      if (this.escapePrimed) {
+    // Forfeit-confirm modal. When the modal is open it owns all input —
+    // Y / Enter / click YES = forfeit, N / Esc / click NO = dismiss.
+    if (this.quitConfirmActive) {
+      if (
+        Phaser.Input.Keyboard.JustDown(this.yesKey) ||
+        Phaser.Input.Keyboard.JustDown(this.enterKey)
+      ) {
         this.returnToMenu();
         return;
       }
-      this.escapePrimed = true;
-      this.topToast = {
-        text: 'PRESS ESC AGAIN TO QUIT TO MENU',
-        color: GAME_CONFIG.colors.yellow,
-        expiresAt: Date.now() + 2500
-      };
-      if (this.escapePrimeTimer !== null) window.clearTimeout(this.escapePrimeTimer);
-      this.escapePrimeTimer = window.setTimeout(() => {
-        this.escapePrimed = false;
-        this.escapePrimeTimer = null;
-        // Clear the toast IF it was the ESC-prime one (don't stomp on a
-        // fall toast that fired after).
-        if (this.topToast && this.topToast.text.startsWith('PRESS ESC AGAIN')) {
-          this.topToast = null;
-        }
+      if (
+        Phaser.Input.Keyboard.JustDown(this.noKey) ||
+        Phaser.Input.Keyboard.JustDown(this.escapeKey) ||
+        Phaser.Input.Keyboard.JustDown(this.spaceKey)
+      ) {
+        this.quitConfirmActive = false;
+        soundSystem.playUiClick();
         this.renderTanksAndHud();
-      }, 2500);
+        return;
+      }
+      // Block all other input while the modal is up.
+      return;
+    }
+
+    // ESC anywhere opens the forfeit-confirm modal.
+    if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
+      this.quitConfirmActive = true;
       soundSystem.playUiClick();
       this.renderTanksAndHud();
       return;
@@ -686,6 +694,11 @@ export class GameScene extends Phaser.Scene {
    * the canvas's actual screen size).
    */
   private handlePointerDown(x: number, y: number): void {
+    // Forfeit-confirm modal owns the pointer when open.
+    if (this.quitConfirmActive) {
+      this.handleQuitConfirmPointer(x, y);
+      return;
+    }
     if (this.turn.phase === 'matchOver') {
       this.scene.restart();
       return;
@@ -702,6 +715,33 @@ export class GameScene extends Phaser.Scene {
       this.handleAimingPointer(x, y);
       return;
     }
+  }
+
+  /**
+   * Modal hit-test: two buttons centered side by side. Geometry must match
+   * HudSystem.drawQuitConfirm so taps line up with the rendered buttons.
+   */
+  private handleQuitConfirmPointer(x: number, y: number): void {
+    const cx = GAME_CONFIG.width / 2;
+    const btnY = 320;
+    const btnH = 48;
+    const btnW = 140;
+    // YES button is left, NO button is right.
+    const yesX = cx - btnW - 20;
+    const noX = cx + 20;
+    if (y >= btnY && y < btnY + btnH) {
+      if (x >= yesX && x < yesX + btnW) {
+        this.returnToMenu();
+        return;
+      }
+      if (x >= noX && x < noX + btnW) {
+        this.quitConfirmActive = false;
+        soundSystem.playUiClick();
+        this.renderTanksAndHud();
+        return;
+      }
+    }
+    // Taps outside the buttons do nothing — modal remains open.
   }
 
   private handleAimingPointer(x: number, y: number): void {
@@ -1122,7 +1162,8 @@ export class GameScene extends Phaser.Scene {
         saleItem: () => this.match.currentSale?.itemKey ?? null,
         saleDiscount: () => this.match.currentSale?.discount ?? 0
       },
-      this.topToast
+      this.topToast,
+      this.quitConfirmActive
     );
   }
 
