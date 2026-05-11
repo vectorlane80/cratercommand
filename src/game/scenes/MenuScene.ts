@@ -14,7 +14,11 @@ type Slot = ControllerKind | undefined;
 export interface MenuResult {
   controllers: ControllerKind[];
   roundsToWin: number;
+  /** Parallel to controllers — null means "use default (PLAYER N)". */
+  names: Array<string | null>;
 }
+
+const MAX_NAME_LEN = 12;
 
 const MATCH_LENGTHS: Array<{ label: string; roundsToWin: number }> = [
   { label: 'BEST OF 3', roundsToWin: 2 },
@@ -27,6 +31,10 @@ const SLOT_CYCLE_OPTIONAL: Array<ControllerKind | undefined> = [undefined, ...CO
 
 export class MenuScene extends Phaser.Scene {
   private slots: Slot[] = ['human', 'cpu-veteran', undefined, undefined];
+  // Per-slot display names. null means "use default (PLAYER N)". Set via
+  // tap on the label to the left of the controller box, which fires
+  // window.prompt() for input.
+  private names: Array<string | null> = [null, null, null, null];
   private matchLengthIndex = 0; // index into MATCH_LENGTHS, default first
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
@@ -91,8 +99,38 @@ export class MenuScene extends Phaser.Scene {
     this.matchLengthIndex = (this.matchLengthIndex + 1) % MATCH_LENGTHS.length;
   }
 
+  /**
+   * Open a browser prompt asking for a display name for slot `idx`.
+   * Empty / cancelled → revert to default. Names are trimmed and capped
+   * at MAX_NAME_LEN characters to keep them fitting in the HUD.
+   */
+  private promptForName(idx: number): void {
+    const current = this.names[idx] ?? '';
+    const input = window.prompt(`Name for Player ${idx + 1} (leave blank for default):`, current);
+    if (input === null) return; // cancelled
+    const trimmed = input.trim().slice(0, MAX_NAME_LEN);
+    this.names[idx] = trimmed.length > 0 ? trimmed : null;
+    soundSystem.playUiClick();
+    this.render();
+  }
+
   private handlePointerDown(x: number, y: number): void {
+    // Player NAME label area sits to the LEFT of each controller box. Tapping
+    // there opens a prompt to set a display name. We check this BEFORE the
+    // controller-cycle box test below so the regions don't conflict.
     const rows = this.slotRowRects();
+    for (let i = 0; i < rows.length; i += 1) {
+      const r = rows[i];
+      const labelHit = x >= 100 && x < r.x && y >= r.y && y <= r.y + r.h;
+      if (labelHit) {
+        if (i >= 2 && this.slots[i] === undefined) {
+          // Empty slot — name input doesn't make sense yet.
+          return;
+        }
+        this.promptForName(i);
+        return;
+      }
+    }
     for (let i = 0; i < rows.length; i += 1) {
       const r = rows[i];
       if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
@@ -148,6 +186,15 @@ export class MenuScene extends Phaser.Scene {
     return this.slots.filter((c): c is ControllerKind => c !== undefined);
   }
 
+  /** Names parallel to participants() — same length, same order. */
+  private participantNames(): Array<string | null> {
+    const out: Array<string | null> = [];
+    this.slots.forEach((slot, i) => {
+      if (slot !== undefined) out.push(this.names[i] ?? null);
+    });
+    return out;
+  }
+
   private canStart(): boolean {
     const active = this.participants();
     if (active.length < 2) return false;
@@ -158,6 +205,7 @@ export class MenuScene extends Phaser.Scene {
   private startMatch(): void {
     const result: MenuResult = {
       controllers: this.participants(),
+      names: this.participantNames(),
       roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin
     };
     this.scene.start('GameScene', result);
@@ -186,9 +234,9 @@ export class MenuScene extends Phaser.Scene {
 
     // Hint
     this.addText(
-      GAME_CONFIG.width / 2 - 254,
+      GAME_CONFIG.width / 2 - 310,
       318,
-      '1-4 cycles controllers   ·   B cycles match length',
+      'Tap name to rename · Tap box to cycle controller · B = match length',
       colors.white,
       GAME_CONFIG.font.small
     );
@@ -225,7 +273,7 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private drawSlotRow(_idx: number, y: number, label: string, slot: Slot, accent: number, optional: boolean): void {
+  private drawSlotRow(idx: number, y: number, label: string, slot: Slot, accent: number, optional: boolean): void {
     const colors = GAME_CONFIG.colors;
     const boxX = 280;
     const boxY = y - 6;
@@ -237,7 +285,12 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.lineStyle(2, accent, 1);
     this.graphics.strokeRect(boxX, boxY, boxW, boxH);
 
-    this.addText(120, y, label, accent, GAME_CONFIG.font.large);
+    // Player label is either the default "PLAYER N" or the custom name.
+    // Tappable area is x=100..280 (handlePointerDown).
+    const customName = this.names[idx];
+    const displayName = customName ?? label;
+    this.addText(120, y, displayName, accent, GAME_CONFIG.font.large);
+
     if (slot === undefined) {
       this.addText(boxX + 16, y + 4, optional ? '— EMPTY —' : '???', colors.dimGray, GAME_CONFIG.font.medium);
     } else {

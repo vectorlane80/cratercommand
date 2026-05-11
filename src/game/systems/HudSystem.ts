@@ -21,14 +21,14 @@ export const SHOP_LAYOUT = {
   panelY: 40,
   panelW: 800,
   panelH: 460,
-  listYStart: 40 + 130 + 30, // panelY + 130 (header) + 30 (column-header row)
-  rowH: 28,
+  listYStart: 40 + 130 + 26, // panelY + 130 (header) + 26 (column-header row gap)
+  rowH: 24,
   weaponCount: 8,
   parachuteGap: 6,
   colMinus: 80 + 500,
   colPlus: 80 + 610,
   buttonW: 32,
-  buttonH: 24,
+  buttonH: 22,
   rowClickX: 80 + 24,
   rowClickW: 460
 };
@@ -71,7 +71,7 @@ export class HudSystem {
     statusMessage: string | null,
     visualSystem: VisualSystem = 'classic',
     pendingShop: ShopPending = EMPTY_SHOP_PENDING,
-    fallToast: { text: string; color: number } | null = null
+    topToast: { text: string; color: number } | null = null
   ): void {
     this.currentPendingShop = pendingShop;
     this.clearTexts();
@@ -104,8 +104,10 @@ export class HudSystem {
       );
     } else if (matchOver) {
       this.drawFullScreenBackdrop();
+      const winId = match.matchWinnerId!;
+      const winName = match.profiles[winId].displayName ?? `PLAYER ${winId + 1}`;
       this.drawCenterBanner(
-        `PLAYER ${match.matchWinnerId! + 1} WINS THE MATCH`,
+        `${winName} WINS THE MATCH`,
         'PRESS R TO RESTART'
       );
     }
@@ -113,15 +115,15 @@ export class HudSystem {
     // Fall-event toast — sits at the top-center under the player cards so
     // chute deployments and fall damage are unmissable. GameScene clears
     // the toast when expired, so we render it whenever it's non-null.
-    if (fallToast) {
-      const labelW = fallToast.text.length * 11;
+    if (topToast) {
+      const labelW = topToast.text.length * 11;
       const x = (GAME_CONFIG.width - labelW) / 2;
       const y = 96;
       this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.7);
       this.graphics.fillRect(x - 10, y - 4, labelW + 20, 26);
-      this.graphics.lineStyle(2, fallToast.color, 1);
+      this.graphics.lineStyle(2, topToast.color, 1);
       this.graphics.strokeRect(x - 10, y - 4, labelW + 20, 26);
-      this.addText(x, y, fallToast.text, fallToast.color, GAME_CONFIG.font.medium);
+      this.addText(x, y, topToast.text, topToast.color, GAME_CONFIG.font.medium);
     }
   }
 
@@ -188,7 +190,8 @@ export class HudSystem {
     const tank = tanks[id];
     if (!profile || !tank) return;
 
-    this.addText(x, 6, `PLAYER ${id + 1}`, palette.primary, GAME_CONFIG.font.large);
+    const name = profile.displayName ?? `PLAYER ${id + 1}`;
+    this.addText(x, 6, name, palette.primary, GAME_CONFIG.font.large);
     this.addText(x, 30, CONTROLLER_LABELS[profile.controller], GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.tiny);
     this.addText(x + 28, 42, `${tank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.large);
     this.addText(x, 68, `$${profile.cash}  W:${profile.wins}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
@@ -584,7 +587,7 @@ export class HudSystem {
     this.addText(
       panelX + 24,
       panelY + 56,
-      `PLAYER ${shopperId + 1} SHOPPING`,
+      `${profile.displayName ?? `PLAYER ${shopperId + 1}`} SHOPPING`,
       shopperId === 0 ? colors.magenta : colors.cyan,
       GAME_CONFIG.font.large
     );
@@ -624,11 +627,11 @@ export class HudSystem {
     this.addText(colName, listY, 'WEAPON', colors.cyan, GAME_CONFIG.font.medium);
     this.addText(colPrice, listY, 'PRICE', colors.cyan, GAME_CONFIG.font.medium);
     this.addText(colCount, listY, 'OWNED', colors.cyan, GAME_CONFIG.font.medium);
-    listY += 30;
+    listY += 26;
 
     const saleKey = pending.saleItem();
     const saleDiscountPct = Math.round(pending.saleDiscount() * 100);
-    const rowH = 28;
+    const rowH = SHOP_LAYOUT.rowH;
 
     const drawRow = (
       keyLabel: string,

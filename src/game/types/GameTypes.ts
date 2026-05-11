@@ -63,6 +63,8 @@ export interface PlayerProfile {
   parachutes: number;
   shields: number;
   controller: ControllerKind;
+  /** Custom display name. Falls back to "PLAYER N" when null. */
+  displayName: string | null;
 }
 
 export interface MatchState {

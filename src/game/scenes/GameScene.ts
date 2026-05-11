@@ -70,6 +70,7 @@ export class GameScene extends Phaser.Scene {
   private aiHasFired = false;
   private aiShopElapsedMs = 0;
   private pendingControllers: ControllerKind[] = ['human', 'cpu-veteran'];
+  private pendingNames: Array<string | null> = [];
   private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
 
   // Tentative shop purchases for the current shopper. Committed on ENTER,
@@ -77,9 +78,13 @@ export class GameScene extends Phaser.Scene {
   private pendingShopBuys: Record<string, number> = {};
   private pendingShopHistory: string[] = [];
 
-  // Ephemeral toast for fall events (chute deployed / fall damage). Lives
-  // ~2s so the human can see it. Cleared lazily during render.
-  private fallToast: { text: string; color: number; expiresAt: number } | null = null;
+  // Ephemeral top-banner toast for fall events and ESC confirmation prompts.
+  // Lives ~2s so the human can see it. Cleared lazily during render.
+  private topToast: { text: string; color: number; expiresAt: number } | null = null;
+
+  // Two-step ESC: first press primes; second press within ESC_PRIME_MS quits.
+  private escapePrimed = false;
+  private escapePrimeTimer: number | null = null;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -98,10 +103,11 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { controllers?: ControllerKind[]; roundsToWin?: number }): void {
+  init(data: { controllers?: ControllerKind[]; names?: Array<string | null>; roundsToWin?: number }): void {
     if (data?.controllers && data.controllers.length >= 2) {
       this.pendingControllers = data.controllers;
     }
+    if (data?.names) this.pendingNames = data.names;
     if (typeof data?.roundsToWin === 'number' && data.roundsToWin >= 1) {
       this.pendingRoundsToWin = data.roundsToWin;
     }
@@ -143,7 +149,7 @@ export class GameScene extends Phaser.Scene {
     this.hudSystem = new HudSystem(this);
     this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin);
+    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames);
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -200,10 +206,33 @@ export class GameScene extends Phaser.Scene {
       this.renderTanksAndHud();
     }
 
-    // Escape hatch: ESC returns to the main menu from any phase. Pending
-    // shop purchases (if any) are discarded.
+    // Escape hatch: two-step ESC to return to the main menu. First ESC
+    // arms the prompt for ~2s; a second ESC in that window commits.
+    // Pending shop purchases (if any) are discarded on commit.
     if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
-      this.returnToMenu();
+      if (this.escapePrimed) {
+        this.returnToMenu();
+        return;
+      }
+      this.escapePrimed = true;
+      this.topToast = {
+        text: 'PRESS ESC AGAIN TO QUIT TO MENU',
+        color: GAME_CONFIG.colors.yellow,
+        expiresAt: Date.now() + 2500
+      };
+      if (this.escapePrimeTimer !== null) window.clearTimeout(this.escapePrimeTimer);
+      this.escapePrimeTimer = window.setTimeout(() => {
+        this.escapePrimed = false;
+        this.escapePrimeTimer = null;
+        // Clear the toast IF it was the ESC-prime one (don't stomp on a
+        // fall toast that fired after).
+        if (this.topToast && this.topToast.text.startsWith('PRESS ESC AGAIN')) {
+          this.topToast = null;
+        }
+        this.renderTanksAndHud();
+      }, 2500);
+      soundSystem.playUiClick();
+      this.renderTanksAndHud();
       return;
     }
 
@@ -379,7 +408,7 @@ export class GameScene extends Phaser.Scene {
       soundSystem.playMatchWin();
     } else {
       this.turn.phase = 'roundOver';
-      this.statusMessage = `PLAYER ${winnerId + 1} WINS ROUND ${this.match.round}`;
+      this.statusMessage = `${this.playerName(winnerId)} WINS ROUND ${this.match.round}`;
       soundSystem.playRoundWin();
     }
 
@@ -437,6 +466,11 @@ export class GameScene extends Phaser.Scene {
   private returnToMenu(): void {
     soundSystem.playUiClick();
     this.scene.start('MenuScene');
+  }
+
+  /** Display name for a tank — custom name from the menu or default. */
+  private playerName(id: PlayerId): string {
+    return this.match.profiles[id]?.displayName ?? `PLAYER ${id + 1}`;
   }
 
   // -------- PENDING SHOP HELPERS --------
@@ -984,11 +1018,11 @@ export class GameScene extends Phaser.Scene {
         }
         if (fall.damage > 0 || fall.usedParachute) {
           soundSystem.playFall();
-          const tankNum = fall.tankId + 1;
+          const name = this.playerName(fall.tankId);
           const text = fall.usedParachute
-            ? `PLAYER ${tankNum} CHUTE DEPLOYED`
-            : `PLAYER ${tankNum} FELL · ${fall.damage} DAMAGE`;
-          this.fallToast = {
+            ? `${name} CHUTE DEPLOYED`
+            : `${name} FELL · ${fall.damage} DAMAGE`;
+          this.topToast = {
             text,
             color: fall.usedParachute ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.red,
             expiresAt: Date.now() + 2200
@@ -1062,8 +1096,8 @@ export class GameScene extends Phaser.Scene {
 
   private renderTanksAndHud(): void {
     // Clear expired fall toast before rendering.
-    if (this.fallToast && Date.now() > this.fallToast.expiresAt) {
-      this.fallToast = null;
+    if (this.topToast && Date.now() > this.topToast.expiresAt) {
+      this.topToast = null;
     }
     this.tankSystem.draw(this.tankGraphics, this.tanks, this.turn.activePlayerId, this.visualSystem);
     this.hudSystem.render(
@@ -1081,7 +1115,7 @@ export class GameScene extends Phaser.Scene {
         saleItem: () => this.match.currentSale?.itemKey ?? null,
         saleDiscount: () => this.match.currentSale?.discount ?? 0
       },
-      this.fallToast
+      this.topToast
     );
   }
 

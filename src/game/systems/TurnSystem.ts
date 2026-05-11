@@ -27,13 +27,14 @@ export class TurnSystem {
    */
   createMatchState(
     controllers: ControllerKind[] = ['human', 'cpu-veteran'],
-    roundsToWin: number = GAME_CONFIG.match.roundsToWin
+    roundsToWin: number = GAME_CONFIG.match.roundsToWin,
+    names: Array<string | null> = []
   ): MatchState {
     const active = controllers.filter((c): c is ControllerKind => !!c);
     return {
       round: 1,
       roundsToWin,
-      profiles: active.map((c) => this.createInitialProfile(c)),
+      profiles: active.map((c, i) => this.createInitialProfile(c, names[i] ?? null)),
       shoppingPlayerId: null,
       shopVisitsRemaining: 0,
       matchWinnerId: null,
@@ -41,7 +42,7 @@ export class TurnSystem {
     };
   }
 
-  createInitialProfile(controller: ControllerKind = 'human'): PlayerProfile {
+  createInitialProfile(controller: ControllerKind = 'human', displayName: string | null = null): PlayerProfile {
     const ammo: Record<string, number> = {};
     GAME_CONFIG.weapons.forEach((w) => {
       ammo[w.id] = w.startingAmmo;
@@ -52,7 +53,8 @@ export class TurnSystem {
       ammo,
       parachutes: GAME_CONFIG.match.startingParachutes,
       shields: GAME_CONFIG.match.startingShields,
-      controller
+      controller,
+      displayName
     };
   }
 
