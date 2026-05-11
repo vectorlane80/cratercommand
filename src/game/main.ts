@@ -7,8 +7,12 @@ import { GAME_CONFIG } from './types/GameTypes';
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: document.body,
-  width: GAME_CONFIG.width,
-  height: GAME_CONFIG.height,
   pixelArt: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: GAME_CONFIG.width,
+    height: GAME_CONFIG.height
+  },
   scene: [BootScene, MenuScene, GameScene]
 });

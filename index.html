@@ -2,27 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>Crater Command</title>
     <style>
       html,
       body {
         margin: 0;
-        min-height: 100%;
+        width: 100%;
+        height: 100%;
         background: #000;
         overflow: hidden;
+        touch-action: none;
       }
 
       body {
-        display: grid;
-        place-items: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       canvas {
-        width: min(100vw, 177.78vh, 960px);
-        height: auto;
         image-rendering: pixelated;
         outline: none;
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
       }
     </style>
   </head>

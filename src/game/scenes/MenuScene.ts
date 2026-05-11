@@ -42,7 +42,29 @@ export class MenuScene extends Phaser.Scene {
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
+
     this.render();
+  }
+
+  private handlePointerDown(x: number, y: number): void {
+    // Player 1 controller row: y=200..240, box x=280..680
+    if (x >= 280 && x <= 680 && y >= 194 && y <= 240) {
+      this.controllers[0] = this.cycle(this.controllers[0]);
+      this.render();
+      return;
+    }
+    // Player 2 controller row: y=260..300
+    if (x >= 280 && x <= 680 && y >= 254 && y <= 300) {
+      this.controllers[1] = this.cycle(this.controllers[1]);
+      this.render();
+      return;
+    }
+    // Start button area (anywhere below the hints) starts the match.
+    if (y >= 370) {
+      const result: MenuResult = { controllers: [...this.controllers] as [ControllerKind, ControllerKind] };
+      this.scene.start('GameScene', result);
+    }
   }
 
   update(): void {
@@ -83,19 +105,23 @@ export class MenuScene extends Phaser.Scene {
 
     // Hints
     this.addText(
-      GAME_CONFIG.width / 2 - 220,
-      350,
-      'Press 1 to cycle Player 1   ·   2 to cycle Player 2',
+      GAME_CONFIG.width / 2 - 254,
+      340,
+      'Tap a row or press 1 / 2 to cycle controllers',
       colors.white,
       GAME_CONFIG.font.medium
     );
-    this.addText(
-      GAME_CONFIG.width / 2 - 156,
-      390,
-      'SPACE or ENTER to start match',
-      colors.yellow,
-      GAME_CONFIG.font.medium
-    );
+
+    // Start button
+    const btnX = GAME_CONFIG.width / 2 - 130;
+    const btnY = 380;
+    const btnW = 260;
+    const btnH = 46;
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(btnX, btnY, btnW, btnH);
+    this.graphics.lineStyle(3, colors.yellow, 1);
+    this.graphics.strokeRect(btnX, btnY, btnW, btnH);
+    this.addText(btnX + 26, btnY + 10, 'START MATCH', colors.yellow, GAME_CONFIG.font.title);
 
     // Difficulty hints
     this.addText(40, 460, 'CADET — sloppy shots, picks random weapons.', colors.dimGray, GAME_CONFIG.font.small);

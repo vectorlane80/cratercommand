@@ -132,8 +132,8 @@ export class HudSystem {
     const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 26);
-    this.addText(20, stripY + 4, '←→ Aim  ↑↓ Power  A/D Move  SPACE Fire', 0x2e66ff, GAME_CONFIG.font.medium);
-    this.addText(720, stripY + 4, '1-8 Weapon', colors.yellow, GAME_CONFIG.font.medium);
+    this.addText(20, stripY + 4, '←→/↑↓ Aim·Power   A/D Move   SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
+    this.addText(660, stripY + 4, 'Tap panels to adjust', colors.yellow, GAME_CONFIG.font.medium);
   }
 
   private drawRetroPixelHud(

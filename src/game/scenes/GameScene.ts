@@ -159,6 +159,9 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
+    // Mouse/touch routing.
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
+
     this.renderAll();
   }
 
@@ -194,6 +197,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       const moved = this.handleMovementInput(delta);
+      const pointerMoved = this.tickPointerMovement(delta);
       const changed = this.handleAimingInput();
       const switched = this.handleWeaponSelection();
 
@@ -202,7 +206,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
 
-      if (moved || changed || switched) {
+      if (moved || pointerMoved || changed || switched) {
         this.renderTanksAndHud();
       }
       return;
@@ -451,6 +455,165 @@ export class GameScene extends Phaser.Scene {
     }
 
     return changed;
+  }
+
+  // -------- POINTER (MOUSE / TOUCH) HANDLING --------
+
+  /**
+   * Single pointerdown handler that routes to whichever interaction the
+   * pointer landed on. All coordinates are in 960x540 game space (Phaser's
+   * Scale.FIT keeps pointer events in this coordinate system regardless of
+   * the canvas's actual screen size).
+   */
+  private handlePointerDown(x: number, y: number): void {
+    if (this.turn.phase === 'matchOver') {
+      this.scene.restart();
+      return;
+    }
+    if (this.turn.phase === 'roundOver') {
+      this.enterShoppingPhase();
+      return;
+    }
+    if (this.turn.phase === 'shopping') {
+      if (!this.isCurrentShopperAI()) this.handleShopPointer(x, y);
+      return;
+    }
+    if (this.turn.phase === 'aiming' && !this.isActivePlayerAI()) {
+      this.handleAimingPointer(x, y);
+      return;
+    }
+  }
+
+  private handleAimingPointer(x: number, y: number): void {
+    const top = GAME_CONFIG.layout.consoleTop;
+    const activeTank = this.tanks[this.turn.activePlayerId];
+
+    // FIRE button (drawn at x=386..496, y=top+8..top+44).
+    if (x >= 386 && x <= 496 && y >= top + 8 && y <= top + 44) {
+      this.fireActiveWeapon();
+      return;
+    }
+
+    // Weapon list: x=14..296, rows at top+36 + i*13, 8 rows.
+    if (x >= 14 && x <= 296 && y >= top + 36 && y < top + 36 + 8 * 13) {
+      const rowIdx = Math.floor((y - (top + 36)) / 13);
+      if (rowIdx >= 0 && rowIdx < GAME_CONFIG.weapons.length) {
+        if (this.tankHasAmmo(activeTank, rowIdx)) {
+          activeTank.selectedWeaponIndex = rowIdx;
+          this.renderTanksAndHud();
+        }
+      }
+      return;
+    }
+
+    // Angle panel: click left half to decrease, right half to increase. Each
+    // click is a noticeable step (5°) so it feels responsive on touch.
+    if (x >= 328 && x <= 533 && y >= top + 42 && y <= top + 146) {
+      const delta = x < (328 + 533) / 2 ? -5 : 5;
+      activeTank.angle = Phaser.Math.Clamp(
+        activeTank.angle + delta,
+        GAME_CONFIG.aiming.minAngle,
+        GAME_CONFIG.aiming.maxAngle
+      );
+      this.renderTanksAndHud();
+      return;
+    }
+
+    // Power panel: same idea.
+    if (x >= 548 && x <= 694 && y >= top + 38 && y <= top + 146) {
+      const delta = x < (548 + 694) / 2 ? -5 : 5;
+      activeTank.power = Phaser.Math.Clamp(
+        activeTank.power + delta,
+        GAME_CONFIG.aiming.minPower,
+        GAME_CONFIG.aiming.maxPower
+      );
+      this.renderTanksAndHud();
+      return;
+    }
+
+    // Battlefield (above the console): clicking left or right of the active
+    // tank moves it that direction, consuming move budget. Touch can hold
+    // the click to keep moving — the held-pointer path lives in update()
+    // via tickPointerMovement.
+    if (y < GAME_CONFIG.layout.consoleTop) {
+      this.tryPointerMove(x, 16); // immediate small step on tap
+    }
+  }
+
+  private handleShopPointer(x: number, y: number): void {
+    if (this.match.shoppingPlayerId === null) return;
+    const profile = this.match.profiles[this.match.shoppingPlayerId];
+
+    // Shop overlay coords mirror HudSystem.drawShopOverlay.
+    const panelX = 80;
+    const panelY = 40;
+    const panelH = GAME_CONFIG.height - 80;
+    const listX = panelX + 24;
+    const listYStart = panelY + 158; // header row at +130, first weapon row at +158
+    const rowH = 24;
+
+    // Weapon rows (8 weapons)
+    for (let i = 0; i < GAME_CONFIG.weapons.length; i += 1) {
+      const rowY = listYStart + i * rowH;
+      if (x >= listX && x <= listX + 500 && y >= rowY - 4 && y < rowY + rowH - 4) {
+        const weapon = GAME_CONFIG.weapons[i];
+        if (weapon.price > 0 && profile.cash >= weapon.price) {
+          profile.cash -= weapon.price;
+          if (profile.ammo[weapon.id] === -1) profile.ammo[weapon.id] = 0;
+          profile.ammo[weapon.id] += 1;
+          this.renderAll();
+        }
+        return;
+      }
+    }
+
+    // Parachute row (next after weapons)
+    const chuteY = listYStart + GAME_CONFIG.weapons.length * rowH + 8;
+    if (x >= listX && x <= listX + 500 && y >= chuteY - 4 && y < chuteY + rowH - 4) {
+      const price = GAME_CONFIG.match.parachutePrice;
+      if (profile.cash >= price) {
+        profile.cash -= price;
+        profile.parachutes += 1;
+        this.renderAll();
+      }
+      return;
+    }
+
+    // Finish button (bottom-right area of the overlay)
+    const finishY = panelY + panelH - 50;
+    if (y >= finishY) {
+      this.finishShoppingForCurrentPlayer();
+    }
+  }
+
+  /**
+   * Continuous movement when the player is holding the pointer on the
+   * battlefield area: each frame in aiming phase we check the active
+   * pointer; if it's held and the cursor is left/right of the active tank,
+   * step the tank in that direction.
+   */
+  private tickPointerMovement(delta: number): boolean {
+    const pointer = this.input.activePointer;
+    if (!pointer.isDown) return false;
+    if (pointer.y >= GAME_CONFIG.layout.consoleTop) return false;
+    return this.tryPointerMove(pointer.x, delta);
+  }
+
+  private tryPointerMove(targetX: number, delta: number): boolean {
+    const activeTank = this.tanks[this.turn.activePlayerId];
+    const other = this.tanks[activeTank.id === 0 ? 1 : 0];
+    const deltaSeconds = Math.min(delta, 64) / 1000;
+    const dx = targetX - activeTank.x;
+    if (Math.abs(dx) < 6) return false;
+    const direction: -1 | 1 = dx < 0 ? -1 : 1;
+    return this.tankSystem.moveTank(
+      activeTank,
+      direction,
+      deltaSeconds,
+      this.terrainSystem,
+      this.terrainData,
+      other
+    );
   }
 
   // -------- WEAPON LOGIC --------
