@@ -88,7 +88,8 @@ export class TerrainSystem {
     const { heights, width, height, segmentWidth } = terrainData;
     const colors = GAME_CONFIG.colors;
 
-    graphics.fillStyle(colors.desertDark, 1);
+    // Solid dirt body
+    graphics.fillStyle(colors.desertBrown, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
     heights.forEach((sampleHeight, index) => {
@@ -98,14 +99,16 @@ export class TerrainSystem {
     graphics.closePath();
     graphics.fillPath();
 
-    graphics.fillStyle(colors.desertBrown, 0.78);
+    // Darker lower body, blended in below ~30px from surface
+    graphics.fillStyle(colors.desertDark, 0.62);
     for (let index = 0; index < heights.length - 1; index += 1) {
       const x = index * segmentWidth;
       const nextX = (index + 1) * segmentWidth;
-      const y = heights[index] + 10;
+      const y = heights[index] + 30;
       graphics.fillRect(x, y, Math.ceil(nextX - x) + 1, Math.max(0, height - y));
     }
 
+    // Bright gold lip along the ridge
     graphics.lineStyle(4, colors.desertGold, 1);
     graphics.beginPath();
     heights.forEach((sampleHeight, index) => {
@@ -118,6 +121,7 @@ export class TerrainSystem {
     });
     graphics.strokePath();
 
+    // Highlight band just under the gold lip
     graphics.lineStyle(2, 0xffb22e, 0.9);
     graphics.beginPath();
     heights.forEach((sampleHeight, index) => {
@@ -131,16 +135,57 @@ export class TerrainSystem {
     });
     graphics.strokePath();
 
-    for (let y = 0; y < height; y += 10) {
-      for (let x = (y * 7) % 17; x < width; x += 17) {
+    // Chunky rock pixels scattered through the dirt body.
+    for (let y = 0; y < height; y += 6) {
+      for (let x = (y * 11) % 13; x < width; x += 13) {
         const groundY = this.getHeightAtX(terrainData, x);
-        if (y > groundY + 12) {
-          const shade = (x + y) % 4 === 0 ? 0x0c0703 : 0x2d1a0b;
-          graphics.fillStyle(shade, 0.72);
-          graphics.fillRect(x, y, 3, 2);
-        }
+        if (y <= groundY + 8) continue;
+        const noise = (x * 137 + y * 53) % 7;
+        let shade: number;
+        let size: number;
+        if (noise === 0) { shade = 0x6b3a17; size = 3; }
+        else if (noise < 3) { shade = 0x2a160a; size = 3; }
+        else if (noise < 5) { shade = 0x361f0d; size = 2; }
+        else continue;
+        graphics.fillStyle(shade, 0.85);
+        graphics.fillRect(x, y, size, 2);
       }
     }
+
+    // Cacti scattered along the ridge, avoiding tank spawn zones.
+    const cactusXs = [0.07, 0.27, 0.41, 0.55, 0.69, 0.93];
+    cactusXs.forEach((t, i) => {
+      const cactusX = t * width;
+      if (Math.abs(t - 0.16) < 0.06) return;
+      if (Math.abs(t - 0.86) < 0.06) return;
+      const groundY = this.getHeightAtX(terrainData, cactusX);
+      this.drawCactus(graphics, Math.round(cactusX), Math.round(groundY), i);
+    });
+  }
+
+  private drawCactus(graphics: Phaser.GameObjects.Graphics, cx: number, baseY: number, seed: number): void {
+    const trunkColor = 0x2e8e36;
+    const shadowColor = 0x143a18;
+    const highlightColor = 0x6ad06c;
+    const trunkHeight = 12 + (seed % 3);
+
+    // Trunk
+    graphics.fillStyle(trunkColor, 1);
+    graphics.fillRect(cx - 1, baseY - trunkHeight, 3, trunkHeight);
+
+    // Left arm
+    graphics.fillRect(cx - 4, baseY - trunkHeight + 4, 2, 4);
+    graphics.fillRect(cx - 4, baseY - trunkHeight + 2, 2, 2);
+    // Right arm
+    graphics.fillRect(cx + 3, baseY - trunkHeight + 5, 2, 4);
+    graphics.fillRect(cx + 3, baseY - trunkHeight + 3, 2, 2);
+
+    // Highlight line on left side
+    graphics.fillStyle(highlightColor, 1);
+    graphics.fillRect(cx - 1, baseY - trunkHeight + 1, 1, trunkHeight - 2);
+    // Shadow on right side
+    graphics.fillStyle(shadowColor, 1);
+    graphics.fillRect(cx + 1, baseY - trunkHeight + 1, 1, trunkHeight - 1);
   }
 
   applyMound(terrainData: TerrainData, x: number, y: number, radius: number): void {

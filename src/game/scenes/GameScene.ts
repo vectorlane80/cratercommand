@@ -519,38 +519,54 @@ export class GameScene extends Phaser.Scene {
     this.backgroundGraphics.fillStyle(colors.white, 0.9);
     for (let i = 0; i < 38; i += 1) {
       const x = (i * 173 + 91) % width;
-      const y = ((i * 47 + 23) % 110) + 8;
+      const y = ((i * 47 + 23) % 90) + 6;
       const size = i % 9 === 0 ? 2 : 1;
       this.backgroundGraphics.fillRect(x, y, size, size);
     }
 
-    // Synthwave sun: yellow disc with horizontal dark cuts on the lower half.
-    const sunX = width / 2;
-    const sunY = 298;
-    const sunR = 26;
-    this.backgroundGraphics.fillStyle(0xffe06a, 1);
-    this.backgroundGraphics.fillCircle(sunX, sunY, sunR);
-    this.backgroundGraphics.fillStyle(0xffb347, 1);
-    this.backgroundGraphics.fillCircle(sunX, sunY + 4, sunR - 6);
-    // dark cuts
-    this.backgroundGraphics.fillStyle(0x8a2a26, 1);
-    for (let i = 0; i < 5; i += 1) {
-      const cutY = sunY + 4 + i * 4;
-      const cutHalfWidth = Math.sqrt(Math.max(0, sunR * sunR - (cutY - sunY) * (cutY - sunY))) - 1;
-      if (cutHalfWidth <= 0) continue;
-      this.backgroundGraphics.fillRect(sunX - cutHalfWidth, cutY, cutHalfWidth * 2, 2);
-    }
+    // Synthwave sun: glow halo, bright yellow disc with deep orange inner
+    // body and horizontal dark cuts across its lower half. Sized and placed
+    // above the mountain peaks so it's actually visible.
+    this.drawSynthwaveSun(width / 2, 168, 34);
 
-    // Mountain silhouettes (back to front, darkest to lightest).
-    this.drawMountainLayer(0x1c1438, 232, 0.95, 40, 9, 7);
-    this.drawMountainLayer(0x2d1d4a, 264, 0.95, 36, 11, 14);
-    this.drawMountainLayer(0x4a2152, 296, 0.95, 30, 13, 22);
+    // Mountain silhouettes (back to front, darkest to lightest). Four layers
+    // for parallax depth; bigger amplitudes and more peaks make them feel
+    // like a desert range rather than rolling hills.
+    this.drawMountainLayer(0x150e2a, 198, 1, 46, 9, 5);
+    this.drawMountainLayer(0x271845, 232, 1, 50, 11, 13);
+    this.drawMountainLayer(0x3b1f4f, 266, 1, 44, 13, 21);
+    this.drawMountainLayer(0x5a2452, 302, 1, 36, 15, 29);
 
     this.backgroundGraphics.lineStyle(2, colors.steelLight, 1);
     this.backgroundGraphics.beginPath();
     this.backgroundGraphics.moveTo(0, GAME_CONFIG.layout.consoleTop - 2);
     this.backgroundGraphics.lineTo(width, GAME_CONFIG.layout.consoleTop - 2);
     this.backgroundGraphics.strokePath();
+  }
+
+  private drawSynthwaveSun(sunX: number, sunY: number, sunR: number): void {
+    // Soft glow halo
+    for (let r = sunR + 14; r > sunR; r -= 2) {
+      const t = (sunR + 14 - r) / 14;
+      this.backgroundGraphics.fillStyle(0xff8a3c, 0.06 + t * 0.07);
+      this.backgroundGraphics.fillCircle(sunX, sunY, r);
+    }
+    // Bright disc
+    this.backgroundGraphics.fillStyle(0xffe7a0, 1);
+    this.backgroundGraphics.fillCircle(sunX, sunY, sunR);
+    // Orange inner body offset down for a sunset feel
+    this.backgroundGraphics.fillStyle(0xff9a36, 1);
+    this.backgroundGraphics.fillCircle(sunX, sunY + 5, sunR - 7);
+
+    // Dark horizontal cuts on the lower half, sized to the disc geometry.
+    this.backgroundGraphics.fillStyle(0x6c1d2c, 1);
+    for (let i = 0; i < 6; i += 1) {
+      const cutY = sunY + 6 + i * 4;
+      const dy = cutY - sunY;
+      const halfWidth = Math.sqrt(Math.max(0, sunR * sunR - dy * dy)) - 1;
+      if (halfWidth <= 0) continue;
+      this.backgroundGraphics.fillRect(sunX - halfWidth, cutY, halfWidth * 2, 2);
+    }
   }
 
   /**
