@@ -34,13 +34,14 @@ export class AISystem {
   decide(
     controller: ControllerKind,
     shooter: TankState,
-    target: TankState,
+    opponents: TankState[],
     wind: WindState,
     terrainSystem: TerrainSystem,
     terrainData: TerrainData
   ): AIDecision {
+    const target = this.pickTarget(controller, shooter, opponents);
     if (controller === 'cpu-cadet') {
-      return this.decideCadet(shooter);
+      return this.decideCadet(shooter, target);
     }
     if (controller === 'cpu-veteran') {
       return this.decideVeteran(shooter, target, wind, terrainSystem, terrainData);
@@ -48,10 +49,29 @@ export class AISystem {
     return this.decideMarshal(shooter, target, wind, terrainSystem, terrainData);
   }
 
+  /**
+   * Pick which opponent to aim at. Cadet rolls random; Veteran/Marshal pick
+   * the nearest alive opponent. Falls back to the shooter (a self-target) if
+   * there are no opponents available, which the caller will turn into a stalled
+   * shot rather than crash.
+   */
+  private pickTarget(controller: ControllerKind, shooter: TankState, opponents: TankState[]): TankState {
+    const alive = opponents.filter((t) => t.alive);
+    if (alive.length === 0) return shooter;
+    if (controller === 'cpu-cadet') {
+      return alive[Math.floor(Math.random() * alive.length)];
+    }
+    // Nearest-by-x for Veteran and Marshal.
+    return alive.reduce((closest, t) =>
+      Math.abs(t.x - shooter.x) < Math.abs(closest.x - shooter.x) ? t : closest
+    );
+  }
+
   // -------- DIFFICULTY: CADET --------
   // Random angle/power within sane bounds, random weapon. Mostly misses.
-  private decideCadet(shooter: TankState): AIDecision {
-    const facingLeft = shooter.id === 1;
+  private decideCadet(shooter: TankState, target: TankState): AIDecision {
+    // Bias firing arc based on which direction the target sits.
+    const facingLeft = target.x < shooter.x;
     const minA = facingLeft ? 95 : 25;
     const maxA = facingLeft ? 155 : 85;
     const angle = minA + Math.random() * (maxA - minA);
@@ -73,8 +93,10 @@ export class AISystem {
     const weaponIndex = this.pickBestDamageWeapon(shooter);
     const weapon = GAME_CONFIG.weapons[weaponIndex];
 
-    const angleStart = shooter.id === 1 ? 95 : 25;
-    const angleEnd = shooter.id === 1 ? 155 : 85;
+    // Bias firing arc toward the target's direction.
+    const facingLeft = target.x < shooter.x;
+    const angleStart = facingLeft ? 95 : 25;
+    const angleEnd = facingLeft ? 155 : 85;
     let bestAngle = (angleStart + angleEnd) / 2;
     let bestPower = 60;
     let bestDistSq = Infinity;
@@ -119,8 +141,10 @@ export class AISystem {
     terrainSystem: TerrainSystem,
     terrainData: TerrainData
   ): AIDecision {
-    const angleStart = shooter.id === 1 ? 95 : 25;
-    const angleEnd = shooter.id === 1 ? 155 : 85;
+    // Bias firing arc toward the target's direction.
+    const facingLeft = target.x < shooter.x;
+    const angleStart = facingLeft ? 95 : 25;
+    const angleEnd = facingLeft ? 155 : 85;
 
     let bestAngle = (angleStart + angleEnd) / 2;
     let bestPower = 60;

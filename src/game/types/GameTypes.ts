@@ -1,4 +1,4 @@
-export type PlayerId = 0 | 1;
+export type PlayerId = 0 | 1 | 2 | 3;
 export type GamePhase =
   | 'aiming'
   | 'projectileInFlight'
@@ -68,11 +68,16 @@ export interface PlayerProfile {
 export interface MatchState {
   round: number;
   roundsToWin: number;
-  profiles: [PlayerProfile, PlayerProfile];
+  // 2 to MAX_PLAYERS entries. Index in this array is the player's PlayerId.
+  // Players that are 'none' in the menu are excluded — they don't get a slot
+  // and don't participate.
+  profiles: PlayerProfile[];
   shoppingPlayerId: PlayerId | null;
   shopVisitsRemaining: number;
   matchWinnerId: PlayerId | null;
 }
+
+export const MAX_PLAYERS = 4;
 
 export interface WeaponDefinition {
   id: string;

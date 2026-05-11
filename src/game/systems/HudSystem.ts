@@ -76,37 +76,61 @@ export class HudSystem {
 
   private drawTopHud(turn: TurnState, tanks: TankState[], match: MatchState): void {
     const colors = GAME_CONFIG.colors;
-    const p1 = getPlayerPalette(0, 'classic');
-    const p2 = getPlayerPalette(1, 'classic');
+    const n = tanks.length;
 
-    this.addText(20, 6, 'PLAYER 1', p1.primary, GAME_CONFIG.font.large);
-    this.addText(20, 30, CONTROLLER_LABELS[match.profiles[0].controller], colors.dimGray, GAME_CONFIG.font.tiny);
-    this.addText(48, 42, `${tanks[0].health}`, colors.white, GAME_CONFIG.font.large);
-    this.addText(20, 68, `$${match.profiles[0].cash}  W:${match.profiles[0].wins}`, colors.yellow, GAME_CONFIG.font.small);
+    // 2 players: keep the classic left+right layout with CRATER COMMAND in
+    // the middle (more room to breathe). For 3-4 players, distribute slots
+    // evenly across the top and move the wind/round indicators to a single
+    // center strip below the player cards.
+    if (n === 2) {
+      this.drawPlayerCard(0, 20, tanks, match);
+      this.drawPlayerCard(1, 836, tanks, match);
+      this.addText(382, 6, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.large);
+      const arrow = turn.wind.direction < 0 ? '<--' : '-->';
+      this.addText(398, 42, 'Wind:', colors.white, GAME_CONFIG.font.medium);
+      this.addText(492, 42, `${arrow}  ${turn.wind.magnitude}`, colors.green, GAME_CONFIG.font.medium);
+      this.addText(
+        430,
+        68,
+        `ROUND ${match.round}  (FIRST TO ${match.roundsToWin})`,
+        colors.cyan,
+        GAME_CONFIG.font.small
+      );
+      return;
+    }
 
-    this.addText(382, 6, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.large);
+    // 3 or 4 player layout
+    const usableW = GAME_CONFIG.width - 40;
+    const slotW = usableW / n;
+    for (let i = 0; i < n; i += 1) {
+      this.drawPlayerCard(i as PlayerId, 20 + i * slotW, tanks, match);
+    }
 
     const arrow = turn.wind.direction < 0 ? '<--' : '-->';
-    this.addText(398, 42, 'Wind:', colors.white, GAME_CONFIG.font.medium);
-    this.addText(492, 42, `${arrow}  ${turn.wind.magnitude}`, colors.green, GAME_CONFIG.font.medium);
+    const stripY = 86;
+    this.graphics.fillStyle(colors.black, 0.4);
+    this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 18);
+    this.addText(36, stripY + 1, `ROUND ${match.round}  (FIRST TO ${match.roundsToWin})`, colors.cyan, GAME_CONFIG.font.small);
     this.addText(
-      430,
-      68,
-      `ROUND ${match.round}  (FIRST TO ${match.roundsToWin})`,
-      colors.cyan,
+      GAME_CONFIG.width / 2 - 60,
+      stripY + 1,
+      `WIND ${arrow}  ${turn.wind.magnitude}`,
+      colors.green,
       GAME_CONFIG.font.small
     );
+    this.addText(GAME_CONFIG.width - 160, stripY + 1, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.small);
+  }
 
-    this.addText(836, 6, 'PLAYER 2', p2.primary, GAME_CONFIG.font.large);
-    this.addText(836, 30, CONTROLLER_LABELS[match.profiles[1].controller], colors.dimGray, GAME_CONFIG.font.tiny);
-    this.addText(874, 42, `${tanks[1].health}`, colors.white, GAME_CONFIG.font.large);
-    this.addText(
-      790,
-      68,
-      `$${match.profiles[1].cash}  W:${match.profiles[1].wins}`,
-      colors.yellow,
-      GAME_CONFIG.font.small
-    );
+  private drawPlayerCard(id: PlayerId, x: number, tanks: TankState[], match: MatchState): void {
+    const palette = getPlayerPalette(id, 'classic');
+    const profile = match.profiles[id];
+    const tank = tanks[id];
+    if (!profile || !tank) return;
+
+    this.addText(x, 6, `PLAYER ${id + 1}`, palette.primary, GAME_CONFIG.font.large);
+    this.addText(x, 30, CONTROLLER_LABELS[profile.controller], GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.tiny);
+    this.addText(x + 28, 42, `${tank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.large);
+    this.addText(x, 68, `$${profile.cash}  W:${profile.wins}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
   }
 
   private drawConsole(turn: TurnState, activeTank: TankState, weapon: WeaponDefinition, match: MatchState): void {

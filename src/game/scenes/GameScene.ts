@@ -67,7 +67,7 @@ export class GameScene extends Phaser.Scene {
   private aiTurnElapsedMs = 0;
   private aiHasFired = false;
   private aiShopElapsedMs = 0;
-  private pendingControllers: [ControllerKind, ControllerKind] = ['human', 'cpu-veteran'];
+  private pendingControllers: ControllerKind[] = ['human', 'cpu-veteran'];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -83,8 +83,10 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { controllers?: [ControllerKind, ControllerKind] }): void {
-    if (data?.controllers) this.pendingControllers = data.controllers;
+  init(data: { controllers?: ControllerKind[] }): void {
+    if (data?.controllers && data.controllers.length >= 2) {
+      this.pendingControllers = data.controllers;
+    }
   }
 
   create(): void {
@@ -233,11 +235,11 @@ export class GameScene extends Phaser.Scene {
 
   private startAITurn(): void {
     const activeTank = this.tanks[this.turn.activePlayerId];
-    const opponent = this.tanks[activeTank.id === 0 ? 1 : 0];
+    const opponents = this.tanks.filter((t) => t.id !== activeTank.id);
     this.aiDecision = this.aiSystem.decide(
       this.match.profiles[activeTank.id].controller,
       activeTank,
-      opponent,
+      opponents,
       this.turn.wind,
       this.terrainSystem,
       this.terrainData
@@ -349,7 +351,9 @@ export class GameScene extends Phaser.Scene {
   private enterShoppingPhase(): void {
     const winnerId = this.turn.winnerId ?? 0;
     this.match.shoppingPlayerId = winnerId;
-    this.match.shopVisitsRemaining = 2;
+    // Every player gets a shopping turn, dead or alive (they'll respawn at
+    // full HP next round but with whatever loadout they bought).
+    this.match.shopVisitsRemaining = this.match.profiles.length;
     this.turn.phase = 'shopping';
     this.statusMessage = null;
     this.renderAll();
@@ -360,11 +364,13 @@ export class GameScene extends Phaser.Scene {
     if (this.match.shopVisitsRemaining <= 0) {
       this.match.shoppingPlayerId = null;
       this.match.round += 1;
-      const nextStarter: PlayerId = this.turn.winnerId === 0 ? 1 : 0;
+      const n = this.match.profiles.length;
+      const nextStarter = (((this.turn.winnerId ?? 0) + 1) % n) as PlayerId;
       this.beginRound(nextStarter);
       return;
     }
-    this.match.shoppingPlayerId = (this.match.shoppingPlayerId === 0 ? 1 : 0) as PlayerId;
+    const n = this.match.profiles.length;
+    this.match.shoppingPlayerId = (((this.match.shoppingPlayerId ?? 0) + 1) % n) as PlayerId;
     this.renderAll();
   }
 
@@ -396,17 +402,17 @@ export class GameScene extends Phaser.Scene {
 
   private handleMovementInput(delta: number): boolean {
     const activeTank = this.tanks[this.turn.activePlayerId];
-    const other = this.tanks[activeTank.id === 0 ? 1 : 0];
+    const others = this.tanks.filter((t) => t.id !== activeTank.id);
     const deltaSeconds = delta / 1000;
     let moved = false;
 
     if (this.moveLeftKey.isDown) {
-      if (this.tankSystem.moveTank(activeTank, -1, deltaSeconds, this.terrainSystem, this.terrainData, other)) {
+      if (this.tankSystem.moveTank(activeTank, -1, deltaSeconds, this.terrainSystem, this.terrainData, others)) {
         moved = true;
       }
     }
     if (this.moveRightKey.isDown) {
-      if (this.tankSystem.moveTank(activeTank, 1, deltaSeconds, this.terrainSystem, this.terrainData, other)) {
+      if (this.tankSystem.moveTank(activeTank, 1, deltaSeconds, this.terrainSystem, this.terrainData, others)) {
         moved = true;
       }
     }
@@ -624,7 +630,7 @@ export class GameScene extends Phaser.Scene {
 
   private tryPointerMove(targetX: number, delta: number): boolean {
     const activeTank = this.tanks[this.turn.activePlayerId];
-    const other = this.tanks[activeTank.id === 0 ? 1 : 0];
+    const others = this.tanks.filter((t) => t.id !== activeTank.id);
     const deltaSeconds = Math.min(delta, 64) / 1000;
     const dx = targetX - activeTank.x;
     if (Math.abs(dx) < 6) return false;
@@ -635,7 +641,7 @@ export class GameScene extends Phaser.Scene {
       deltaSeconds,
       this.terrainSystem,
       this.terrainData,
-      other
+      others
     );
   }
 

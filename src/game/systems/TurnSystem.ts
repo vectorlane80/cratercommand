@@ -19,14 +19,18 @@ export class TurnSystem {
     };
   }
 
-  createMatchState(controllers: [ControllerKind, ControllerKind] = ['human', 'cpu-veteran']): MatchState {
+  /**
+   * Build a fresh match state from a list of controller selections. Slots that
+   * the menu set to undefined are dropped so MatchState.profiles only contains
+   * actual participants. The menu guarantees at least 2 participants and at
+   * least one human.
+   */
+  createMatchState(controllers: ControllerKind[] = ['human', 'cpu-veteran']): MatchState {
+    const active = controllers.filter((c): c is ControllerKind => !!c);
     return {
       round: 1,
       roundsToWin: GAME_CONFIG.match.roundsToWin,
-      profiles: [
-        this.createInitialProfile(controllers[0]),
-        this.createInitialProfile(controllers[1])
-      ],
+      profiles: active.map((c) => this.createInitialProfile(c)),
       shoppingPlayerId: null,
       shopVisitsRemaining: 0,
       matchWinnerId: null
@@ -65,9 +69,12 @@ export class TurnSystem {
   }
 
   nextActivePlayer(currentPlayerId: PlayerId, tanks: TankState[]): PlayerId {
-    const nextPlayerId: PlayerId = currentPlayerId === 0 ? 1 : 0;
-
-    return tanks[nextPlayerId].alive ? nextPlayerId : currentPlayerId;
+    const n = tanks.length;
+    for (let step = 1; step <= n; step += 1) {
+      const candidate = ((currentPlayerId + step) % n) as PlayerId;
+      if (tanks[candidate].alive) return candidate;
+    }
+    return currentPlayerId;
   }
 
   findWinner(tanks: TankState[]): PlayerId | null {

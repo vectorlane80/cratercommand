@@ -3,20 +3,26 @@ import {
   CONTROLLER_CYCLE,
   CONTROLLER_LABELS,
   GAME_CONFIG,
+  MAX_PLAYERS,
   type ControllerKind
 } from '../types/GameTypes';
 
+/** Slot 3 and 4 can be empty (no participant) via `undefined`. */
+type Slot = ControllerKind | undefined;
+
 export interface MenuResult {
-  controllers: [ControllerKind, ControllerKind];
+  controllers: ControllerKind[];
 }
 
+const SLOT_CYCLE_REQUIRED: ControllerKind[] = CONTROLLER_CYCLE; // human + 3 CPU tiers
+const SLOT_CYCLE_OPTIONAL: Array<ControllerKind | undefined> = [undefined, ...CONTROLLER_CYCLE];
+
 export class MenuScene extends Phaser.Scene {
-  private controllers: [ControllerKind, ControllerKind] = ['human', 'cpu-veteran'];
+  private slots: Slot[] = ['human', 'cpu-veteran', undefined, undefined];
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
 
-  private oneKey!: Phaser.Input.Keyboard.Key;
-  private twoKey!: Phaser.Input.Keyboard.Key;
+  private slotKeys: Phaser.Input.Keyboard.Key[] = [];
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
 
@@ -26,16 +32,19 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
-
     this.graphics = this.add.graphics();
 
-    this.oneKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
-    this.twoKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+    const keyCodes = [
+      Phaser.Input.Keyboard.KeyCodes.ONE,
+      Phaser.Input.Keyboard.KeyCodes.TWO,
+      Phaser.Input.Keyboard.KeyCodes.THREE,
+      Phaser.Input.Keyboard.KeyCodes.FOUR
+    ];
+    this.slotKeys = keyCodes.map((c) => this.input.keyboard!.addKey(c));
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.input.keyboard!.addCapture([
-      Phaser.Input.Keyboard.KeyCodes.ONE,
-      Phaser.Input.Keyboard.KeyCodes.TWO,
+      ...keyCodes,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
       Phaser.Input.Keyboard.KeyCodes.ENTER
     ]);
@@ -47,89 +56,127 @@ export class MenuScene extends Phaser.Scene {
     this.render();
   }
 
-  private handlePointerDown(x: number, y: number): void {
-    // Player 1 controller row: y=200..240, box x=280..680
-    if (x >= 280 && x <= 680 && y >= 194 && y <= 240) {
-      this.controllers[0] = this.cycle(this.controllers[0]);
-      this.render();
-      return;
-    }
-    // Player 2 controller row: y=260..300
-    if (x >= 280 && x <= 680 && y >= 254 && y <= 300) {
-      this.controllers[1] = this.cycle(this.controllers[1]);
-      this.render();
-      return;
-    }
-    // Start button area (anywhere below the hints) starts the match.
-    if (y >= 370) {
-      const result: MenuResult = { controllers: [...this.controllers] as [ControllerKind, ControllerKind] };
-      this.scene.start('GameScene', result);
-    }
-  }
-
   update(): void {
-    if (Phaser.Input.Keyboard.JustDown(this.oneKey)) {
-      this.controllers[0] = this.cycle(this.controllers[0]);
-      this.render();
+    for (let i = 0; i < this.slotKeys.length; i += 1) {
+      if (Phaser.Input.Keyboard.JustDown(this.slotKeys[i])) {
+        this.cycleSlot(i);
+        this.render();
+      }
     }
-    if (Phaser.Input.Keyboard.JustDown(this.twoKey)) {
-      this.controllers[1] = this.cycle(this.controllers[1]);
-      this.render();
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-      const result: MenuResult = { controllers: [...this.controllers] as [ControllerKind, ControllerKind] };
-      this.scene.start('GameScene', result);
+    if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.canStart()) {
+      this.startMatch();
     }
   }
 
-  private cycle(current: ControllerKind): ControllerKind {
-    const idx = CONTROLLER_CYCLE.indexOf(current);
-    return CONTROLLER_CYCLE[(idx + 1) % CONTROLLER_CYCLE.length];
+  private handlePointerDown(x: number, y: number): void {
+    const rows = this.slotRowRects();
+    for (let i = 0; i < rows.length; i += 1) {
+      const r = rows[i];
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        this.cycleSlot(i);
+        this.render();
+        return;
+      }
+    }
+    // Start button hitbox — see render() for matching geometry.
+    const btnX = GAME_CONFIG.width / 2 - 130;
+    const btnY = 470;
+    if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 46 && this.canStart()) {
+      this.startMatch();
+    }
+  }
+
+  /**
+   * Slots 0 and 1 are required: they cycle human → cpu-cadet → cpu-veteran →
+   * cpu-marshal → human. Slots 2 and 3 are optional: their cycle starts at
+   * `undefined` (empty) so the user can leave them out. Cycling slot 2 to
+   * empty also empties slot 3 (no gaps allowed — keeps PlayerId contiguous).
+   */
+  private cycleSlot(idx: number): void {
+    const cycle = idx <= 1 ? SLOT_CYCLE_REQUIRED : SLOT_CYCLE_OPTIONAL;
+    const current = this.slots[idx];
+    const ci = cycle.indexOf(current as ControllerKind);
+    const next = cycle[(ci + 1) % cycle.length] as Slot;
+    this.slots[idx] = next;
+    // Cascade: if slot 2 went empty, slot 3 must also be empty.
+    if (idx === 2 && next === undefined) this.slots[3] = undefined;
+    // Cascade: if slot 3 was just made non-empty but slot 2 is empty, fill slot 2 first instead.
+    if (idx === 3 && next !== undefined && this.slots[2] === undefined) {
+      this.slots[2] = next;
+      this.slots[3] = undefined;
+    }
+  }
+
+  private participants(): ControllerKind[] {
+    return this.slots.filter((c): c is ControllerKind => c !== undefined);
+  }
+
+  private canStart(): boolean {
+    const active = this.participants();
+    if (active.length < 2) return false;
+    if (!active.includes('human')) return false;
+    return true;
+  }
+
+  private startMatch(): void {
+    const result: MenuResult = { controllers: this.participants() };
+    this.scene.start('GameScene', result);
+  }
+
+  private slotRowRects(): Array<{ x: number; y: number; w: number; h: number }> {
+    const ys = [200, 260, 320, 380];
+    return ys.map((y) => ({ x: 240, y: y - 6, w: 480, h: 46 }));
   }
 
   private render(): void {
     this.clearTexts();
     this.graphics.clear();
-
     const colors = GAME_CONFIG.colors;
 
     // Title
     this.addText(GAME_CONFIG.width / 2 - 174, 60, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
     this.addText(GAME_CONFIG.width / 2 - 80, 100, 'MATCH SETUP', colors.cyan, GAME_CONFIG.font.large);
 
-    // Player rows
-    const rowY1 = 200;
-    const rowY2 = 260;
-    this.drawPlayerRow(0, rowY1, 'PLAYER 1', this.controllers[0], colors.cyan);
-    this.drawPlayerRow(1, rowY2, 'PLAYER 2', this.controllers[1], colors.magenta);
+    const labels = ['PLAYER 1', 'PLAYER 2', 'PLAYER 3', 'PLAYER 4'];
+    const rowYs = [200, 260, 320, 380];
+    const palettes = [colors.cyan, colors.magenta, colors.green, colors.yellow];
+    for (let i = 0; i < MAX_PLAYERS; i += 1) {
+      this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i], i >= 2);
+    }
 
-    // Hints
+    // Hint
     this.addText(
       GAME_CONFIG.width / 2 - 254,
-      340,
-      'Tap a row or press 1 / 2 to cycle controllers',
+      438,
+      'Click a row or press 1-4 to cycle controllers',
       colors.white,
       GAME_CONFIG.font.medium
     );
 
-    // Start button
+    // Start button (gated on canStart())
+    const enabled = this.canStart();
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 380;
+    const btnY = 470;
     const btnW = 260;
     const btnH = 46;
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(btnX, btnY, btnW, btnH);
-    this.graphics.lineStyle(3, colors.yellow, 1);
+    this.graphics.lineStyle(3, enabled ? colors.yellow : colors.dimGray, 1);
     this.graphics.strokeRect(btnX, btnY, btnW, btnH);
-    this.addText(btnX + 26, btnY + 10, 'START MATCH', colors.yellow, GAME_CONFIG.font.title);
+    this.addText(btnX + 26, btnY + 10, 'START MATCH', enabled ? colors.yellow : colors.dimGray, GAME_CONFIG.font.title);
 
-    // Difficulty hints
-    this.addText(40, 460, 'CADET — sloppy shots, picks random weapons.', colors.dimGray, GAME_CONFIG.font.small);
-    this.addText(40, 478, 'VETERAN — solid aim, uses highest-damage weapon available.', colors.dimGray, GAME_CONFIG.font.small);
-    this.addText(40, 496, 'MARSHAL — searches every weapon and angle for the best shot.', colors.dimGray, GAME_CONFIG.font.small);
+    if (!enabled) {
+      this.addText(
+        GAME_CONFIG.width / 2 - 222,
+        524,
+        'Need at least 2 participants and 1 human.',
+        colors.red,
+        GAME_CONFIG.font.small
+      );
+    }
   }
 
-  private drawPlayerRow(_idx: number, y: number, label: string, kind: ControllerKind, accent: number): void {
+  private drawSlotRow(_idx: number, y: number, label: string, slot: Slot, accent: number, optional: boolean): void {
     const colors = GAME_CONFIG.colors;
     const boxX = 280;
     const boxY = y - 6;
@@ -142,7 +189,11 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.strokeRect(boxX, boxY, boxW, boxH);
 
     this.addText(120, y, label, accent, GAME_CONFIG.font.large);
-    this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[kind], colors.white, GAME_CONFIG.font.medium);
+    if (slot === undefined) {
+      this.addText(boxX + 16, y + 4, optional ? '— EMPTY —' : '???', colors.dimGray, GAME_CONFIG.font.medium);
+    } else {
+      this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
+    }
   }
 
   private addText(x: number, y: number, value: string, color: number, fontSize: string): void {
