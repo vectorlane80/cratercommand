@@ -16,12 +16,21 @@ export interface ShopPending {
   pendingFor: (key: string) => number;
   effectiveCash: (profile: { cash: number }) => number;
   hasPending: () => boolean;
+  /** Round-inflated + sale-adjusted price for a given item. 0 → not for sale. */
+  effectivePrice: (basePrice: number, itemKey: string) => number;
+  /** Item key currently on sale this round, or null. */
+  saleItem: () => string | null;
+  /** Sale discount fraction (0..1) for `saleItem`, or 0. */
+  saleDiscount: () => number;
 }
 
 export const EMPTY_SHOP_PENDING: ShopPending = {
   pendingFor: () => 0,
   effectiveCash: (p) => p.cash,
-  hasPending: () => false
+  hasPending: () => false,
+  effectivePrice: (basePrice) => basePrice,
+  saleItem: () => null,
+  saleDiscount: () => 0
 };
 
 export class HudSystem {
@@ -568,16 +577,21 @@ export class HudSystem {
     this.addText(listX, listY, 'KEY  WEAPON              PRICE     OWNED', colors.cyan, GAME_CONFIG.font.medium);
     listY += 28;
 
+    const saleKey = pending.saleItem();
+    const saleDiscountPct = Math.round(pending.saleDiscount() * 100);
+
     GAME_CONFIG.weapons.forEach((weapon, index) => {
       const owned = profile.ammo[weapon.id];
       const pendingQty = pending.pendingFor(weapon.id);
-      const canAfford = weapon.price > 0 && effectiveCash >= weapon.price;
+      const price = pending.effectivePrice(weapon.price, weapon.id);
+      const onSale = saleKey === weapon.id;
+      const canAfford = weapon.price > 0 && effectiveCash >= price;
       const labelColor = weapon.price === 0
         ? colors.dimGray
         : canAfford
           ? colors.white
           : colors.dimGray;
-      const priceText = weapon.price === 0 ? 'FREE' : `$${weapon.price}`;
+      const priceText = weapon.price === 0 ? 'FREE' : `$${price}`;
       const totalCount = owned === -1 ? '--' : `${owned + pendingQty}`;
       const ownedText = pendingQty > 0 ? `${totalCount} (+${pendingQty})` : totalCount;
       this.addText(
@@ -587,32 +601,43 @@ export class HudSystem {
         labelColor,
         GAME_CONFIG.font.medium
       );
+      if (onSale) {
+        this.addText(listX + 470, listY, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+      }
       listY += 24;
     });
 
     listY += 8;
+    const chutePrice = pending.effectivePrice(GAME_CONFIG.match.parachutePrice, 'parachute');
     const chutePending = pending.pendingFor('parachute');
-    const chuteAfford = effectiveCash >= GAME_CONFIG.match.parachutePrice;
+    const chuteAfford = effectiveCash >= chutePrice;
     const chuteCount = `${profile.parachutes + chutePending}${chutePending ? ` (+${chutePending})` : ''}`;
     this.addText(
       listX,
       listY,
-      `P    Parachute           $${GAME_CONFIG.match.parachutePrice}      ${chuteCount}`,
+      `P    Parachute           $${chutePrice}      ${chuteCount}`,
       chuteAfford ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.dimGray,
       GAME_CONFIG.font.medium
     );
+    if (saleKey === 'parachute') {
+      this.addText(listX + 470, listY, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+    }
 
     listY += 24;
+    const shieldPrice = pending.effectivePrice(GAME_CONFIG.match.shieldPrice, 'shield');
     const shieldPending = pending.pendingFor('shield');
-    const shieldAfford = effectiveCash >= GAME_CONFIG.match.shieldPrice;
+    const shieldAfford = effectiveCash >= shieldPrice;
     const shieldCount = `${profile.shields + shieldPending}${shieldPending ? ` (+${shieldPending})` : ''}`;
     this.addText(
       listX,
       listY,
-      `S    Shield              $${GAME_CONFIG.match.shieldPrice}      ${shieldCount}`,
+      `S    Shield              $${shieldPrice}      ${shieldCount}`,
       shieldAfford ? GAME_CONFIG.colors.cyan : GAME_CONFIG.colors.dimGray,
       GAME_CONFIG.font.medium
     );
+    if (saleKey === 'shield') {
+      this.addText(listX + 470, listY, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+    }
 
     // Footer buttons: UNDO (left, only when something to undo) and FINISH
     const footerY = panelY + panelH - 50;

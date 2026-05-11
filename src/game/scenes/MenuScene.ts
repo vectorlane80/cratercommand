@@ -112,7 +112,7 @@ export class MenuScene extends Phaser.Scene {
     }
     // Start button hitbox — see render() for matching geometry.
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 500;
+    const btnY = 400;
     if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 46 && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
@@ -120,7 +120,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private matchLengthRect() {
-    return { x: GAME_CONFIG.width / 2 - 130, y: 450, w: 260, h: 36 };
+    return { x: GAME_CONFIG.width / 2 - 130, y: 340, w: 260, h: 36 };
   }
 
   /**
@@ -164,7 +164,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private slotRowRects(): Array<{ x: number; y: number; w: number; h: number }> {
-    const ys = [200, 260, 320, 380];
+    const ys = [120, 170, 220, 270];
     return ys.map((y) => ({ x: 240, y: y - 6, w: 480, h: 46 }));
   }
 
@@ -173,16 +173,25 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.clear();
     const colors = GAME_CONFIG.colors;
 
-    // Title
-    this.addText(GAME_CONFIG.width / 2 - 174, 60, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
-    this.addText(GAME_CONFIG.width / 2 - 80, 100, 'MATCH SETUP', colors.cyan, GAME_CONFIG.font.large);
+    // Title — shifted up to leave room for everything below within 540 px.
+    this.addText(GAME_CONFIG.width / 2 - 174, 20, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
+    this.addText(GAME_CONFIG.width / 2 - 80, 60, 'MATCH SETUP', colors.cyan, GAME_CONFIG.font.large);
 
     const labels = ['PLAYER 1', 'PLAYER 2', 'PLAYER 3', 'PLAYER 4'];
-    const rowYs = [200, 260, 320, 380];
+    const rowYs = [120, 170, 220, 270];
     const palettes = [colors.cyan, colors.magenta, colors.green, colors.yellow];
     for (let i = 0; i < MAX_PLAYERS; i += 1) {
       this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i], i >= 2);
     }
+
+    // Hint
+    this.addText(
+      GAME_CONFIG.width / 2 - 254,
+      318,
+      '1-4 cycles controllers   ·   B cycles match length',
+      colors.white,
+      GAME_CONFIG.font.small
+    );
 
     // Match length button (B to cycle, also clickable)
     const ml = this.matchLengthRect();
@@ -193,19 +202,10 @@ export class MenuScene extends Phaser.Scene {
     const mlLabel = MATCH_LENGTHS[this.matchLengthIndex].label;
     this.addText(ml.x + 60, ml.y + 8, mlLabel, colors.cyan, GAME_CONFIG.font.large);
 
-    // Hint
-    this.addText(
-      GAME_CONFIG.width / 2 - 254,
-      430,
-      '1-4 cycles controllers   ·   B cycles match length',
-      colors.white,
-      GAME_CONFIG.font.small
-    );
-
     // Start button (gated on canStart())
     const enabled = this.canStart();
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 500;
+    const btnY = 400;
     const btnW = 260;
     const btnH = 46;
     this.graphics.fillStyle(colors.panelDark, 1);
@@ -217,7 +217,7 @@ export class MenuScene extends Phaser.Scene {
     if (!enabled) {
       this.addText(
         GAME_CONFIG.width / 2 - 222,
-        554,
+        460,
         'Need at least 2 participants and 1 human.',
         colors.red,
         GAME_CONFIG.font.small

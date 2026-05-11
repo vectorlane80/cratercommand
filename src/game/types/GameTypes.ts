@@ -75,6 +75,12 @@ export interface MatchState {
   shoppingPlayerId: PlayerId | null;
   shopVisitsRemaining: number;
   matchWinnerId: PlayerId | null;
+  /**
+   * Item key (weapon.id / 'parachute' / 'shield') that is on sale this
+   * round's shop, plus the discount fraction (0..1). Re-rolled in
+   * enterShoppingPhase. Null when there's no sale.
+   */
+  currentSale: { itemKey: string; discount: number } | null;
 }
 
 export const MAX_PLAYERS = 4;
@@ -241,7 +247,14 @@ export const GAME_CONFIG = {
     minTankSeparation: 36
   },
   fall: {
-    threshold: 8,
+    // Drop distance (game-world px) before a fall event registers. Combined
+    // with the 3-point cross-tank sampling in settleTanksAfterTerrainChange,
+    // this triggers falls reliably whenever a crater pulls ground out from
+    // under any part of the tank's base. Players were "falling in small
+    // bits" without seeing the chute deployment / fall damage trigger,
+    // because the threshold was too high relative to the typical crater
+    // drop at one side of the tank.
+    threshold: 6,
     damagePerPixel: 0.85,
     maxDamage: 75
   },
@@ -255,7 +268,17 @@ export const GAME_CONFIG = {
     shieldAbsorbAmount: 40,
     damageCashMultiplier: 3,
     roundWinBonus: 500,
-    survivalBonus: 150
+    survivalBonus: 150,
+    // Each round past round 1, every base price is multiplied by
+    // (1 + (round - 1) * roundPriceInflation). At 0.15, round 2 prices are
+    // 1.15x, round 5 are 1.60x, round 7 are 1.90x.
+    roundPriceInflation: 0.15,
+    // Chance per round (when entering shop) that a random buyable item gets
+    // discounted. Discount fraction is a random value in [minSaleDiscount,
+    // maxSaleDiscount]. Sales display alongside the price in the shop.
+    saleChance: 0.25,
+    minSaleDiscount: 0.3,
+    maxSaleDiscount: 0.5
   },
   weapons: [
     {

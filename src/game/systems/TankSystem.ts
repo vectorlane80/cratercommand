@@ -148,7 +148,18 @@ export class TankSystem {
     tanks.forEach((tank) => {
       if (!tank.alive) return;
 
-      const groundY = terrainSystem.getHeightAtX(terrainData, tank.x) - GAME_CONFIG.tank.placementOffsetY;
+      // Sample under both feet AND the center so a crater that pulls ground
+      // out from under one side of the tank still registers as a fall. The
+      // deepest (largest-y) sample wins — partial support loss tips the
+      // tank into the hole.
+      const halfBase = GAME_CONFIG.tank.width / 2 - 2;
+      const samples = [
+        terrainSystem.getHeightAtX(terrainData, tank.x - halfBase),
+        terrainSystem.getHeightAtX(terrainData, tank.x),
+        terrainSystem.getHeightAtX(terrainData, tank.x + halfBase)
+      ];
+      const lowestTerrain = Math.max(samples[0], samples[1], samples[2]);
+      const groundY = lowestTerrain - GAME_CONFIG.tank.placementOffsetY;
       const fallDistance = groundY - tank.y;
 
       if (fallDistance > GAME_CONFIG.fall.threshold) {

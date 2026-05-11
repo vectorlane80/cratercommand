@@ -391,7 +391,43 @@ export class GameScene extends Phaser.Scene {
     this.turn.phase = 'shopping';
     this.statusMessage = null;
     this.clearPendingShop();
+    this.rollShopSale();
     this.renderAll();
+  }
+
+  /**
+   * Roll a fresh sale for the shop the players are about to enter. Picks a
+   * uniformly-random *purchasable* item (weapon with price > 0, or
+   * parachute / shield), applies a random discount in the configured range.
+   * Stored in match.currentSale so the same sale is visible to every shopper
+   * in this round's shop session.
+   */
+  private rollShopSale(): void {
+    if (Math.random() >= GAME_CONFIG.match.saleChance) {
+      this.match.currentSale = null;
+      return;
+    }
+    const candidates: string[] = [];
+    GAME_CONFIG.weapons.forEach((w) => { if (w.price > 0) candidates.push(w.id); });
+    candidates.push('parachute', 'shield');
+    const itemKey = candidates[Math.floor(Math.random() * candidates.length)];
+    const range = GAME_CONFIG.match.maxSaleDiscount - GAME_CONFIG.match.minSaleDiscount;
+    const discount = GAME_CONFIG.match.minSaleDiscount + Math.random() * range;
+    this.match.currentSale = { itemKey, discount };
+  }
+
+  /**
+   * Effective price of an item given the current round and any active sale.
+   * Base price scales by (1 + (round-1) * roundPriceInflation), then any
+   * active sale on this exact item knocks off (discount) of the inflated
+   * price. Minimum 1 to keep it a real transaction.
+   */
+  private effectivePrice(basePrice: number, itemKey: string): number {
+    if (basePrice <= 0) return 0;
+    const inflated = basePrice * (1 + (this.match.round - 1) * GAME_CONFIG.match.roundPriceInflation);
+    const sale = this.match.currentSale;
+    const final = sale && sale.itemKey === itemKey ? inflated * (1 - sale.discount) : inflated;
+    return Math.max(1, Math.round(final));
   }
 
   private returnToMenu(): void {
@@ -402,6 +438,10 @@ export class GameScene extends Phaser.Scene {
   // -------- PENDING SHOP HELPERS --------
 
   private pendingPriceFor(key: string): number {
+    return this.effectivePrice(this.basePriceFor(key), key);
+  }
+
+  private basePriceFor(key: string): number {
     if (key === 'parachute') return GAME_CONFIG.match.parachutePrice;
     if (key === 'shield') return GAME_CONFIG.match.shieldPrice;
     const weapon = GAME_CONFIG.weapons.find((w) => w.id === key);
@@ -432,11 +472,14 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Try to add one unit to the shopping cart. Returns true if it fit within
-   * the shopper's remaining cash budget. Free items (price 0) are rejected
-   * because they aren't purchasable anyway (the unlimited Small Missile).
+   * the shopper's remaining cash budget after applying round-inflation and
+   * any active sale. Free items (base price 0) are rejected because they
+   * aren't purchasable anyway (the unlimited Small Missile).
    */
-  private tryQueueShopBuy(profile: PlayerProfile, key: string, price: number): boolean {
-    if (price <= 0) return false;
+  private tryQueueShopBuy(profile: PlayerProfile, key: string): boolean {
+    const basePrice = this.basePriceFor(key);
+    if (basePrice <= 0) return false;
+    const price = this.effectivePrice(basePrice, key);
     if (this.effectiveCash(profile) < price) return false;
     this.pendingShopBuys[key] = (this.pendingShopBuys[key] ?? 0) + 1;
     this.pendingShopHistory.push(key);
@@ -558,7 +601,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
         const weapon = GAME_CONFIG.weapons[i];
-        if (this.tryQueueShopBuy(profile, weapon.id, weapon.price)) {
+        if (this.tryQueueShopBuy(profile, weapon.id)) {
           soundSystem.playUiSelect();
           changed = true;
         }
@@ -566,14 +609,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.parachuteBuyKey)) {
-      if (this.tryQueueShopBuy(profile, 'parachute', GAME_CONFIG.match.parachutePrice)) {
+      if (this.tryQueueShopBuy(profile, 'parachute')) {
         soundSystem.playUiSelect();
         changed = true;
       }
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.shieldBuyKey)) {
-      if (this.tryQueueShopBuy(profile, 'shield', GAME_CONFIG.match.shieldPrice)) {
+      if (this.tryQueueShopBuy(profile, 'shield')) {
         soundSystem.playUiSelect();
         changed = true;
       }
@@ -702,7 +745,7 @@ export class GameScene extends Phaser.Scene {
       const rowY = listYStart + i * rowH;
       if (x >= listX && x <= listX + 500 && y >= rowY - 4 && y < rowY + rowH - 4) {
         const weapon = GAME_CONFIG.weapons[i];
-        if (this.tryQueueShopBuy(profile, weapon.id, weapon.price)) {
+        if (this.tryQueueShopBuy(profile, weapon.id)) {
           soundSystem.playUiSelect();
           this.renderAll();
         }
@@ -713,7 +756,7 @@ export class GameScene extends Phaser.Scene {
     // Parachute row (next after weapons)
     const chuteY = listYStart + GAME_CONFIG.weapons.length * rowH + 8;
     if (x >= listX && x <= listX + 500 && y >= chuteY - 4 && y < chuteY + rowH - 4) {
-      if (this.tryQueueShopBuy(profile, 'parachute', GAME_CONFIG.match.parachutePrice)) {
+      if (this.tryQueueShopBuy(profile, 'parachute')) {
         soundSystem.playUiSelect();
         this.renderAll();
       }
@@ -723,7 +766,7 @@ export class GameScene extends Phaser.Scene {
     // Shield row (after parachute)
     const shieldY = chuteY + rowH;
     if (x >= listX && x <= listX + 500 && y >= shieldY - 4 && y < shieldY + rowH - 4) {
-      if (this.tryQueueShopBuy(profile, 'shield', GAME_CONFIG.match.shieldPrice)) {
+      if (this.tryQueueShopBuy(profile, 'shield')) {
         soundSystem.playUiSelect();
         this.renderAll();
       }
@@ -985,7 +1028,10 @@ export class GameScene extends Phaser.Scene {
       {
         pendingFor: (key) => this.pendingFor(key),
         effectiveCash: (p) => this.effectiveCash(p as PlayerProfile),
-        hasPending: () => Object.keys(this.pendingShopBuys).length > 0
+        hasPending: () => Object.keys(this.pendingShopBuys).length > 0,
+        effectivePrice: (basePrice, key) => this.effectivePrice(basePrice, key),
+        saleItem: () => this.match.currentSale?.itemKey ?? null,
+        saleDiscount: () => this.match.currentSale?.discount ?? 0
       }
     );
   }

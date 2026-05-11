@@ -36,7 +36,8 @@ export class TurnSystem {
       profiles: active.map((c) => this.createInitialProfile(c)),
       shoppingPlayerId: null,
       shopVisitsRemaining: 0,
-      matchWinnerId: null
+      matchWinnerId: null,
+      currentSale: null
     };
   }
 
