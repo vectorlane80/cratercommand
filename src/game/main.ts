@@ -8,5 +8,6 @@ new Phaser.Game({
   parent: document.body,
   width: GAME_CONFIG.width,
   height: GAME_CONFIG.height,
+  pixelArt: true,
   scene: [BootScene, GameScene]
 });

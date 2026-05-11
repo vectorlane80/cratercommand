@@ -17,11 +17,33 @@ import {
   type WeaponDefinition
 } from '../types/GameTypes';
 
+// Retro pixel backdrop layout (within the 356 px battlefield height).
+const RETRO_LAYOUT = {
+  skyY: 0,
+  skyHeight: 162,
+  farMountainsY: 162,
+  farMountainsHeight: 96,
+  midMountainsY: 230,
+  midMountainsHeight: 126,
+  sunX: 480,
+  sunY: 100,
+  sunScale: 1.4
+};
+
+const RETRO_CACTUS_POSITIONS = [0.06, 0.27, 0.42, 0.58, 0.72, 0.94] as const;
+
 export class GameScene extends Phaser.Scene {
   private backgroundGraphics!: Phaser.GameObjects.Graphics;
   private terrainGraphics!: Phaser.GameObjects.Graphics;
   private tankGraphics!: Phaser.GameObjects.Graphics;
   private projectileGraphics!: Phaser.GameObjects.Graphics;
+
+  // Retro-mode image layers (created once, shown only when visualSystem === 'retroPixel').
+  private retroSky!: Phaser.GameObjects.Image;
+  private retroSun!: Phaser.GameObjects.Image;
+  private retroFarMountains!: Phaser.GameObjects.Image;
+  private retroMidMountains!: Phaser.GameObjects.Image;
+  private retroCacti: Phaser.GameObjects.Image[] = [];
 
   private terrainSystem!: TerrainSystem;
   private tankSystem!: TankSystem;
@@ -55,7 +77,35 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
 
     this.backgroundGraphics = this.add.graphics();
+
+    // Retro layers sit between background fill and procedural terrain. They
+    // are only made visible when visualSystem === 'retroPixel'.
+    this.retroSky = this.add.image(GAME_CONFIG.width / 2, RETRO_LAYOUT.skyY, 'retro-sky').setOrigin(0.5, 0);
+    this.retroSky.displayWidth = GAME_CONFIG.width;
+    this.retroSky.displayHeight = RETRO_LAYOUT.skyHeight;
+
+    this.retroSun = this.add.image(RETRO_LAYOUT.sunX, RETRO_LAYOUT.sunY, 'retro-sun').setOrigin(0.5, 0.5);
+    this.retroSun.setScale(RETRO_LAYOUT.sunScale);
+
+    this.retroFarMountains = this.add
+      .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.farMountainsY, 'retro-far-mountains')
+      .setOrigin(0.5, 0);
+    this.retroFarMountains.displayWidth = GAME_CONFIG.width;
+    this.retroFarMountains.displayHeight = RETRO_LAYOUT.farMountainsHeight;
+
+    this.retroMidMountains = this.add
+      .image(GAME_CONFIG.width / 2, RETRO_LAYOUT.midMountainsY, 'retro-mid-mountains')
+      .setOrigin(0.5, 0);
+    this.retroMidMountains.displayWidth = GAME_CONFIG.width;
+    this.retroMidMountains.displayHeight = RETRO_LAYOUT.midMountainsHeight;
+
     this.terrainGraphics = this.add.graphics();
+
+    // Cacti sit above terrain but below tanks/projectiles.
+    this.retroCacti = RETRO_CACTUS_POSITIONS.map(() =>
+      this.add.image(0, 0, 'retro-cactus').setOrigin(0.5, 1).setScale(1)
+    );
+
     this.tankGraphics = this.add.graphics();
     this.projectileGraphics = this.add.graphics();
 
@@ -444,8 +494,33 @@ export class GameScene extends Phaser.Scene {
   private renderAll(): void {
     this.drawRetroBattlefieldBackground();
     this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
+    this.updateRetroLayerVisibility();
     this.renderTanksAndHud();
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
+  }
+
+  private updateRetroLayerVisibility(): void {
+    const retro = this.visualSystem === 'retroPixel';
+    this.retroSky.visible = retro;
+    this.retroSun.visible = retro;
+    this.retroFarMountains.visible = retro;
+    this.retroMidMountains.visible = retro;
+    this.retroCacti.forEach((cactus) => (cactus.visible = retro));
+
+    if (retro && this.terrainData) {
+      RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
+        const cactus = this.retroCacti[idx];
+        if (!cactus) return;
+        // Skip cacti that would land on tank spawn columns
+        if (Math.abs(t - 0.16) < 0.06 || Math.abs(t - 0.86) < 0.06) {
+          cactus.visible = false;
+          return;
+        }
+        const x = t * GAME_CONFIG.width;
+        const y = this.terrainSystem.getHeightAtX(this.terrainData, x);
+        cactus.setPosition(Math.round(x), Math.round(y) + 2);
+      });
+    }
   }
 
   private renderTanksAndHud(): void {
@@ -472,171 +547,25 @@ export class GameScene extends Phaser.Scene {
     this.backgroundGraphics.fillStyle(colors.black, 1);
     this.backgroundGraphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
 
-    if (this.visualSystem === 'retroPixel') {
-      this.drawRetroPixelBattlefieldBackground();
-      return;
-    }
-
-    // Classic: black sky with a faint deterministic starfield.
-    this.backgroundGraphics.fillStyle(colors.white, 0.45);
-    const starSeed = 1337;
-    for (let i = 0; i < 60; i += 1) {
-      const px = (i * 73 + starSeed) % GAME_CONFIG.width;
-      const py = ((i * 41 + starSeed) % 150) + 12;
-      this.backgroundGraphics.fillRect(px, py, 1, 1);
-    }
-
-    this.backgroundGraphics.lineStyle(2, colors.white, 1);
+    // Console divider line is shared by both visual systems.
+    this.backgroundGraphics.lineStyle(2, this.visualSystem === 'retroPixel' ? colors.steelLight : colors.white, 1);
     this.backgroundGraphics.beginPath();
     this.backgroundGraphics.moveTo(0, GAME_CONFIG.layout.consoleTop - 2);
     this.backgroundGraphics.lineTo(GAME_CONFIG.width, GAME_CONFIG.layout.consoleTop - 2);
     this.backgroundGraphics.strokePath();
-  }
 
-  private drawRetroPixelBattlefieldBackground(): void {
-    const colors = GAME_CONFIG.colors;
-    const width = GAME_CONFIG.width;
-    const height = GAME_CONFIG.layout.battlefieldHeight;
-
-    // Smooth sunset gradient: interpolate per-row between color stops.
-    const stops: Array<{ y: number; color: number }> = [
-      { y: 0, color: 0x0a0820 },
-      { y: 72, color: 0x2a1148 },
-      { y: 140, color: 0x5e1c5a },
-      { y: 198, color: 0x9d2848 },
-      { y: 248, color: 0xd14d2a },
-      { y: 290, color: 0xf28d1a },
-      { y: 326, color: 0xffd15c },
-      { y: height, color: 0xfdba3a }
-    ];
-    for (let y = 0; y < height; y += 1) {
-      const color = sampleGradient(stops, y);
-      this.backgroundGraphics.fillStyle(color, 1);
-      this.backgroundGraphics.fillRect(0, y, width, 1);
-    }
-
-    // Sparse starfield in the upper sky.
-    this.backgroundGraphics.fillStyle(colors.white, 0.9);
-    for (let i = 0; i < 38; i += 1) {
-      const x = (i * 173 + 91) % width;
-      const y = ((i * 47 + 23) % 90) + 6;
-      const size = i % 9 === 0 ? 2 : 1;
-      this.backgroundGraphics.fillRect(x, y, size, size);
-    }
-
-    // Synthwave sun: glow halo, bright yellow disc with deep orange inner
-    // body and horizontal dark cuts across its lower half. Sized and placed
-    // above the mountain peaks so it's actually visible.
-    this.drawSynthwaveSun(width / 2, 168, 34);
-
-    // Mountain silhouettes (back to front, darkest to lightest). Four layers
-    // for parallax depth; bigger amplitudes and more peaks make them feel
-    // like a desert range rather than rolling hills.
-    this.drawMountainLayer(0x150e2a, 198, 1, 46, 9, 5);
-    this.drawMountainLayer(0x271845, 232, 1, 50, 11, 13);
-    this.drawMountainLayer(0x3b1f4f, 266, 1, 44, 13, 21);
-    this.drawMountainLayer(0x5a2452, 302, 1, 36, 15, 29);
-
-    this.backgroundGraphics.lineStyle(2, colors.steelLight, 1);
-    this.backgroundGraphics.beginPath();
-    this.backgroundGraphics.moveTo(0, GAME_CONFIG.layout.consoleTop - 2);
-    this.backgroundGraphics.lineTo(width, GAME_CONFIG.layout.consoleTop - 2);
-    this.backgroundGraphics.strokePath();
-  }
-
-  private drawSynthwaveSun(sunX: number, sunY: number, sunR: number): void {
-    // Soft glow halo
-    for (let r = sunR + 14; r > sunR; r -= 2) {
-      const t = (sunR + 14 - r) / 14;
-      this.backgroundGraphics.fillStyle(0xff8a3c, 0.06 + t * 0.07);
-      this.backgroundGraphics.fillCircle(sunX, sunY, r);
-    }
-    // Bright disc
-    this.backgroundGraphics.fillStyle(0xffe7a0, 1);
-    this.backgroundGraphics.fillCircle(sunX, sunY, sunR);
-    // Orange inner body offset down for a sunset feel
-    this.backgroundGraphics.fillStyle(0xff9a36, 1);
-    this.backgroundGraphics.fillCircle(sunX, sunY + 5, sunR - 7);
-
-    // Dark horizontal cuts on the lower half, sized to the disc geometry.
-    this.backgroundGraphics.fillStyle(0x6c1d2c, 1);
-    for (let i = 0; i < 6; i += 1) {
-      const cutY = sunY + 6 + i * 4;
-      const dy = cutY - sunY;
-      const halfWidth = Math.sqrt(Math.max(0, sunR * sunR - dy * dy)) - 1;
-      if (halfWidth <= 0) continue;
-      this.backgroundGraphics.fillRect(sunX - halfWidth, cutY, halfWidth * 2, 2);
-    }
-  }
-
-  /**
-   * Sharp triangular mountain range. Peaks are placed deterministically from
-   * the seed so the silhouette is stable per layer, and each layer offsets
-   * its peaks to break up the overlap.
-   */
-  private drawMountainLayer(
-    color: number,
-    baseY: number,
-    alpha: number,
-    amplitude: number,
-    peakCount: number,
-    seed: number
-  ): void {
-    const width = GAME_CONFIG.width;
-    const battlefieldBottom = GAME_CONFIG.layout.battlefieldHeight;
-    const peakSpacing = width / peakCount;
-
-    const points: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i <= peakCount; i += 1) {
-      const jitter = ((i * 919 + seed * 71) % 41) - 20;
-      const peakHeightVariance = ((i * 313 + seed * 53) % amplitude) - amplitude * 0.25;
-      points.push({
-        x: i * peakSpacing + jitter,
-        y: baseY - amplitude + peakHeightVariance
-      });
-    }
-
-    this.backgroundGraphics.fillStyle(color, alpha);
-    this.backgroundGraphics.beginPath();
-    this.backgroundGraphics.moveTo(-12, battlefieldBottom);
-    for (let i = 0; i < points.length; i += 1) {
-      const peak = points[i];
-      if (i > 0) {
-        // Valley between peaks at the layer's base elevation.
-        const prev = points[i - 1];
-        const valleyX = (prev.x + peak.x) / 2;
-        const valleyDip = ((i * 199 + seed * 37) % 8) + 2;
-        this.backgroundGraphics.lineTo(valleyX, baseY + valleyDip);
+    if (this.visualSystem === 'classic') {
+      // Classic sky: faint deterministic starfield.
+      this.backgroundGraphics.fillStyle(colors.white, 0.45);
+      const starSeed = 1337;
+      for (let i = 0; i < 60; i += 1) {
+        const px = (i * 73 + starSeed) % GAME_CONFIG.width;
+        const py = ((i * 41 + starSeed) % 150) + 12;
+        this.backgroundGraphics.fillRect(px, py, 1, 1);
       }
-      this.backgroundGraphics.lineTo(peak.x, peak.y);
     }
-    this.backgroundGraphics.lineTo(width + 12, battlefieldBottom);
-    this.backgroundGraphics.closePath();
-    this.backgroundGraphics.fillPath();
+    // Retro mode: backdrop is supplied by retroSky / retroFarMountains /
+    // retroMidMountains image game objects; no procedural drawing needed.
   }
-}
 
-/**
- * Linear-interpolate between adjacent color stops sorted by y. Returns a
- * packed 24-bit RGB int suitable for Phaser fillStyle.
- */
-function sampleGradient(stops: Array<{ y: number; color: number }>, y: number): number {
-  for (let i = 0; i < stops.length - 1; i += 1) {
-    const a = stops[i];
-    const b = stops[i + 1];
-    if (y >= a.y && y <= b.y) {
-      const t = b.y === a.y ? 0 : (y - a.y) / (b.y - a.y);
-      const ar = (a.color >> 16) & 0xff;
-      const ag = (a.color >> 8) & 0xff;
-      const ab = a.color & 0xff;
-      const br = (b.color >> 16) & 0xff;
-      const bg = (b.color >> 8) & 0xff;
-      const bb = b.color & 0xff;
-      const r = Math.round(ar + (br - ar) * t);
-      const g = Math.round(ag + (bg - ag) * t);
-      const bl = Math.round(ab + (bb - ab) * t);
-      return (r << 16) | (g << 8) | bl;
-    }
-  }
-  return stops[stops.length - 1].color;
 }

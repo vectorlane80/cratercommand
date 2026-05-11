@@ -152,40 +152,7 @@ export class TerrainSystem {
       }
     }
 
-    // Cacti scattered along the ridge, avoiding tank spawn zones.
-    const cactusXs = [0.07, 0.27, 0.41, 0.55, 0.69, 0.93];
-    cactusXs.forEach((t, i) => {
-      const cactusX = t * width;
-      if (Math.abs(t - 0.16) < 0.06) return;
-      if (Math.abs(t - 0.86) < 0.06) return;
-      const groundY = this.getHeightAtX(terrainData, cactusX);
-      this.drawCactus(graphics, Math.round(cactusX), Math.round(groundY), i);
-    });
-  }
-
-  private drawCactus(graphics: Phaser.GameObjects.Graphics, cx: number, baseY: number, seed: number): void {
-    const trunkColor = 0x2e8e36;
-    const shadowColor = 0x143a18;
-    const highlightColor = 0x6ad06c;
-    const trunkHeight = 12 + (seed % 3);
-
-    // Trunk
-    graphics.fillStyle(trunkColor, 1);
-    graphics.fillRect(cx - 1, baseY - trunkHeight, 3, trunkHeight);
-
-    // Left arm
-    graphics.fillRect(cx - 4, baseY - trunkHeight + 4, 2, 4);
-    graphics.fillRect(cx - 4, baseY - trunkHeight + 2, 2, 2);
-    // Right arm
-    graphics.fillRect(cx + 3, baseY - trunkHeight + 5, 2, 4);
-    graphics.fillRect(cx + 3, baseY - trunkHeight + 3, 2, 2);
-
-    // Highlight line on left side
-    graphics.fillStyle(highlightColor, 1);
-    graphics.fillRect(cx - 1, baseY - trunkHeight + 1, 1, trunkHeight - 2);
-    // Shadow on right side
-    graphics.fillStyle(shadowColor, 1);
-    graphics.fillRect(cx + 1, baseY - trunkHeight + 1, 1, trunkHeight - 1);
+    // Cacti are now drawn as image sprites by GameScene's retro layer pass.
   }
 
   applyMound(terrainData: TerrainData, x: number, y: number, radius: number): void {
