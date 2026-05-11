@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_CONFIG, type TerrainData } from '../types/GameTypes';
+import { GAME_CONFIG, type TerrainData, type VisualSystem } from '../types/GameTypes';
 
 export class TerrainSystem {
   generate(sceneWidth: number, battlefieldHeight: number): TerrainData {
@@ -43,10 +43,15 @@ export class TerrainSystem {
     };
   }
 
-  draw(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
+  draw(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData, visualSystem: VisualSystem = 'classic'): void {
     const { heights, width, height, segmentWidth } = terrainData;
 
     graphics.clear();
+    if (visualSystem === 'retroPixel') {
+      this.drawRetroPixel(graphics, terrainData);
+      return;
+    }
+
     graphics.fillStyle(GAME_CONFIG.colors.darkGreen, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
@@ -76,6 +81,65 @@ export class TerrainSystem {
       const x = index * segmentWidth;
       const y = heights[index] + 12;
       graphics.fillRect(x, y, 2, Math.max(0, height - y));
+    }
+  }
+
+  private drawRetroPixel(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
+    const { heights, width, height, segmentWidth } = terrainData;
+    const colors = GAME_CONFIG.colors;
+
+    graphics.fillStyle(colors.desertDark, 1);
+    graphics.beginPath();
+    graphics.moveTo(0, height);
+    heights.forEach((sampleHeight, index) => {
+      graphics.lineTo(index * segmentWidth, sampleHeight);
+    });
+    graphics.lineTo(width, height);
+    graphics.closePath();
+    graphics.fillPath();
+
+    graphics.fillStyle(colors.desertBrown, 0.78);
+    for (let index = 0; index < heights.length - 1; index += 1) {
+      const x = index * segmentWidth;
+      const nextX = (index + 1) * segmentWidth;
+      const y = heights[index] + 10;
+      graphics.fillRect(x, y, Math.ceil(nextX - x) + 1, Math.max(0, height - y));
+    }
+
+    graphics.lineStyle(4, colors.desertGold, 1);
+    graphics.beginPath();
+    heights.forEach((sampleHeight, index) => {
+      const x = index * segmentWidth;
+      if (index === 0) {
+        graphics.moveTo(x, sampleHeight);
+      } else {
+        graphics.lineTo(x, sampleHeight);
+      }
+    });
+    graphics.strokePath();
+
+    graphics.lineStyle(2, 0xffb22e, 0.9);
+    graphics.beginPath();
+    heights.forEach((sampleHeight, index) => {
+      const x = index * segmentWidth;
+      const y = sampleHeight + 5;
+      if (index === 0) {
+        graphics.moveTo(x, y);
+      } else {
+        graphics.lineTo(x, y);
+      }
+    });
+    graphics.strokePath();
+
+    for (let y = 0; y < height; y += 10) {
+      for (let x = (y * 7) % 17; x < width; x += 17) {
+        const groundY = this.getHeightAtX(terrainData, x);
+        if (y > groundY + 12) {
+          const shade = (x + y) % 4 === 0 ? 0x0c0703 : 0x2d1a0b;
+          graphics.fillStyle(shade, 0.72);
+          graphics.fillRect(x, y, 3, 2);
+        }
+      }
     }
   }
 
