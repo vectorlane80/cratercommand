@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AISystem, isAIController, type AIDecision } from '../systems/AISystem';
-import { HudSystem } from '../systems/HudSystem';
+import { HudSystem, SHOP_LAYOUT } from '../systems/HudSystem';
 import { soundSystem } from '../systems/SoundSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
@@ -76,6 +76,10 @@ export class GameScene extends Phaser.Scene {
   // discarded on ESC. Keys: weapon ids + 'parachute' + 'shield'.
   private pendingShopBuys: Record<string, number> = {};
   private pendingShopHistory: string[] = [];
+
+  // Ephemeral toast for fall events (chute deployed / fall damage). Lives
+  // ~2s so the human can see it. Cleared lazily during render.
+  private fallToast: { text: string; color: number; expiresAt: number } | null = null;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -732,20 +736,51 @@ export class GameScene extends Phaser.Scene {
     if (this.match.shoppingPlayerId === null) return;
     const profile = this.match.profiles[this.match.shoppingPlayerId];
 
-    // Shop overlay coords mirror HudSystem.drawShopOverlay.
-    const panelX = 80;
-    const panelY = 40;
-    const panelH = GAME_CONFIG.height - 80;
-    const listX = panelX + 24;
-    const listYStart = panelY + 158; // header row at +130, first weapon row at +158
-    const rowH = 24;
+    // Row keys IN ORDER, matching HudSystem.drawShopOverlay's render order.
+    const rowKeys = [
+      ...GAME_CONFIG.weapons.map((w) => w.id),
+      'parachute',
+      'shield'
+    ];
 
-    // Weapon rows (8 weapons) — clicking adds to pending cart
-    for (let i = 0; i < GAME_CONFIG.weapons.length; i += 1) {
-      const rowY = listYStart + i * rowH;
-      if (x >= listX && x <= listX + 500 && y >= rowY - 4 && y < rowY + rowH - 4) {
-        const weapon = GAME_CONFIG.weapons[i];
-        if (this.tryQueueShopBuy(profile, weapon.id)) {
+    // Compute row y-positions
+    const weaponRowY = (i: number) => SHOP_LAYOUT.listYStart + i * SHOP_LAYOUT.rowH;
+    const chuteRowY = SHOP_LAYOUT.listYStart + GAME_CONFIG.weapons.length * SHOP_LAYOUT.rowH + SHOP_LAYOUT.parachuteGap;
+    const shieldRowY = chuteRowY + SHOP_LAYOUT.rowH;
+    const rowYs = [
+      ...GAME_CONFIG.weapons.map((_, i) => weaponRowY(i)),
+      chuteRowY,
+      shieldRowY
+    ];
+
+    // For each row: check minus button, plus button, then rest-of-row (which
+    // also acts as a plus shortcut for big touch targets).
+    for (let i = 0; i < rowKeys.length; i += 1) {
+      const rowY = rowYs[i];
+      const inRowYBounds = y >= rowY - 4 && y < rowY + SHOP_LAYOUT.rowH - 4;
+      if (!inRowYBounds) continue;
+
+      // Minus button hitbox
+      if (x >= SHOP_LAYOUT.colMinus && x < SHOP_LAYOUT.colMinus + SHOP_LAYOUT.buttonW) {
+        if (this.removeFromCart(rowKeys[i])) {
+          soundSystem.playUiClick();
+          this.renderAll();
+        }
+        return;
+      }
+      // Plus button hitbox
+      if (x >= SHOP_LAYOUT.colPlus && x < SHOP_LAYOUT.colPlus + SHOP_LAYOUT.buttonW) {
+        if (this.tryQueueShopBuy(profile, rowKeys[i])) {
+          soundSystem.playUiSelect();
+          this.renderAll();
+        }
+        return;
+      }
+      // Rest-of-row (left of minus) = quick-add. Keeps the old "click the
+      // row name to buy" feel as well, just doesn't conflict with the
+      // dedicated minus button.
+      if (x >= SHOP_LAYOUT.rowClickX && x < SHOP_LAYOUT.colMinus - 4) {
+        if (this.tryQueueShopBuy(profile, rowKeys[i])) {
           soundSystem.playUiSelect();
           this.renderAll();
         }
@@ -753,42 +788,40 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Parachute row (next after weapons)
-    const chuteY = listYStart + GAME_CONFIG.weapons.length * rowH + 8;
-    if (x >= listX && x <= listX + 500 && y >= chuteY - 4 && y < chuteY + rowH - 4) {
-      if (this.tryQueueShopBuy(profile, 'parachute')) {
-        soundSystem.playUiSelect();
-        this.renderAll();
+    // Footer buttons (UNDO LAST + FINISH) at panelY + panelH - 50.
+    const footerY = SHOP_LAYOUT.panelY + SHOP_LAYOUT.panelH - 50;
+    if (y >= footerY) {
+      if (x >= SHOP_LAYOUT.panelX + 24 && x < SHOP_LAYOUT.panelX + 184) {
+        if (this.undoLastShopBuy()) {
+          soundSystem.playUiClick();
+          this.renderAll();
+        }
+        return;
       }
-      return;
-    }
-
-    // Shield row (after parachute)
-    const shieldY = chuteY + rowH;
-    if (x >= listX && x <= listX + 500 && y >= shieldY - 4 && y < shieldY + rowH - 4) {
-      if (this.tryQueueShopBuy(profile, 'shield')) {
-        soundSystem.playUiSelect();
-        this.renderAll();
-      }
-      return;
-    }
-
-    // Undo button — small button left of Finish
-    const undoY = panelY + panelH - 50;
-    if (x >= listX && x <= listX + 160 && y >= undoY) {
-      if (this.undoLastShopBuy()) {
-        soundSystem.playUiClick();
-        this.renderAll();
-      }
-      return;
-    }
-
-    // Finish/checkout button (bottom-right area of the overlay)
-    if (y >= undoY) {
+      // FINISH covers the rest of the footer width
       this.commitPendingShop(profile);
       soundSystem.playUiClick();
       this.finishShoppingForCurrentPlayer();
     }
+  }
+
+  /**
+   * Decrement the cart count for the given item. Used by the "-" rocker
+   * button in the shop overlay. Removes the LAST occurrence of this item
+   * from the history so the BACKSPACE undo behavior stays consistent.
+   */
+  private removeFromCart(key: string): boolean {
+    const cur = this.pendingShopBuys[key] ?? 0;
+    if (cur <= 0) return false;
+    if (cur === 1) delete this.pendingShopBuys[key];
+    else this.pendingShopBuys[key] = cur - 1;
+    for (let i = this.pendingShopHistory.length - 1; i >= 0; i -= 1) {
+      if (this.pendingShopHistory[i] === key) {
+        this.pendingShopHistory.splice(i, 1);
+        break;
+      }
+    }
+    return true;
   }
 
   /**
@@ -949,7 +982,18 @@ export class GameScene extends Phaser.Scene {
         if (fall.damage > 0 && fall.tankId !== shooter.id) {
           shooter.damageDealt += fall.damage;
         }
-        if (fall.damage > 0 || fall.usedParachute) soundSystem.playFall();
+        if (fall.damage > 0 || fall.usedParachute) {
+          soundSystem.playFall();
+          const tankNum = fall.tankId + 1;
+          const text = fall.usedParachute
+            ? `PLAYER ${tankNum} CHUTE DEPLOYED`
+            : `PLAYER ${tankNum} FELL · ${fall.damage} DAMAGE`;
+          this.fallToast = {
+            text,
+            color: fall.usedParachute ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.red,
+            expiresAt: Date.now() + 2200
+          };
+        }
       });
     }
   }
@@ -1017,6 +1061,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderTanksAndHud(): void {
+    // Clear expired fall toast before rendering.
+    if (this.fallToast && Date.now() > this.fallToast.expiresAt) {
+      this.fallToast = null;
+    }
     this.tankSystem.draw(this.tankGraphics, this.tanks, this.turn.activePlayerId, this.visualSystem);
     this.hudSystem.render(
       this.turn,
@@ -1032,7 +1080,8 @@ export class GameScene extends Phaser.Scene {
         effectivePrice: (basePrice, key) => this.effectivePrice(basePrice, key),
         saleItem: () => this.match.currentSale?.itemKey ?? null,
         saleDiscount: () => this.match.currentSale?.discount ?? 0
-      }
+      },
+      this.fallToast
     );
   }
 

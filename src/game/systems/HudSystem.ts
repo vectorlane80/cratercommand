@@ -12,6 +12,27 @@ import {
 import { soundSystem } from './SoundSystem';
 import { getPlayerPalette } from './TankSystem';
 
+/**
+ * Shop overlay layout constants. Click hit-tests in GameScene must match
+ * these so the rocker (+/-) buttons line up with their drawn graphics.
+ */
+export const SHOP_LAYOUT = {
+  panelX: 80,
+  panelY: 40,
+  panelW: 800,
+  panelH: 460,
+  listYStart: 40 + 130 + 30, // panelY + 130 (header) + 30 (column-header row)
+  rowH: 28,
+  weaponCount: 8,
+  parachuteGap: 6,
+  colMinus: 80 + 500,
+  colPlus: 80 + 610,
+  buttonW: 32,
+  buttonH: 24,
+  rowClickX: 80 + 24,
+  rowClickW: 460
+};
+
 export interface ShopPending {
   pendingFor: (key: string) => number;
   effectiveCash: (profile: { cash: number }) => number;
@@ -49,7 +70,8 @@ export class HudSystem {
     match: MatchState,
     statusMessage: string | null,
     visualSystem: VisualSystem = 'classic',
-    pendingShop: ShopPending = EMPTY_SHOP_PENDING
+    pendingShop: ShopPending = EMPTY_SHOP_PENDING,
+    fallToast: { text: string; color: number } | null = null
   ): void {
     this.currentPendingShop = pendingShop;
     this.clearTexts();
@@ -86,6 +108,20 @@ export class HudSystem {
         `PLAYER ${match.matchWinnerId! + 1} WINS THE MATCH`,
         'PRESS R TO RESTART'
       );
+    }
+
+    // Fall-event toast — sits at the top-center under the player cards so
+    // chute deployments and fall damage are unmissable. GameScene clears
+    // the toast when expired, so we render it whenever it's non-null.
+    if (fallToast) {
+      const labelW = fallToast.text.length * 11;
+      const x = (GAME_CONFIG.width - labelW) / 2;
+      const y = 96;
+      this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.7);
+      this.graphics.fillRect(x - 10, y - 4, labelW + 20, 26);
+      this.graphics.lineStyle(2, fallToast.color, 1);
+      this.graphics.strokeRect(x - 10, y - 4, labelW + 20, 26);
+      this.addText(x, y, fallToast.text, fallToast.color, GAME_CONFIG.font.medium);
     }
   }
 
@@ -572,81 +608,91 @@ export class HudSystem {
       GAME_CONFIG.font.large
     );
 
-    const listX = panelX + 24;
+    // Column layout — each row is rendered as discrete text spans plus the
+    // graphical +/- "rocker" buttons. Click hitboxes in GameScene must use
+    // the same column x values (see SHOP_COL_* below).
+    const colKey = panelX + 24;
+    const colName = panelX + 60;
+    const colPrice = panelX + 280;
+    const colSale = panelX + 380;
+    const colMinus = panelX + 500;
+    const colCount = panelX + 542;
+    const colPlus = panelX + 610;
+
     let listY = panelY + 130;
-    this.addText(listX, listY, 'KEY  WEAPON              PRICE     OWNED', colors.cyan, GAME_CONFIG.font.medium);
-    listY += 28;
+    this.addText(colKey, listY, 'KEY', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colName, listY, 'WEAPON', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colPrice, listY, 'PRICE', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colCount, listY, 'OWNED', colors.cyan, GAME_CONFIG.font.medium);
+    listY += 30;
 
     const saleKey = pending.saleItem();
     const saleDiscountPct = Math.round(pending.saleDiscount() * 100);
+    const rowH = 28;
 
-    GAME_CONFIG.weapons.forEach((weapon, index) => {
-      const owned = profile.ammo[weapon.id];
-      const pendingQty = pending.pendingFor(weapon.id);
-      const price = pending.effectivePrice(weapon.price, weapon.id);
-      const onSale = saleKey === weapon.id;
-      const canAfford = weapon.price > 0 && effectiveCash >= price;
-      const labelColor = weapon.price === 0
+    const drawRow = (
+      keyLabel: string,
+      itemKey: string,
+      itemName: string,
+      basePrice: number,
+      ownedDisplay: number,
+      tint: number,
+      y: number
+    ) => {
+      const pendingQty = pending.pendingFor(itemKey);
+      const price = pending.effectivePrice(basePrice, itemKey);
+      const onSale = saleKey === itemKey;
+      const buyable = basePrice > 0;
+      const canAfford = buyable && effectiveCash >= price;
+      const rowColor = !buyable
         ? colors.dimGray
         : canAfford
-          ? colors.white
+          ? tint
           : colors.dimGray;
-      const priceText = weapon.price === 0 ? 'FREE' : `$${price}`;
-      const totalCount = owned === -1 ? '--' : `${owned + pendingQty}`;
-      const ownedText = pendingQty > 0 ? `${totalCount} (+${pendingQty})` : totalCount;
-      this.addText(
-        listX,
-        listY,
-        `${index + 1}    ${weapon.name.padEnd(18, ' ')}  ${priceText.padEnd(8, ' ')}  ${ownedText}`,
-        labelColor,
-        GAME_CONFIG.font.medium
-      );
+
+      this.addText(colKey, y, keyLabel, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colName, y, itemName, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colPrice, y, buyable ? `$${price}` : 'FREE', rowColor, GAME_CONFIG.font.medium);
       if (onSale) {
-        this.addText(listX + 470, listY, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+        this.addText(colSale, y + 2, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
       }
-      listY += 24;
+      // Minus button — dim when nothing in cart for this item.
+      const minusActive = pendingQty > 0;
+      this.drawRockerButton(colMinus, y, '-', minusActive ? colors.red : colors.dimGray);
+      const ownedText = ownedDisplay === -1 ? '--' : `${ownedDisplay + pendingQty}`;
+      const countLabel = pendingQty > 0 ? `${ownedText} (+${pendingQty})` : ownedText;
+      this.addText(colCount, y, countLabel, rowColor, GAME_CONFIG.font.medium);
+      // Plus button — dim when not affordable.
+      this.drawRockerButton(colPlus, y, '+', canAfford ? colors.green : colors.dimGray);
+    };
+
+    GAME_CONFIG.weapons.forEach((weapon, index) => {
+      drawRow(
+        String(index + 1),
+        weapon.id,
+        weapon.name,
+        weapon.price,
+        profile.ammo[weapon.id],
+        colors.white,
+        listY
+      );
+      listY += rowH;
     });
 
-    listY += 8;
-    const chutePrice = pending.effectivePrice(GAME_CONFIG.match.parachutePrice, 'parachute');
-    const chutePending = pending.pendingFor('parachute');
-    const chuteAfford = effectiveCash >= chutePrice;
-    const chuteCount = `${profile.parachutes + chutePending}${chutePending ? ` (+${chutePending})` : ''}`;
-    this.addText(
-      listX,
-      listY,
-      `P    Parachute           $${chutePrice}      ${chuteCount}`,
-      chuteAfford ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.dimGray,
-      GAME_CONFIG.font.medium
-    );
-    if (saleKey === 'parachute') {
-      this.addText(listX + 470, listY, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
-    }
+    listY += 6;
+    drawRow('P', 'parachute', 'Parachute', GAME_CONFIG.match.parachutePrice, profile.parachutes, colors.yellow, listY);
+    listY += rowH;
+    drawRow('S', 'shield', 'Shield', GAME_CONFIG.match.shieldPrice, profile.shields, colors.cyan, listY);
 
-    listY += 24;
-    const shieldPrice = pending.effectivePrice(GAME_CONFIG.match.shieldPrice, 'shield');
-    const shieldPending = pending.pendingFor('shield');
-    const shieldAfford = effectiveCash >= shieldPrice;
-    const shieldCount = `${profile.shields + shieldPending}${shieldPending ? ` (+${shieldPending})` : ''}`;
-    this.addText(
-      listX,
-      listY,
-      `S    Shield              $${shieldPrice}      ${shieldCount}`,
-      shieldAfford ? GAME_CONFIG.colors.cyan : GAME_CONFIG.colors.dimGray,
-      GAME_CONFIG.font.medium
-    );
-    if (saleKey === 'shield') {
-      this.addText(listX + 470, listY, `SALE -${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
-    }
-
-    // Footer buttons: UNDO (left, only when something to undo) and FINISH
+    // Footer buttons: UNDO LAST (left, only when something to undo) and FINISH.
+    const footerListX = panelX + 24;
     const footerY = panelY + panelH - 50;
     if (hasPending) {
       this.graphics.fillStyle(colors.panelDark, 1);
-      this.graphics.fillRect(listX, footerY, 160, 36);
+      this.graphics.fillRect(footerListX, footerY, 160, 36);
       this.graphics.lineStyle(2, colors.red, 1);
-      this.graphics.strokeRect(listX, footerY, 160, 36);
-      this.addText(listX + 14, footerY + 6, 'UNDO ⌫', colors.red, GAME_CONFIG.font.medium);
+      this.graphics.strokeRect(footerListX, footerY, 160, 36);
+      this.addText(footerListX + 14, footerY + 6, 'UNDO ⌫', colors.red, GAME_CONFIG.font.medium);
     }
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(panelX + panelW - 184, footerY, 160, 36);
@@ -655,12 +701,28 @@ export class HudSystem {
     this.addText(panelX + panelW - 174, footerY + 6, 'FINISH ⏎', colors.yellow, GAME_CONFIG.font.medium);
 
     this.addText(
-      listX + 200,
+      footerListX + 200,
       footerY + 8,
-      'TAP TO BUY · BACKSPACE undoes',
+      'TAP +/- TO ADJUST · ENTER FINISHES',
       colors.white,
       GAME_CONFIG.font.small
     );
+  }
+
+  /**
+   * Filled "rocker" button used in the shop overlay for +/- quantity
+   * adjustments. The text label (+/-) is centered in a fixed-size cell so
+   * the click hitboxes in GameScene line up with the visuals.
+   */
+  private drawRockerButton(x: number, y: number, label: string, accent: number): void {
+    const w = SHOP_LAYOUT.buttonW;
+    const h = SHOP_LAYOUT.buttonH;
+    this.graphics.fillStyle(GAME_CONFIG.colors.panelDark, 1);
+    this.graphics.fillRect(x, y - 2, w, h);
+    this.graphics.lineStyle(2, accent, 1);
+    this.graphics.strokeRect(x, y - 2, w, h);
+    // Center the +/- glyph in the cell. Medium font is ~14px wide per glyph.
+    this.addText(x + 10, y, label, accent, GAME_CONFIG.font.medium);
   }
 
   private addText(x: number, y: number, value: string, color: number, fontSize: string): void {
