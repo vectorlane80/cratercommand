@@ -9,6 +9,7 @@ import {
   type VisualSystem,
   type WeaponDefinition
 } from '../types/GameTypes';
+import { soundSystem } from './SoundSystem';
 import { getPlayerPalette } from './TankSystem';
 
 export class HudSystem {
@@ -157,7 +158,8 @@ export class HudSystem {
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 26);
     this.addText(20, stripY + 4, '←→/↑↓ Aim·Power   A/D Move   SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
-    this.addText(660, stripY + 4, 'Tap panels to adjust', colors.yellow, GAME_CONFIG.font.medium);
+    const soundLabel = `F10 SOUND: ${soundSystem.enabled ? 'ON' : 'OFF'}`;
+    this.addText(660, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.medium);
   }
 
   private drawRetroPixelHud(

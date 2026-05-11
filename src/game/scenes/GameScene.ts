@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { AISystem, isAIController, type AIDecision } from '../systems/AISystem';
 import { HudSystem } from '../systems/HudSystem';
+import { soundSystem } from '../systems/SoundSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
 import { TerrainSystem } from '../systems/TerrainSystem';
@@ -77,6 +78,7 @@ export class GameScene extends Phaser.Scene {
   private moveRightKey!: Phaser.Input.Keyboard.Key;
   private parachuteBuyKey!: Phaser.Input.Keyboard.Key;
   private shieldBuyKey!: Phaser.Input.Keyboard.Key;
+  private soundToggleKey!: Phaser.Input.Keyboard.Key;
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
 
   constructor() {
@@ -136,6 +138,7 @@ export class GameScene extends Phaser.Scene {
     this.moveRightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.parachuteBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     this.shieldBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+    this.soundToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F10);
     const numberKeyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
       Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -159,6 +162,7 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.P,
       Phaser.Input.Keyboard.KeyCodes.S,
       Phaser.Input.Keyboard.KeyCodes.V,
+      Phaser.Input.Keyboard.KeyCodes.F10,
       ...numberKeyCodes
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
@@ -171,6 +175,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    if (Phaser.Input.Keyboard.JustDown(this.soundToggleKey)) {
+      soundSystem.toggle();
+      this.renderTanksAndHud();
+    }
+
     if (this.turn.phase === 'matchOver') {
       if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
         this.scene.restart();
@@ -340,9 +349,11 @@ export class GameScene extends Phaser.Scene {
     if (this.match.profiles[winnerId].wins >= this.match.roundsToWin) {
       this.match.matchWinnerId = winnerId;
       this.turn.phase = 'matchOver';
+      soundSystem.playMatchWin();
     } else {
       this.turn.phase = 'roundOver';
       this.statusMessage = `PLAYER ${winnerId + 1} WINS ROUND ${this.match.round}`;
+      soundSystem.playRoundWin();
     }
 
     this.renderAll();
@@ -425,6 +436,7 @@ export class GameScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
         if (this.tankHasAmmo(activeTank, i)) {
           activeTank.selectedWeaponIndex = i;
+          soundSystem.playUiClick();
           return true;
         }
       }
@@ -444,6 +456,7 @@ export class GameScene extends Phaser.Scene {
           profile.cash -= weapon.price;
           if (profile.ammo[weapon.id] === -1) profile.ammo[weapon.id] = 0;
           profile.ammo[weapon.id] += 1;
+          soundSystem.playUiSelect();
           changed = true;
         }
       }
@@ -454,6 +467,7 @@ export class GameScene extends Phaser.Scene {
       if (profile.cash >= price) {
         profile.cash -= price;
         profile.parachutes += 1;
+        soundSystem.playUiSelect();
         changed = true;
       }
     }
@@ -463,11 +477,13 @@ export class GameScene extends Phaser.Scene {
       if (profile.cash >= price) {
         profile.cash -= price;
         profile.shields += 1;
+        soundSystem.playUiSelect();
         changed = true;
       }
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      soundSystem.playUiClick();
       this.finishShoppingForCurrentPlayer();
       return true;
     }
@@ -578,6 +594,7 @@ export class GameScene extends Phaser.Scene {
           profile.cash -= weapon.price;
           if (profile.ammo[weapon.id] === -1) profile.ammo[weapon.id] = 0;
           profile.ammo[weapon.id] += 1;
+          soundSystem.playUiSelect();
           this.renderAll();
         }
         return;
@@ -591,6 +608,7 @@ export class GameScene extends Phaser.Scene {
       if (profile.cash >= price) {
         profile.cash -= price;
         profile.parachutes += 1;
+        soundSystem.playUiSelect();
         this.renderAll();
       }
       return;
@@ -603,6 +621,7 @@ export class GameScene extends Phaser.Scene {
       if (profile.cash >= price) {
         profile.cash -= price;
         profile.shields += 1;
+        soundSystem.playUiSelect();
         this.renderAll();
       }
       return;
@@ -611,6 +630,7 @@ export class GameScene extends Phaser.Scene {
     // Finish button (bottom-right area of the overlay)
     const finishY = panelY + panelH - 50;
     if (y >= finishY) {
+      soundSystem.playUiClick();
       this.finishShoppingForCurrentPlayer();
     }
   }
@@ -680,6 +700,7 @@ export class GameScene extends Phaser.Scene {
 
     this.activeProjectiles = this.projectileSystem.launch(activeTank, weapon, this.tankSystem);
     this.turn.phase = 'projectileInFlight';
+    soundSystem.playFire();
     this.renderTanksAndHud();
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
   }
@@ -739,10 +760,12 @@ export class GameScene extends Phaser.Scene {
 
       // Shield absorbs up to shieldAbsorbAmount and is consumed on any hit.
       let incoming = weapon.damage;
+      let shieldUsed = false;
       if (target.shields > 0) {
         const absorbed = Math.min(incoming, GAME_CONFIG.match.shieldAbsorbAmount);
         incoming -= absorbed;
         target.shields -= 1;
+        shieldUsed = true;
       }
 
       const damageDealt = Math.min(incoming, target.health);
@@ -751,6 +774,13 @@ export class GameScene extends Phaser.Scene {
       if (target.id !== shooter.id) {
         shooter.damageDealt += damageDealt;
       }
+
+      if (shieldUsed) soundSystem.playShieldHit();
+      if (incoming > 0) soundSystem.playTankHit();
+    } else if (impact.kind === 'terrain') {
+      soundSystem.playExplosion(weapon.craterRadius > 40 ? 1.3 : 0.85);
+    } else if (impact.kind === 'outOfBounds') {
+      soundSystem.playMiss();
     }
 
     if (terrainChanged) {
@@ -763,6 +793,7 @@ export class GameScene extends Phaser.Scene {
         if (fall.damage > 0 && fall.tankId !== shooter.id) {
           shooter.damageDealt += fall.damage;
         }
+        if (fall.damage > 0 || fall.usedParachute) soundSystem.playFall();
       });
     }
   }

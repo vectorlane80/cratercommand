@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { soundSystem } from '../systems/SoundSystem';
 import {
   CONTROLLER_CYCLE,
   CONTROLLER_LABELS,
@@ -60,10 +61,12 @@ export class MenuScene extends Phaser.Scene {
     for (let i = 0; i < this.slotKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.slotKeys[i])) {
         this.cycleSlot(i);
+        soundSystem.playUiClick();
         this.render();
       }
     }
     if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.canStart()) {
+      soundSystem.playUiSelect();
       this.startMatch();
     }
   }
@@ -74,6 +77,7 @@ export class MenuScene extends Phaser.Scene {
       const r = rows[i];
       if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
         this.cycleSlot(i);
+        soundSystem.playUiClick();
         this.render();
         return;
       }
@@ -82,6 +86,7 @@ export class MenuScene extends Phaser.Scene {
     const btnX = GAME_CONFIG.width / 2 - 130;
     const btnY = 470;
     if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 46 && this.canStart()) {
+      soundSystem.playUiSelect();
       this.startMatch();
     }
   }
