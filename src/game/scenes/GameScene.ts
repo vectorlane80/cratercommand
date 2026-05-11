@@ -506,27 +506,26 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Angle panel: click left half to decrease, right half to increase. Each
-    // click is a noticeable step (5°) so it feels responsive on touch.
+    // The console's middle inner panel (x=328..533) holds BOTH the Angle
+    // value (top half, y < top+84) and the Power value + bar (bottom half).
+    // Split the hitbox top/bottom; within each half, clicking the left side
+    // decreases by 5, right side increases by 5.
     if (x >= 328 && x <= 533 && y >= top + 42 && y <= top + 146) {
-      const delta = x < (328 + 533) / 2 ? -5 : 5;
-      activeTank.angle = Phaser.Math.Clamp(
-        activeTank.angle + delta,
-        GAME_CONFIG.aiming.minAngle,
-        GAME_CONFIG.aiming.maxAngle
-      );
-      this.renderTanksAndHud();
-      return;
-    }
-
-    // Power panel: same idea.
-    if (x >= 548 && x <= 694 && y >= top + 38 && y <= top + 146) {
-      const delta = x < (548 + 694) / 2 ? -5 : 5;
-      activeTank.power = Phaser.Math.Clamp(
-        activeTank.power + delta,
-        GAME_CONFIG.aiming.minPower,
-        GAME_CONFIG.aiming.maxPower
-      );
+      const horizontalDelta = x < (328 + 533) / 2 ? -5 : 5;
+      const isAngleHalf = y < top + 84;
+      if (isAngleHalf) {
+        activeTank.angle = Phaser.Math.Clamp(
+          activeTank.angle + horizontalDelta,
+          GAME_CONFIG.aiming.minAngle,
+          GAME_CONFIG.aiming.maxAngle
+        );
+      } else {
+        activeTank.power = Phaser.Math.Clamp(
+          activeTank.power + horizontalDelta,
+          GAME_CONFIG.aiming.minPower,
+          GAME_CONFIG.aiming.maxPower
+        );
+      }
       this.renderTanksAndHud();
       return;
     }
