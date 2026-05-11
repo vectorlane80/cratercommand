@@ -221,10 +221,12 @@ export class TankSystem {
 
       // Active-player indicator: filled down-arrow above the tank in the
       // player's own palette color so it doubles as identity at a glance.
+      // Sits well above the tank (and above the shield dome arc when present)
+      // for clear separation.
       if (isActive) {
         const tipX = tank.x;
-        const tipY = bodyY - 4;
-        const baseY = bodyY - 18;
+        const tipY = bodyY - 16;
+        const baseY = bodyY - 34;
         graphics.fillStyle(palette.primary, 1);
         graphics.beginPath();
         graphics.moveTo(tipX, tipY);
