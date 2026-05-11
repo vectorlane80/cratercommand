@@ -7,6 +7,7 @@ export type GamePhase =
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
 export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo';
+export type VisualSystem = 'classic' | 'retroPixel';
 
 export interface TerrainData {
   heights: number[];
@@ -132,7 +133,32 @@ export const GAME_CONFIG = {
     blue: 0x0837ff,
     purple: 0x79217d,
     dimGray: 0x707070,
-    overlayDim: 0x000000
+    overlayDim: 0x000000,
+    retroBlue: 0x238cff,
+    retroOrange: 0xff4b16,
+    steelDark: 0x171717,
+    steelMid: 0x3b3b3b,
+    steelLight: 0xa8a8a8,
+    desertGold: 0xc68417,
+    desertBrown: 0x4b2b10,
+    desertDark: 0x1f1208,
+    sunsetPurple: 0x26114c,
+    sunsetRed: 0xb52f22,
+    sunsetOrange: 0xf57918,
+    sunsetYellow: 0xffd15c
+  },
+  visuals: {
+    defaultSystem: 'classic' as VisualSystem,
+    systems: {
+      classic: {
+        label: 'Classic',
+        toggleHint: 'V Visual: Classic'
+      },
+      retroPixel: {
+        label: 'Retro Pixel',
+        toggleHint: 'V Visual: Retro Pixel'
+      }
+    }
   },
   font: {
     family: 'Courier New, monospace',
