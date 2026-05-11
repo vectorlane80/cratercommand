@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AISystem, isAIController, type AIDecision } from '../systems/AISystem';
 import { HudSystem } from '../systems/HudSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
@@ -6,6 +7,7 @@ import { TerrainSystem } from '../systems/TerrainSystem';
 import { TurnSystem } from '../systems/TurnSystem';
 import {
   GAME_CONFIG,
+  type ControllerKind,
   type ImpactResult,
   type MatchState,
   type PlayerId,
@@ -16,6 +18,12 @@ import {
   type VisualSystem,
   type WeaponDefinition
 } from '../types/GameTypes';
+
+// How long an AI tank spends thinking + animating its aim before firing.
+const AI_TURN_THINK_MS = 700;
+const AI_TURN_AIM_MS = 900;
+const AI_TURN_FIRE_DELAY_MS = 250;
+const AI_SHOP_DELAY_MS = 350;
 
 // Retro pixel backdrop: the single full-width panorama from Sprites 2,
 // scaled to cover the battlefield. Cacti sit on the procedural terrain.
@@ -40,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   private projectileSystem!: ProjectileSystem;
   private turnSystem!: TurnSystem;
   private hudSystem!: HudSystem;
+  private aiSystem!: AISystem;
 
   private terrainData!: TerrainData;
   private tanks: TankState[] = [];
@@ -49,6 +58,17 @@ export class GameScene extends Phaser.Scene {
   private statusMessage: string | null = null;
   private visualSystem: VisualSystem = GAME_CONFIG.visuals.defaultSystem;
 
+  // AI turn state. When the active tank is CPU-controlled, the scene
+  // computes an AIDecision once and then animates the tank's angle/power
+  // toward those targets across AI_TURN_AIM_MS before firing.
+  private aiDecision: AIDecision | null = null;
+  private aiStartAngle = 0;
+  private aiStartPower = 0;
+  private aiTurnElapsedMs = 0;
+  private aiHasFired = false;
+  private aiShopElapsedMs = 0;
+  private pendingControllers: [ControllerKind, ControllerKind] = ['human', 'cpu-veteran'];
+
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
@@ -56,11 +76,14 @@ export class GameScene extends Phaser.Scene {
   private moveLeftKey!: Phaser.Input.Keyboard.Key;
   private moveRightKey!: Phaser.Input.Keyboard.Key;
   private parachuteBuyKey!: Phaser.Input.Keyboard.Key;
-  private visualToggleKey!: Phaser.Input.Keyboard.Key;
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
 
   constructor() {
     super('GameScene');
+  }
+
+  init(data: { controllers?: [ControllerKind, ControllerKind] }): void {
+    if (data?.controllers) this.pendingControllers = data.controllers;
   }
 
   create(): void {
@@ -97,8 +120,9 @@ export class GameScene extends Phaser.Scene {
     this.projectileSystem = new ProjectileSystem();
     this.turnSystem = new TurnSystem();
     this.hudSystem = new HudSystem(this);
+    this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState();
+    this.match = this.turnSystem.createMatchState(this.pendingControllers);
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -108,7 +132,6 @@ export class GameScene extends Phaser.Scene {
     this.moveLeftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.moveRightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.parachuteBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
-    this.visualToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.V);
     const numberKeyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
       Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -155,12 +178,21 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.turn.phase === 'shopping') {
+      if (this.isCurrentShopperAI()) {
+        this.tickAIShop(delta);
+        return;
+      }
       const changed = this.handleShoppingInput();
       if (changed) this.renderAll();
       return;
     }
 
     if (this.turn.phase === 'aiming') {
+      if (this.isActivePlayerAI()) {
+        this.tickAITurn(delta);
+        return;
+      }
+
       const moved = this.handleMovementInput(delta);
       const changed = this.handleAimingInput();
       const switched = this.handleWeaponSelection();
@@ -178,6 +210,89 @@ export class GameScene extends Phaser.Scene {
 
     if (this.turn.phase === 'projectileInFlight') {
       this.tickProjectiles(delta);
+    }
+  }
+
+  // -------- AI TURN HANDLING --------
+
+  private isActivePlayerAI(): boolean {
+    return isAIController(this.match.profiles[this.turn.activePlayerId].controller);
+  }
+
+  private isCurrentShopperAI(): boolean {
+    const id = this.match.shoppingPlayerId;
+    return id !== null && isAIController(this.match.profiles[id].controller);
+  }
+
+  private startAITurn(): void {
+    const activeTank = this.tanks[this.turn.activePlayerId];
+    const opponent = this.tanks[activeTank.id === 0 ? 1 : 0];
+    this.aiDecision = this.aiSystem.decide(
+      this.match.profiles[activeTank.id].controller,
+      activeTank,
+      opponent,
+      this.turn.wind,
+      this.terrainSystem,
+      this.terrainData
+    );
+    // Force the AI to a weapon it actually has ammo for.
+    if (!this.tankHasAmmo(activeTank, this.aiDecision.weaponIndex)) {
+      for (let i = 0; i < GAME_CONFIG.weapons.length; i += 1) {
+        if (this.tankHasAmmo(activeTank, i)) {
+          this.aiDecision.weaponIndex = i;
+          break;
+        }
+      }
+    }
+    activeTank.selectedWeaponIndex = this.aiDecision.weaponIndex;
+    this.aiStartAngle = activeTank.angle;
+    this.aiStartPower = activeTank.power;
+    this.aiTurnElapsedMs = 0;
+    this.aiHasFired = false;
+    this.statusMessage = `${this.match.profiles[activeTank.id].controller.replace('cpu-', '').toUpperCase()} IS THINKING…`;
+    this.renderAll();
+  }
+
+  private tickAITurn(delta: number): void {
+    if (!this.aiDecision) {
+      this.startAITurn();
+      return;
+    }
+
+    this.aiTurnElapsedMs += delta;
+    const activeTank = this.tanks[this.turn.activePlayerId];
+
+    if (this.aiTurnElapsedMs <= AI_TURN_THINK_MS) {
+      // Pure pause so the player can read the "thinking" message.
+      return;
+    }
+
+    const aimT = Math.min(
+      1,
+      (this.aiTurnElapsedMs - AI_TURN_THINK_MS) / AI_TURN_AIM_MS
+    );
+    activeTank.angle = Phaser.Math.Linear(this.aiStartAngle, this.aiDecision.angle, aimT);
+    activeTank.power = Phaser.Math.Linear(this.aiStartPower, this.aiDecision.power, aimT);
+    this.renderTanksAndHud();
+
+    if (
+      !this.aiHasFired &&
+      this.aiTurnElapsedMs >= AI_TURN_THINK_MS + AI_TURN_AIM_MS + AI_TURN_FIRE_DELAY_MS
+    ) {
+      activeTank.angle = this.aiDecision.angle;
+      activeTank.power = this.aiDecision.power;
+      this.statusMessage = null;
+      this.aiHasFired = true;
+      this.aiDecision = null;
+      this.fireActiveWeapon();
+    }
+  }
+
+  private tickAIShop(delta: number): void {
+    this.aiShopElapsedMs += delta;
+    if (this.aiShopElapsedMs >= AI_SHOP_DELAY_MS) {
+      this.aiShopElapsedMs = 0;
+      this.finishShoppingForCurrentPlayer();
     }
   }
 
@@ -520,11 +635,6 @@ export class GameScene extends Phaser.Scene {
       this.statusMessage,
       this.visualSystem
     );
-  }
-
-  private toggleVisualSystem(): void {
-    this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
-    this.renderAll();
   }
 
   private drawRetroBattlefieldBackground(): void {

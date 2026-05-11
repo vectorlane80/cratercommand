@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  CONTROLLER_LABELS,
   GAME_CONFIG,
   type MatchState,
   type PlayerId,
@@ -45,6 +46,15 @@ export class HudSystem {
       this.drawShopOverlay(match);
     } else if (turn.phase === 'roundOver' && statusMessage) {
       this.drawCenterBanner(statusMessage, 'PRESS SPACE OR ENTER FOR SHOP');
+    } else if (turn.phase === 'aiming' && statusMessage) {
+      // AI is thinking — small banner that doesn't block visibility.
+      this.addText(
+        (GAME_CONFIG.width - statusMessage.length * 11) / 2,
+        140,
+        statusMessage,
+        GAME_CONFIG.colors.yellow,
+        GAME_CONFIG.font.medium
+      );
     } else if (matchOver) {
       this.drawFullScreenBackdrop();
       this.drawCenterBanner(
@@ -70,8 +80,9 @@ export class HudSystem {
     const p2 = getPlayerPalette(1, 'classic');
 
     this.addText(20, 6, 'PLAYER 1', p1.primary, GAME_CONFIG.font.large);
-    this.addText(48, 38, `${tanks[0].health}`, colors.white, GAME_CONFIG.font.large);
-    this.addText(20, 64, `$${match.profiles[0].cash}  W:${match.profiles[0].wins}`, colors.yellow, GAME_CONFIG.font.small);
+    this.addText(20, 30, CONTROLLER_LABELS[match.profiles[0].controller], colors.dimGray, GAME_CONFIG.font.tiny);
+    this.addText(48, 42, `${tanks[0].health}`, colors.white, GAME_CONFIG.font.large);
+    this.addText(20, 68, `$${match.profiles[0].cash}  W:${match.profiles[0].wins}`, colors.yellow, GAME_CONFIG.font.small);
 
     this.addText(382, 6, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.large);
 
@@ -87,10 +98,11 @@ export class HudSystem {
     );
 
     this.addText(836, 6, 'PLAYER 2', p2.primary, GAME_CONFIG.font.large);
-    this.addText(874, 38, `${tanks[1].health}`, colors.white, GAME_CONFIG.font.large);
+    this.addText(836, 30, CONTROLLER_LABELS[match.profiles[1].controller], colors.dimGray, GAME_CONFIG.font.tiny);
+    this.addText(874, 42, `${tanks[1].health}`, colors.white, GAME_CONFIG.font.large);
     this.addText(
       790,
-      64,
+      68,
       `$${match.profiles[1].cash}  W:${match.profiles[1].wins}`,
       colors.yellow,
       GAME_CONFIG.font.small

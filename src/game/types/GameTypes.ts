@@ -34,11 +34,33 @@ export interface TankState {
   damageDealt: number;
 }
 
+/**
+ * Who is driving a tank. `human` is local keyboard. `cpu-*` is local AI at
+ * the given difficulty tier. `remote` is reserved for future online play
+ * where decisions arrive over the network — not yet implemented.
+ */
+export type ControllerKind = 'human' | 'cpu-cadet' | 'cpu-veteran' | 'cpu-marshal';
+
+export const CONTROLLER_LABELS: Record<ControllerKind, string> = {
+  'human': 'HUMAN',
+  'cpu-cadet': 'CPU: CADET',
+  'cpu-veteran': 'CPU: VETERAN',
+  'cpu-marshal': 'CPU: MARSHAL'
+};
+
+export const CONTROLLER_CYCLE: ControllerKind[] = [
+  'human',
+  'cpu-cadet',
+  'cpu-veteran',
+  'cpu-marshal'
+];
+
 export interface PlayerProfile {
   cash: number;
   wins: number;
   ammo: Record<string, number>;
   parachutes: number;
+  controller: ControllerKind;
 }
 
 export interface MatchState {

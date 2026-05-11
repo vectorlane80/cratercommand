@@ -1,5 +1,6 @@
 import {
   GAME_CONFIG,
+  type ControllerKind,
   type MatchState,
   type PlayerId,
   type PlayerProfile,
@@ -18,18 +19,21 @@ export class TurnSystem {
     };
   }
 
-  createMatchState(): MatchState {
+  createMatchState(controllers: [ControllerKind, ControllerKind] = ['human', 'cpu-veteran']): MatchState {
     return {
       round: 1,
       roundsToWin: GAME_CONFIG.match.roundsToWin,
-      profiles: [this.createInitialProfile(), this.createInitialProfile()],
+      profiles: [
+        this.createInitialProfile(controllers[0]),
+        this.createInitialProfile(controllers[1])
+      ],
       shoppingPlayerId: null,
       shopVisitsRemaining: 0,
       matchWinnerId: null
     };
   }
 
-  createInitialProfile(): PlayerProfile {
+  createInitialProfile(controller: ControllerKind = 'human'): PlayerProfile {
     const ammo: Record<string, number> = {};
     GAME_CONFIG.weapons.forEach((w) => {
       ammo[w.id] = w.startingAmmo;
@@ -38,7 +42,8 @@ export class TurnSystem {
       cash: GAME_CONFIG.match.startingCash,
       wins: 0,
       ammo,
-      parachutes: GAME_CONFIG.match.startingParachutes
+      parachutes: GAME_CONFIG.match.startingParachutes,
+      controller
     };
   }
 

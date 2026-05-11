@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { MenuScene } from './scenes/MenuScene';
 import { GAME_CONFIG } from './types/GameTypes';
 
 new Phaser.Game({
@@ -9,5 +10,5 @@ new Phaser.Game({
   width: GAME_CONFIG.width,
   height: GAME_CONFIG.height,
   pixelArt: true,
-  scene: [BootScene, GameScene]
+  scene: [BootScene, MenuScene, GameScene]
 });
