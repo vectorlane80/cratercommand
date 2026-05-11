@@ -36,7 +36,6 @@ export class GameScene extends Phaser.Scene {
   private activeProjectiles: ProjectileState[] = [];
   private statusMessage: string | null = null;
   private visualSystem: VisualSystem = GAME_CONFIG.visuals.defaultSystem;
-  private visualToggleButton: HTMLButtonElement | null = null;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -101,19 +100,6 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.V,
       ...numberKeyCodes
     ]);
-    this.input.keyboard!.on('keydown-V', () => {
-      this.toggleVisualSystem();
-    });
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.y >= GAME_CONFIG.layout.bottomStatusTop - 8 && pointer.x >= 680) {
-        this.toggleVisualSystem();
-      }
-    });
-    this.visualToggleButton = document.querySelector<HTMLButtonElement>('#visual-toggle');
-    if (this.visualToggleButton) {
-      this.visualToggleButton.onclick = () => this.toggleVisualSystem();
-      this.syncVisualToggleButton();
-    }
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
@@ -476,18 +462,11 @@ export class GameScene extends Phaser.Scene {
 
   private toggleVisualSystem(): void {
     this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
-    this.syncVisualToggleButton();
     this.renderAll();
-  }
-
-  private syncVisualToggleButton(): void {
-    if (!this.visualToggleButton) return;
-    this.visualToggleButton.textContent = `Visual: ${GAME_CONFIG.visuals.systems[this.visualSystem].label}`;
   }
 
   private drawRetroBattlefieldBackground(): void {
     const colors = GAME_CONFIG.colors;
-    const battlefieldHeight = GAME_CONFIG.layout.battlefieldHeight;
 
     this.backgroundGraphics.clear();
     this.backgroundGraphics.fillStyle(colors.black, 1);
@@ -498,34 +477,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Faint starfield in the upper sky
+    // Classic: black sky with a faint deterministic starfield.
     this.backgroundGraphics.fillStyle(colors.white, 0.45);
     const starSeed = 1337;
     for (let i = 0; i < 60; i += 1) {
-      const px = ((i * 73 + starSeed) % GAME_CONFIG.width);
+      const px = (i * 73 + starSeed) % GAME_CONFIG.width;
       const py = ((i * 41 + starSeed) % 150) + 12;
       this.backgroundGraphics.fillRect(px, py, 1, 1);
-    }
-
-    this.backgroundGraphics.fillStyle(colors.purple, 0.45);
-    for (let y = 166; y < 260; y += 8) {
-      for (let x = (y / 2) % 10; x < GAME_CONFIG.width; x += 10) {
-        this.backgroundGraphics.fillRect(x, y, 2, 2);
-      }
-    }
-
-    this.backgroundGraphics.fillStyle(colors.red, 0.7);
-    for (let y = 246; y < battlefieldHeight; y += 6) {
-      for (let x = (y * 3) % 14; x < GAME_CONFIG.width; x += 14) {
-        this.backgroundGraphics.fillRect(x, y, 3, 2);
-      }
-    }
-
-    this.backgroundGraphics.fillStyle(colors.blue, 0.8);
-    this.backgroundGraphics.fillRect(352, 318, 208, 48);
-    this.backgroundGraphics.fillStyle(0x508bff, 0.9);
-    for (let x = 356; x < 556; x += 9) {
-      this.backgroundGraphics.fillRect(x, 318 + ((x / 9) % 2), 5, 3);
     }
 
     this.backgroundGraphics.lineStyle(2, colors.white, 1);
@@ -562,13 +520,7 @@ export class GameScene extends Phaser.Scene {
     this.drawMountainLayer(0x39205b, 278, 0.65, 42, 11);
     this.drawMountainLayer(0x5a2544, 306, 0.75, 48, 17);
 
-    this.backgroundGraphics.fillStyle(0x2b7bff, 0.75);
-    this.backgroundGraphics.fillRect(438, 332, 116, 26);
-    this.backgroundGraphics.fillStyle(0x62b7ff, 0.9);
-    for (let x = 442; x < 552; x += 8) {
-      this.backgroundGraphics.fillRect(x, 333 + ((x / 8) % 2), 6, 2);
-    }
-
+    // Starfield twinkles, deterministic.
     this.backgroundGraphics.fillStyle(colors.retroBlue, 0.9);
     for (let i = 0; i < 62; i += 1) {
       const x = (i * 73) % width;

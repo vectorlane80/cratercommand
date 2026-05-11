@@ -10,6 +10,29 @@ import {
 } from '../types/GameTypes';
 import { TerrainSystem } from './TerrainSystem';
 
+export interface PlayerPalette {
+  primary: number;
+  accent: number;
+  dark: number;
+}
+
+/**
+ * Single source of truth for "what color is player N in visual mode M".
+ * P1 is always the cool color, P2 is always the warm color. The hue family
+ * changes with the visual system, but the player identity does not swap.
+ */
+export function getPlayerPalette(id: PlayerId, visualSystem: VisualSystem): PlayerPalette {
+  const c = GAME_CONFIG.colors;
+  if (visualSystem === 'retroPixel') {
+    return id === 0
+      ? { primary: c.retroBlue, accent: 0x7fc4ff, dark: 0x073c86 }
+      : { primary: c.retroOrange, accent: 0xff9b53, dark: 0x8f2106 };
+  }
+  return id === 0
+    ? { primary: c.cyan, accent: 0x8effff, dark: 0x0c8c98 }
+    : { primary: c.magenta, accent: 0xffa6ff, dark: 0x8c1b8c };
+}
+
 export class TankSystem {
   createTanks(
     terrainSystem: TerrainSystem,
@@ -26,8 +49,8 @@ export class TankSystem {
         id,
         x,
         y: terrainSystem.getHeightAtX(terrainData, x) - GAME_CONFIG.tank.placementOffsetY,
-        color: id === 0 ? GAME_CONFIG.colors.magenta : GAME_CONFIG.colors.cyan,
-        accentColor: id === 0 ? 0xffa6ff : 0x8effff,
+        color: id === 0 ? GAME_CONFIG.colors.cyan : GAME_CONFIG.colors.magenta,
+        accentColor: id === 0 ? 0x8effff : 0xffa6ff,
         label: id === 0 ? 'PLAYER 1' : 'PLAYER 2',
         health: GAME_CONFIG.tank.maxHealth,
         angle: GAME_CONFIG.aiming.initialAngles[id],
@@ -142,8 +165,10 @@ export class TankSystem {
 
     tanks.forEach((tank) => {
       if (!tank.alive) return;
+      const palette = getPlayerPalette(tank.id, visualSystem);
+
       if (visualSystem === 'retroPixel') {
-        this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId);
+        this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId, palette);
         return;
       }
 
@@ -158,11 +183,11 @@ export class TankSystem {
         graphics.strokeRect(bodyX - 4, bodyY - 5, GAME_CONFIG.tank.width + 8, GAME_CONFIG.tank.height + 7);
       }
 
-      graphics.fillStyle(tank.color, 1);
+      graphics.fillStyle(palette.primary, 1);
       graphics.fillRect(bodyX, bodyY, GAME_CONFIG.tank.width, GAME_CONFIG.tank.height);
-      graphics.fillStyle(tank.accentColor, 1);
+      graphics.fillStyle(palette.accent, 1);
       graphics.fillRect(tank.x - 9, bodyY - 5, 18, 5);
-      graphics.lineStyle(4, tank.color, 1);
+      graphics.lineStyle(4, palette.primary, 1);
       graphics.beginPath();
       graphics.moveTo(turretStart.x, turretStart.y);
       graphics.lineTo(turretTip.x, turretTip.y);
@@ -177,12 +202,17 @@ export class TankSystem {
     });
   }
 
-  private drawRetroPixelTank(graphics: Phaser.GameObjects.Graphics, tank: TankState, isActive: boolean): void {
+  private drawRetroPixelTank(
+    graphics: Phaser.GameObjects.Graphics,
+    tank: TankState,
+    isActive: boolean,
+    palette: PlayerPalette
+  ): void {
     const colors = GAME_CONFIG.colors;
     const facing = tank.id === 0 ? 1 : -1;
-    const baseColor = tank.id === 0 ? colors.retroBlue : colors.retroOrange;
-    const darkColor = tank.id === 0 ? 0x073c86 : 0x8f2106;
-    const lightColor = tank.id === 0 ? 0x7fc4ff : 0xff9b53;
+    const baseColor = palette.primary;
+    const darkColor = palette.dark;
+    const lightColor = palette.accent;
     const bodyX = Math.round(tank.x - 20);
     const bodyY = Math.round(tank.y - 19);
     const turretStart = this.getTurretStart(tank);
@@ -191,7 +221,7 @@ export class TankSystem {
     if (isActive) {
       const markerX = Math.round(tank.x);
       const markerY = Math.round(bodyY - 18);
-      graphics.fillStyle(tank.id === 0 ? colors.retroBlue : colors.retroOrange, 1);
+      graphics.fillStyle(baseColor, 1);
       graphics.beginPath();
       graphics.moveTo(markerX, markerY);
       graphics.lineTo(markerX - 8, markerY - 16);

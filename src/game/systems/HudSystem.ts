@@ -8,6 +8,7 @@ import {
   type VisualSystem,
   type WeaponDefinition
 } from '../types/GameTypes';
+import { getPlayerPalette } from './TankSystem';
 
 export class HudSystem {
   private graphics: Phaser.GameObjects.Graphics;
@@ -65,8 +66,10 @@ export class HudSystem {
 
   private drawTopHud(turn: TurnState, tanks: TankState[], match: MatchState): void {
     const colors = GAME_CONFIG.colors;
+    const p1 = getPlayerPalette(0, 'classic');
+    const p2 = getPlayerPalette(1, 'classic');
 
-    this.addText(20, 6, 'PLAYER 1', colors.magenta, GAME_CONFIG.font.large);
+    this.addText(20, 6, 'PLAYER 1', p1.primary, GAME_CONFIG.font.large);
     this.addText(48, 38, `${tanks[0].health}`, colors.white, GAME_CONFIG.font.large);
     this.addText(20, 64, `$${match.profiles[0].cash}  W:${match.profiles[0].wins}`, colors.yellow, GAME_CONFIG.font.small);
 
@@ -83,7 +86,7 @@ export class HudSystem {
       GAME_CONFIG.font.small
     );
 
-    this.addText(836, 6, 'PLAYER 2', colors.cyan, GAME_CONFIG.font.large);
+    this.addText(836, 6, 'PLAYER 2', p2.primary, GAME_CONFIG.font.large);
     this.addText(874, 38, `${tanks[1].health}`, colors.white, GAME_CONFIG.font.large);
     this.addText(
       790,
@@ -130,6 +133,7 @@ export class HudSystem {
     const colors = GAME_CONFIG.colors;
     const activeTank = tanks[turn.activePlayerId];
     const top = GAME_CONFIG.layout.consoleTop;
+    const activePalette = getPlayerPalette(turn.activePlayerId, 'retroPixel');
 
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, 0, GAME_CONFIG.width, 82);
@@ -138,19 +142,19 @@ export class HudSystem {
     this.graphics.lineStyle(1, colors.steelDark, 1);
     this.graphics.strokeRect(6, 6, GAME_CONFIG.width - 12, GAME_CONFIG.height - 12);
 
-    this.drawRetroPlayerPanel(22, 14, tanks[0], match, colors.retroBlue);
-    this.drawRetroPlayerPanel(774, 14, tanks[1], match, colors.retroOrange);
+    this.drawRetroPlayerPanel(22, 14, tanks[0], match, getPlayerPalette(0, 'retroPixel').primary);
+    this.drawRetroPlayerPanel(774, 14, tanks[1], match, getPlayerPalette(1, 'retroPixel').primary);
 
     const windArrow = turn.wind.direction < 0 ? '<' : '>';
-    this.addText(448, 16, `Turn ${match.round}`, colors.white, GAME_CONFIG.font.medium);
+    this.addText(434, 12, `ROUND ${match.round}`, colors.white, GAME_CONFIG.font.medium);
     this.addText(
       434,
-      42,
+      36,
       `PLAYER ${turn.activePlayerId + 1}`,
-      turn.activePlayerId === 0 ? colors.retroBlue : colors.retroOrange,
+      activePalette.primary,
       GAME_CONFIG.font.large
     );
-    this.addText(432, 66, `Wind ${windArrow} ${turn.wind.magnitude}`, colors.white, GAME_CONFIG.font.medium);
+    this.addText(432, 66, `Wind ${windArrow} ${turn.wind.magnitude}`, colors.green, GAME_CONFIG.font.medium);
 
     this.graphics.fillStyle(colors.steelMid, 1);
     this.graphics.fillRect(0, top, GAME_CONFIG.width, 134);
@@ -158,42 +162,61 @@ export class HudSystem {
     this.graphics.strokeRect(0, top, GAME_CONFIG.width, 134);
 
     this.drawRetroPanelFrame(8, top + 8, 208, 122, 'WEAPONS');
-    this.drawRetroWeaponRows(18, top + 38, activeTank);
+    this.drawRetroWeaponRows(18, top + 32, activeTank, activePalette.primary);
     this.drawRetroPanelFrame(220, top + 8, 176, 122, 'ANGLE');
-    this.drawRetroAnglePanel(236, top + 42, activeTank);
+    this.drawRetroAnglePanel(236, top + 42, activeTank, activePalette.primary);
     this.drawRetroPanelFrame(400, top + 8, 204, 122, 'POWER');
-    this.drawRetroPowerPanel(416, top + 42, activeTank);
+    this.drawRetroPowerPanel(416, top + 42, activeTank, activePalette.primary);
     this.drawRetroPanelFrame(610, top + 8, 140, 122, '');
     this.drawRetroFireButton(632, top + 36, turn.phase === 'aiming');
-    this.drawRetroPanelFrame(756, top + 8, 196, 122, 'ITEMS');
-    this.drawRetroItemsPanel(772, top + 42, activeTank, match);
+    this.drawRetroPanelFrame(756, top + 8, 196, 122, 'STATUS');
+    this.drawRetroStatusPanel(770, top + 36, activeTank, match);
 
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, top + 136, GAME_CONFIG.width, 46);
     this.graphics.lineStyle(2, colors.steelLight, 1);
     this.graphics.strokeRect(0, top + 136, GAME_CONFIG.width, 46);
-    this.addText(16, top + 144, '** Welcome to CRATER COMMAND! **', colors.green, GAME_CONFIG.font.small);
+
     this.addText(
       16,
-      top + 162,
-      `** Turn ${match.round} - PLAYER ${turn.activePlayerId + 1} **   Weapon: ${weapon.name}   V swaps visual system`,
+      top + 144,
+      '←→ Aim   ↑↓ Power   A/D Move   1-8 Weapon',
       colors.cyan,
       GAME_CONFIG.font.small
     );
-    this.addText(744, top + 146, turn.phase === 'aiming' ? 'SPACE to fire' : 'SHOT IN FLIGHT', colors.white, GAME_CONFIG.font.small);
-    this.addText(744, top + 164, 'ESC for menu', colors.red, GAME_CONFIG.font.small);
+    this.addText(
+      16,
+      top + 162,
+      'SPACE Fire    V Visual    ENTER Advance',
+      colors.cyan,
+      GAME_CONFIG.font.small
+    );
+    this.addText(
+      720,
+      top + 144,
+      turn.phase === 'aiming' ? 'SPACE to fire' : 'SHOT IN FLIGHT',
+      turn.phase === 'aiming' ? colors.green : colors.yellow,
+      GAME_CONFIG.font.small
+    );
+    this.addText(720, top + 162, `Weapon: ${weapon.name}`, colors.white, GAME_CONFIG.font.small);
   }
 
   private drawRetroPlayerPanel(x: number, y: number, tank: TankState, match: MatchState, color: number): void {
     const colors = GAME_CONFIG.colors;
     this.addText(x, y, `PLAYER ${tank.id + 1}`, color, GAME_CONFIG.font.medium);
     this.drawMiniTank(x + 2, y + 30, color);
-    this.addText(x + 56, y + 24, `${tank.health}`, colors.white, GAME_CONFIG.font.medium);
+    this.addText(x + 56, y + 22, `${tank.health}`, colors.white, GAME_CONFIG.font.medium);
     this.graphics.fillStyle(colors.steelDark, 1);
     this.graphics.fillRect(x + 102, y + 28, 74, 8);
     this.graphics.fillStyle(colors.green, 1);
     this.graphics.fillRect(x + 104, y + 30, Math.max(0, tank.health / GAME_CONFIG.tank.maxHealth) * 70, 4);
-    this.addText(x + 56, y + 48, `$ ${match.profiles[tank.id].cash}`, colors.yellow, GAME_CONFIG.font.small);
+    this.addText(
+      x + 56,
+      y + 44,
+      `$ ${match.profiles[tank.id].cash}  W:${match.profiles[tank.id].wins}`,
+      colors.yellow,
+      GAME_CONFIG.font.small
+    );
   }
 
   private drawMiniTank(x: number, y: number, color: number): void {
@@ -220,46 +243,53 @@ export class HudSystem {
     this.graphics.lineStyle(1, colors.black, 1);
     this.graphics.strokeRect(x + 5, y + 5, w - 10, h - 10);
     if (title) {
-      this.addText(x + 52, y + 8, title, colors.white, GAME_CONFIG.font.medium);
+      this.addText(x + (w - title.length * 11) / 2, y + 8, title, colors.white, GAME_CONFIG.font.medium);
     }
   }
 
-  private drawRetroWeaponRows(x: number, y: number, activeTank: TankState): void {
-    GAME_CONFIG.weapons.slice(0, 5).forEach((weapon, index) => {
+  private drawRetroWeaponRows(x: number, y: number, activeTank: TankState, highlightColor: number): void {
+    const rowStep = 11;
+    GAME_CONFIG.weapons.forEach((weapon, index) => {
       const selected = activeTank.selectedWeaponIndex === index;
       const count = activeTank.ammo[weapon.id];
+      const isEmpty = count === 0;
+      const rowY = y + index * rowStep;
       if (selected) {
-        this.graphics.fillStyle(GAME_CONFIG.colors.retroBlue, 0.95);
-        this.graphics.fillRect(x - 4, y + index * 17 - 2, 188, 16);
+        this.graphics.fillStyle(highlightColor, 0.95);
+        this.graphics.fillRect(x - 4, rowY - 1, 188, rowStep);
       }
+      const labelColor = selected
+        ? GAME_CONFIG.colors.white
+        : isEmpty
+          ? GAME_CONFIG.colors.dimGray
+          : GAME_CONFIG.colors.green;
+      this.addText(x, rowY, `${index + 1}. ${weapon.name}`, labelColor, GAME_CONFIG.font.small);
       this.addText(
-        x,
-        y + index * 17,
-        `${index + 1}. ${weapon.name}`,
-        selected ? GAME_CONFIG.colors.white : GAME_CONFIG.colors.green,
+        x + 148,
+        rowY,
+        count === -1 ? '--' : `${count}`,
+        labelColor,
         GAME_CONFIG.font.small
       );
-      this.addText(x + 148, y + index * 17, count === -1 ? '--' : `${count}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
     });
-    this.addText(x + 30, y + 88, 'More Weapons...', GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
   }
 
-  private drawRetroAnglePanel(x: number, y: number, activeTank: TankState): void {
-    this.addText(x + 48, y - 4, `${Math.round(activeTank.angle)}°`, GAME_CONFIG.colors.retroBlue, GAME_CONFIG.font.title);
+  private drawRetroAnglePanel(x: number, y: number, activeTank: TankState, accentColor: number): void {
+    this.addText(x + 48, y - 4, `${Math.round(activeTank.angle)}°`, accentColor, GAME_CONFIG.font.title);
     this.graphics.lineStyle(3, GAME_CONFIG.colors.white, 1);
     this.graphics.beginPath();
     this.graphics.moveTo(x + 18, y + 72);
     this.graphics.lineTo(x + 138, y + 72);
+
+    const rad = Phaser.Math.DegToRad(activeTank.angle);
+    const dial = 56;
     this.graphics.moveTo(x + 18, y + 72);
-    this.graphics.lineTo(x + 102, y + 24);
-    this.graphics.strokePath();
-    this.graphics.lineStyle(1, GAME_CONFIG.colors.steelLight, 1);
-    this.graphics.arc(x + 18, y + 72, 52, Phaser.Math.DegToRad(-45), 0);
+    this.graphics.lineTo(x + 18 + Math.cos(rad) * dial, y + 72 - Math.sin(rad) * dial);
     this.graphics.strokePath();
   }
 
-  private drawRetroPowerPanel(x: number, y: number, activeTank: TankState): void {
-    this.addText(x + 60, y - 4, `${Math.round(activeTank.power)}`, GAME_CONFIG.colors.retroBlue, GAME_CONFIG.font.title);
+  private drawRetroPowerPanel(x: number, y: number, activeTank: TankState, accentColor: number): void {
+    this.addText(x + 60, y - 4, `${Math.round(activeTank.power)}`, accentColor, GAME_CONFIG.font.title);
     this.graphics.fillStyle(GAME_CONFIG.colors.black, 1);
     this.graphics.fillRect(x + 4, y + 54, 168, 22);
     this.graphics.lineStyle(2, GAME_CONFIG.colors.steelLight, 1);
@@ -281,18 +311,26 @@ export class HudSystem {
     this.addText(x + 20, y + 14, 'FIRE', canFire ? GAME_CONFIG.colors.red : GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.title);
   }
 
-  private drawRetroItemsPanel(x: number, y: number, activeTank: TankState, match: MatchState): void {
-    const rows = [
-      `1. Shield     $ 150`,
-      `2. Armor      $ 200`,
-      `3. Repair Kit $ 100`,
-      `4. Teleporter $ 300`
-    ];
-    rows.forEach((row, index) => {
-      this.addText(x, y + index * 15, row, index === 0 ? GAME_CONFIG.colors.cyan : GAME_CONFIG.colors.white, GAME_CONFIG.font.tiny);
-    });
-    this.addText(x, y + 66, `Cash $${match.profiles[activeTank.id].cash}`, GAME_CONFIG.colors.green, GAME_CONFIG.font.tiny);
-    this.addText(x, y + 82, 'More Items...', GAME_CONFIG.colors.yellow, GAME_CONFIG.font.tiny);
+  private drawRetroStatusPanel(x: number, y: number, activeTank: TankState, match: MatchState): void {
+    const colors = GAME_CONFIG.colors;
+    this.addText(x, y, `HP     ${activeTank.health} / ${GAME_CONFIG.tank.maxHealth}`, colors.white, GAME_CONFIG.font.small);
+    this.addText(
+      x,
+      y + 14,
+      `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}`,
+      colors.white,
+      GAME_CONFIG.font.small
+    );
+    this.addText(x, y + 28, `CHUTES ${activeTank.parachutes}`, colors.yellow, GAME_CONFIG.font.small);
+    this.addText(x, y + 42, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
+    this.addText(
+      x,
+      y + 56,
+      `WINS   ${match.profiles[0].wins}-${match.profiles[1].wins}  (to ${match.roundsToWin})`,
+      colors.cyan,
+      GAME_CONFIG.font.small
+    );
+    this.addText(x, y + 70, `WEAPON ${GAME_CONFIG.weapons[activeTank.selectedWeaponIndex].name}`, colors.white, GAME_CONFIG.font.small);
   }
 
   private drawFireButton(top: number): void {
