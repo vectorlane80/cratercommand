@@ -1293,6 +1293,7 @@ export class GameScene extends Phaser.Scene {
 
     this.activeProjectiles = [...remaining, ...spawnedThisFrame];
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
+    if (this.isOnlineHost) this.broadcastSnapshot();
 
     if (this.activeProjectiles.length === 0) {
       this.endTurn();

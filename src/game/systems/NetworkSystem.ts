@@ -29,6 +29,7 @@ export type ConnectionState =
  */
 export type NetworkMessage =
   | { type: 'lobby-hello'; name: string }
+  | { type: 'lobby-name'; name: string }
   | { type: 'lobby-ready'; controllers: ControllerKind[]; names: Array<string | null>; roundsToWin: number }
   | { type: 'lobby-start' }
   | { type: 'snapshot'; data: GameSnapshot }

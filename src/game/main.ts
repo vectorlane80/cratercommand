@@ -9,6 +9,9 @@ new Phaser.Game({
   type: Phaser.AUTO,
   parent: document.body,
   antialias: true,
+  // Enable Phaser's DOM-element layer so LobbyScene can put real HTML
+  // <input>s on top of the canvas (proper touch keyboard support, etc.).
+  dom: { createContainer: true },
   // scale.zoom doubles the canvas backing-store while keeping game-world
   // coordinates the same. Game logic still sees a 960x540 world; the canvas
   // is 1920x1080 internally. Combined with Text.setResolution(2) (in HUD /
