@@ -98,6 +98,15 @@ export class HudSystem {
     const inShop = turn.phase === 'shopping' && match.shoppingPlayerId !== null;
     const matchOver = turn.phase === 'matchOver' && match.matchWinnerId !== null;
 
+    // When the forfeit modal is open, skip every other layer — the modal
+    // demands focus and Phaser Text objects from the regular HUD would
+    // otherwise show through the modal's dim rectangle (Text is above
+    // Graphics in the display list).
+    if (quitConfirm) {
+      this.drawQuitConfirmModal();
+      return;
+    }
+
     if (!inShop && !matchOver) {
       if (visualSystem === 'retroPixel') {
         this.drawRetroPixelHud(turn, tanks, weapon, match);
@@ -145,10 +154,6 @@ export class HudSystem {
       this.addText(x, y, topToast.text, topToast.color, GAME_CONFIG.font.medium);
     }
 
-    // Forfeit-confirm modal — drawn LAST so it covers everything else.
-    if (quitConfirm) {
-      this.drawQuitConfirmModal();
-    }
   }
 
   /**
@@ -160,13 +165,14 @@ export class HudSystem {
     const colors = GAME_CONFIG.colors;
     const W = GAME_CONFIG.width;
     const H = GAME_CONFIG.height;
+    const cx = W / 2;
 
     // Hard-dim everything behind so the modal demands attention.
     this.graphics.fillStyle(colors.black, 0.85);
     this.graphics.fillRect(0, 0, W, H);
 
-    // Centered card
-    const cardW = 620;
+    // Centered card sized to fit cleanly within 540h.
+    const cardW = 480;
     const cardH = 240;
     const cardX = (W - cardW) / 2;
     const cardY = (H - cardH) / 2;
@@ -176,43 +182,55 @@ export class HudSystem {
     this.graphics.strokeRect(cardX, cardY, cardW, cardH);
 
     // Heading
-    this.addText(cardX + 158, cardY + 20, 'FORFEIT MATCH?', colors.red, GAME_CONFIG.font.title);
+    this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', colors.red, GAME_CONFIG.font.title);
 
-    // Body — two lines so the long sentence wraps cleanly.
-    this.addText(
-      cardX + 30,
-      cardY + 78,
-      'Are you sure you want to return to the menu?',
+    // Body
+    this.addTextCentered(
+      cx,
+      cardY + 80,
+      'Return to the menu?',
       colors.white,
       GAME_CONFIG.font.medium
     );
-    this.addText(
-      cardX + 30,
-      cardY + 110,
-      'This will count as a forfeit.',
+    this.addTextCentered(
+      cx,
+      cardY + 108,
+      'This counts as a forfeit.',
       colors.yellow,
       GAME_CONFIG.font.medium
     );
 
     // Buttons (must match handleQuitConfirmPointer geometry)
-    const cx = W / 2;
-    const btnY = 320;
-    const btnH = 48;
+    const btnH = 44;
     const btnW = 140;
-    const yesX = cx - btnW - 20;
-    const noX = cx + 20;
+    const btnY = cardY + cardH - btnH - 20;
+    const gap = 24;
+    const yesX = cx - btnW - gap / 2;
+    const noX = cx + gap / 2;
 
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(yesX, btnY, btnW, btnH);
     this.graphics.lineStyle(3, colors.red, 1);
     this.graphics.strokeRect(yesX, btnY, btnW, btnH);
-    this.addText(yesX + 28, btnY + 12, 'YES (Y)', colors.red, GAME_CONFIG.font.large);
+    this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, GAME_CONFIG.font.large);
 
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(noX, btnY, btnW, btnH);
     this.graphics.lineStyle(3, colors.green, 1);
     this.graphics.strokeRect(noX, btnY, btnW, btnH);
-    this.addText(noX + 36, btnY + 12, 'NO (N)', colors.green, GAME_CONFIG.font.large);
+    this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, GAME_CONFIG.font.large);
+  }
+
+  private addTextCentered(cx: number, y: number, value: string, color: number, fontSize: string): void {
+    const text = this.scene.add.text(cx, y, value, {
+      color: Phaser.Display.Color.IntegerToColor(color).rgba,
+      fontFamily: GAME_CONFIG.font.family,
+      fontSize,
+      fontStyle: 'bold'
+    });
+    text.setOrigin(0.5, 0);
+    text.setResolution(2);
+    this.texts.push(text);
   }
 
   private drawFullScreenBackdrop(): void {

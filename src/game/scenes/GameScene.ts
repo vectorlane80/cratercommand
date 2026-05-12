@@ -144,6 +144,28 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
 
+    // Phaser keeps keyboard Key state across scene transitions. If the user
+    // pressed a number key in MenuScene (e.g. "4" to cycle slot 4) and the
+    // GameScene's first update() polls JustDown on that same code, the stale
+    // press fires here — flipping selectedWeaponIndex to whatever digit was
+    // last typed. Clearing state at scene entry keeps each match starting
+    // fresh.
+    this.input.keyboard?.resetKeys();
+
+    // Class fields persist across scene.start() because Phaser reuses the
+    // scene instance. Explicitly clear anything that could leak from a prior
+    // match.
+    this.pendingShopBuys = {};
+    this.pendingShopHistory = [];
+    this.topToast = null;
+    this.quitConfirmActive = false;
+    this.aiDecision = null;
+    this.aiHasFired = false;
+    this.aiTurnElapsedMs = 0;
+    this.aiShopElapsedMs = 0;
+    this.activeProjectiles = [];
+    this.statusMessage = null;
+
     this.backgroundGraphics = this.add.graphics();
 
     // Retro layers sit between background fill and procedural terrain. They
@@ -1012,13 +1034,18 @@ export class GameScene extends Phaser.Scene {
    * HudSystem.drawQuitConfirm so taps line up with the rendered buttons.
    */
   private handleQuitConfirmPointer(x: number, y: number): void {
-    const cx = GAME_CONFIG.width / 2;
-    const btnY = 320;
-    const btnH = 48;
+    const W = GAME_CONFIG.width;
+    const H = GAME_CONFIG.height;
+    const cx = W / 2;
+    const cardH = 240;
+    const cardY = (H - cardH) / 2;
+    const btnH = 44;
     const btnW = 140;
+    const gap = 24;
+    const btnY = cardY + cardH - btnH - 20;
     // YES button is left, NO button is right.
-    const yesX = cx - btnW - 20;
-    const noX = cx + 20;
+    const yesX = cx - btnW - gap / 2;
+    const noX = cx + gap / 2;
     if (y >= btnY && y < btnY + btnH) {
       if (x >= yesX && x < yesX + btnW) {
         this.returnToMenu();
