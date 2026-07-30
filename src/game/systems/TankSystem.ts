@@ -6,7 +6,8 @@ import {
   type PlayerProfile,
   type TankState,
   type TerrainData,
-  type VisualSystem
+  type VisualSystem,
+  PHYSICS_DEFAULTS
 } from '../types/GameTypes';
 import { TerrainSystem } from './TerrainSystem';
 
@@ -157,7 +158,8 @@ export class TankSystem {
   settleTanksAfterTerrainChange(
     tanks: TankState[],
     terrainSystem: TerrainSystem,
-    terrainData: TerrainData
+    terrainData: TerrainData,
+    tanksFall: boolean = PHYSICS_DEFAULTS.tanksFall
   ): FallEvent[] {
     const events: FallEvent[] = [];
 
@@ -170,6 +172,12 @@ export class TankSystem {
       // terrain shape rather than actual destruction.
       const groundY = terrainSystem.getHeightAtX(terrainData, tank.x) - GAME_CONFIG.tank.placementOffsetY;
       const fallDistance = groundY - tank.y;
+
+      // Snap tank to ground
+      tank.y = groundY;
+
+      // Only process fall events if tanksFall is enabled
+      if (!tanksFall) return;
 
       if (fallDistance > GAME_CONFIG.fall.threshold) {
         // SE parachute logic: only deploy on falls that would cause damage
@@ -189,8 +197,6 @@ export class TankSystem {
           events.push({ tankId: tank.id, distance: fallDistance, damage, usedParachute: false });
         }
       }
-
-      tank.y = groundY;
     });
 
     return events;

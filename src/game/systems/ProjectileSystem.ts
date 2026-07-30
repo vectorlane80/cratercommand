@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import {
   GAME_CONFIG,
+  PHYSICS_DEFAULTS,
   type ImpactResult,
+  type PhysicsSettings,
   type ProjectileState,
   type TankState,
   type TerrainData,
@@ -79,7 +81,8 @@ export class ProjectileSystem {
     terrainSystem: TerrainSystem,
     terrainData: TerrainData,
     tankSystem: TankSystem,
-    tanks: TankState[]
+    tanks: TankState[],
+    physics: PhysicsSettings = PHYSICS_DEFAULTS
   ): ProjectileTick {
     const deltaSeconds = deltaMs / 1000;
     projectile.ageMs += deltaMs;
@@ -93,14 +96,21 @@ export class ProjectileSystem {
 
     // Rolling physics: takes priority over ballistic
     if (projectile.rolling === true) {
-      return this.updateRolling(projectile, deltaSeconds, wallMode, terrainSystem, terrainData, tankSystem, tanks);
+      return this.updateRolling(projectile, deltaSeconds, wallMode, terrainSystem, terrainData, tankSystem, tanks, physics);
     }
 
     // Ballistic projectile physics
     projectile.velocityX += wind.direction * wind.magnitude * GAME_CONFIG.projectile.windAccelerationScale * deltaSeconds;
-    projectile.velocityY += GAME_CONFIG.projectile.gravity * deltaSeconds;
+    projectile.velocityY += physics.gravity * deltaSeconds;
     projectile.x += projectile.velocityX * deltaSeconds;
     projectile.y += projectile.velocityY * deltaSeconds;
+
+    // Viscosity drag
+    if (physics.viscosity > 0) {
+      const drag = 1 - physics.viscosity * deltaSeconds;
+      projectile.velocityX *= drag;
+      projectile.velocityY *= drag;
+    }
 
     // Mag deflection: push projectiles upward when near enemy tanks with mag-deflectors
     tanks.forEach((tank) => {
@@ -316,7 +326,8 @@ export class ProjectileSystem {
     terrainSystem: TerrainSystem,
     terrainData: TerrainData,
     tankSystem: TankSystem,
-    tanks: TankState[]
+    tanks: TankState[],
+    physics: PhysicsSettings = PHYSICS_DEFAULTS
   ): ProjectileTick {
     const spawned: ProjectileState[] = [];
 
@@ -333,7 +344,7 @@ export class ProjectileSystem {
     const slope = (h2 - h1) / 8;
 
     // Accelerate downhill, apply friction, clamp speed
-    projectile.velocityX += slope * GAME_CONFIG.projectile.gravity * deltaSeconds;
+    projectile.velocityX += slope * physics.gravity * deltaSeconds;
     projectile.velocityX *= Math.max(0, 1 - GAME_CONFIG.projectile.rollerFriction * deltaSeconds);
     projectile.velocityX = Phaser.Math.Clamp(
       projectile.velocityX,

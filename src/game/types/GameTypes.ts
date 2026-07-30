@@ -24,6 +24,35 @@ export const WALL_LABELS: Record<WallMode, string> = {
   erratic: 'ERRATIC'
 };
 
+export interface PhysicsSettings {
+  gravity: number;
+  viscosity: number;
+  tanksFall: boolean;
+}
+
+export const PHYSICS_DEFAULTS: PhysicsSettings = {
+  gravity: 138,
+  viscosity: 0,
+  tanksFall: true
+};
+
+export const GRAVITY_STEPS = [70, 100, 138, 180, 240];
+export const GRAVITY_LABELS: Record<number, string> = {
+  70: 'LOW',
+  100: 'LIGHT',
+  138: 'NORMAL',
+  180: 'HEAVY',
+  240: 'CRUSHING'
+};
+
+export const VISCOSITY_STEPS = [0, 0.15, 0.35, 0.6];
+export const VISCOSITY_LABELS: Record<number, string> = {
+  0: 'NONE',
+  0.15: 'THIN',
+  0.35: 'THICK',
+  0.6: 'SOUP'
+};
+
 export interface TerrainData {
   heights: number[];
   width: number;
@@ -114,6 +143,7 @@ export interface MatchState {
   currentSale: { itemKey: string; discount: number } | null;
   wallMode: WallMode;
   activeWallMode: Exclude<WallMode, 'random' | 'erratic'>;
+  physics: PhysicsSettings;
 }
 
 export const MAX_PLAYERS = 4;

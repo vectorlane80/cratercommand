@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import {
   CONTROLLER_LABELS,
   GAME_CONFIG,
+  GRAVITY_LABELS,
+  PHYSICS_DEFAULTS,
+  VISCOSITY_LABELS,
   WALL_LABELS,
   type MatchState,
   type PlayerId,
@@ -290,6 +293,9 @@ export class HudSystem {
       );
       const wallColor = match.activeWallMode === 'none' ? colors.dimGray : colors.cyan;
       this.addText(GAME_CONFIG.width / 2 - 40, 136, WALL_LABELS[match.activeWallMode], wallColor, GAME_CONFIG.font.small);
+
+      // Physics indicator (only show if non-default)
+      this.drawPhysicsIndicator(GAME_CONFIG.width / 2 - 40, 154, match);
       return;
     }
 
@@ -326,6 +332,27 @@ export class HudSystem {
     this.addText(x, 30, CONTROLLER_LABELS[profile.controller], GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.tiny);
     this.addText(x + 28, 42, `${tank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.large);
     this.addText(x, 68, `$${profile.cash}  W:${profile.wins}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
+  }
+
+  private drawPhysicsIndicator(x: number, y: number, match: MatchState): void {
+    const colors = GAME_CONFIG.colors;
+    const physics = match.physics;
+    const isNonDefault =
+      physics.gravity !== PHYSICS_DEFAULTS.gravity ||
+      physics.viscosity !== PHYSICS_DEFAULTS.viscosity ||
+      physics.tanksFall !== PHYSICS_DEFAULTS.tanksFall;
+
+    if (!isNonDefault) {
+      return;
+    }
+
+    // Build indicator text
+    const gravityLabel = GRAVITY_LABELS[physics.gravity];
+    const viscosityLabel = VISCOSITY_LABELS[physics.viscosity];
+    const fallsLabel = physics.tanksFall ? 'ON' : 'OFF';
+
+    const indicator = `${gravityLabel}/${viscosityLabel}/${fallsLabel}`;
+    this.addText(x, y, indicator, colors.white, GAME_CONFIG.font.small);
   }
 
   private drawConsole(turn: TurnState, activeTank: TankState, weapon: WeaponDefinition, match: MatchState, weaponWindowStart = 0): void {

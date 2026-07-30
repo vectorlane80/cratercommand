@@ -11,10 +11,12 @@ import { TurnSystem } from '../systems/TurnSystem';
 import { adjustWindow, cycleWeapon } from '../systems/WeaponWindow';
 import {
   GAME_CONFIG,
+  PHYSICS_DEFAULTS,
   type ControllerKind,
   type PlayerProfile,
   type ImpactResult,
   type MatchState,
+  type PhysicsSettings,
   type PlayerId,
   type ProjectileState,
   type TankState,
@@ -78,6 +80,7 @@ export class GameScene extends Phaser.Scene {
   private pendingNames: Array<string | null> = [];
   private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
   private pendingWallMode: WallMode = 'none';
+  private pendingPhysics: PhysicsSettings = PHYSICS_DEFAULTS;
 
   // Tentative shop purchases for the current shopper. Committed on ENTER,
   // discarded on ESC. Keys: weapon ids + 'parachute' + 'shield'.
@@ -137,6 +140,7 @@ export class GameScene extends Phaser.Scene {
     names?: Array<string | null>;
     roundsToWin?: number;
     wallMode?: WallMode;
+    physics?: PhysicsSettings;
     online?: { isHost: boolean };
   }): void {
     if (data?.controllers && data.controllers.length >= 2) {
@@ -148,6 +152,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (data?.wallMode) {
       this.pendingWallMode = data.wallMode;
+    }
+    if (data?.physics) {
+      this.pendingPhysics = data.physics;
     }
     if (data?.online) {
       this.isOnlineHost = data.online.isHost;
@@ -221,7 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.hudSystem = new HudSystem(this);
     this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode);
+    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode, this.pendingPhysics);
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -1640,7 +1647,8 @@ export class GameScene extends Phaser.Scene {
         this.terrainSystem,
         this.terrainData,
         this.tankSystem,
-        this.tanks
+        this.tanks,
+        this.match.physics
       );
 
       if (tick.spawned.length) spawnedThisFrame.push(...tick.spawned);
@@ -1744,7 +1752,8 @@ export class GameScene extends Phaser.Scene {
     const falls = this.tankSystem.settleTanksAfterTerrainChange(
       this.tanks,
       this.terrainSystem,
-      this.terrainData
+      this.terrainData,
+      this.match.physics.tanksFall
     );
     falls.forEach((fall) => {
       if (fall.damage > 0 && fall.tankId !== shooter.id) {

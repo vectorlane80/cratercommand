@@ -227,4 +227,30 @@ describe('TankSystem', () => {
     expect(tank.health).toBe(125);
     expect(tank.parachutes).toBe(5);
   });
+
+  it('settleTanksAfterTerrainChange with tanksFall=false: tank snapped to ground but no fall events generated', () => {
+    const fallDistance = GAME_CONFIG.fall.safeDistance + 50;
+    const newTerrain = makeFlatTerrain(250 + fallDistance);
+    const tank = makeTank({ id: 0, y: 250 - GAME_CONFIG.tank.placementOffsetY, health: 125, parachutes: 5 });
+    const originalY = tank.y;
+
+    const events = tankSystem.settleTanksAfterTerrainChange([tank], terrainSystem, newTerrain, false);
+
+    expect(tank.y).toBe(250 + fallDistance - GAME_CONFIG.tank.placementOffsetY);
+    expect(tank.y).not.toBe(originalY);
+    expect(events.length).toBe(0);
+    expect(tank.health).toBe(125);
+    expect(tank.parachutes).toBe(5);
+  });
+
+  it('settleTanksAfterTerrainChange with tanksFall=true: tank falls and takes damage', () => {
+    const fallDistance = GAME_CONFIG.fall.safeDistance + 50;
+    const newTerrain = makeFlatTerrain(250 + fallDistance);
+    const tank = makeTank({ id: 0, y: 250 - GAME_CONFIG.tank.placementOffsetY, health: 125, parachutes: 0 });
+
+    const events = tankSystem.settleTanksAfterTerrainChange([tank], terrainSystem, newTerrain, true);
+
+    expect(events.length).toBeGreaterThan(0);
+    expect(tank.health).toBeLessThan(125);
+  });
 });

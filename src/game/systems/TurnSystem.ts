@@ -1,7 +1,9 @@
 import {
   GAME_CONFIG,
+  PHYSICS_DEFAULTS,
   type ControllerKind,
   type MatchState,
+  type PhysicsSettings,
   type PlayerId,
   type PlayerProfile,
   type TankState,
@@ -30,7 +32,8 @@ export class TurnSystem {
     controllers: ControllerKind[] = ['human', 'cpu-veteran'],
     roundsToWin: number = GAME_CONFIG.match.roundsToWin,
     names: Array<string | null> = [],
-    wallMode: WallMode = 'none'
+    wallMode: WallMode = 'none',
+    physics: PhysicsSettings = PHYSICS_DEFAULTS
   ): MatchState {
     const active = controllers.filter((c): c is ControllerKind => !!c);
     const activeWallMode = this.resolveActiveWallMode(wallMode);
@@ -43,7 +46,8 @@ export class TurnSystem {
       matchWinnerId: null,
       currentSale: null,
       wallMode,
-      activeWallMode
+      activeWallMode,
+      physics
     };
   }
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ProjectileSystem } from '../src/game/systems/ProjectileSystem';
 import { TankSystem } from '../src/game/systems/TankSystem';
 import { TerrainSystem } from '../src/game/systems/TerrainSystem';
-import { GAME_CONFIG } from '../src/game/types/GameTypes';
+import { GAME_CONFIG, PHYSICS_DEFAULTS } from '../src/game/types/GameTypes';
 import { makeFlatTerrain, makeTank } from './helpers';
 
 describe('ProjectileSystem', () => {
@@ -857,5 +857,56 @@ describe('ProjectileSystem', () => {
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('outOfBounds');
+  });
+
+  it('physics gravity override: lower gravity increases vertical velocity less', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 50;
+    projectile.velocityY = 0;
+
+    const lowGravityPhysics = { gravity: 70, viscosity: 0, tanksFall: true };
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [], lowGravityPhysics);
+
+    expect(Math.abs(projectile.velocityY - (70 * 0.1))).toBeLessThan(1e-6);
+    expect(tick.impact).toBeNull();
+  });
+
+  it('physics viscosity drag: velocity magnitudes shrink over time', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    const initialVelocityX = projectile.velocityX;
+    const initialVelocityY = projectile.velocityY;
+
+    const viscousPhysics = { gravity: 138, viscosity: 0.35, tanksFall: true };
+    projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [], viscousPhysics);
+
+    const expectedDrag = 1 - 0.35 * 0.1;
+    expect(Math.abs(projectile.velocityX - (initialVelocityX * expectedDrag))).toBeLessThan(1e-3);
+    const expectedVelocityYAfterGravity = initialVelocityY + 138 * 0.1;
+    const expectedVelocityY = expectedVelocityYAfterGravity * expectedDrag;
+    expect(Math.abs(projectile.velocityY - expectedVelocityY)).toBeLessThan(1e-3);
+  });
+
+  it('physics default physics preserved when param omitted', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 50;
+    projectile.velocityY = 0;
+
+    const initialVelocityY = projectile.velocityY;
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, []);
+
+    expect(Math.abs(projectile.velocityY - (initialVelocityY + PHYSICS_DEFAULTS.gravity * 0.1))).toBeLessThan(1e-6);
+    expect(tick.impact).toBeNull();
   });
 });

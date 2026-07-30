@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TurnSystem } from '../src/game/systems/TurnSystem';
-import { GAME_CONFIG, WALL_MODES } from '../src/game/types/GameTypes';
+import { GAME_CONFIG, WALL_MODES, PHYSICS_DEFAULTS } from '../src/game/types/GameTypes';
 import { makeTank } from './helpers';
 
 describe('TurnSystem', () => {
@@ -256,5 +256,42 @@ describe('TurnSystem', () => {
 
     // Over 50 iterations, we should see at least 2 different modes (statistically very likely)
     expect(modeSet.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('createMatchState with default physics uses PHYSICS_DEFAULTS', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet']);
+
+    expect(match.physics).toEqual(PHYSICS_DEFAULTS);
+    expect(match.physics.gravity).toBe(138);
+    expect(match.physics.viscosity).toBe(0);
+    expect(match.physics.tanksFall).toBe(true);
+  });
+
+  it('createMatchState with custom physics stores the provided settings', () => {
+    const customPhysics = { gravity: 70, viscosity: 0.35, tanksFall: false };
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none', customPhysics);
+
+    expect(match.physics).toEqual(customPhysics);
+    expect(match.physics.gravity).toBe(70);
+    expect(match.physics.viscosity).toBe(0.35);
+    expect(match.physics.tanksFall).toBe(false);
+  });
+
+  it('createMatchState with custom gravity override stores correct gravity', () => {
+    const customPhysics = { gravity: 240, viscosity: 0, tanksFall: true };
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none', customPhysics);
+
+    expect(match.physics.gravity).toBe(240);
+    expect(match.physics.viscosity).toBe(0);
+    expect(match.physics.tanksFall).toBe(true);
+  });
+
+  it('createMatchState with custom viscosity override stores correct viscosity', () => {
+    const customPhysics = { gravity: 138, viscosity: 0.6, tanksFall: true };
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none', customPhysics);
+
+    expect(match.physics.gravity).toBe(138);
+    expect(match.physics.viscosity).toBe(0.6);
+    expect(match.physics.tanksFall).toBe(true);
   });
 });

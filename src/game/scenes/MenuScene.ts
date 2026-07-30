@@ -4,10 +4,16 @@ import {
   CONTROLLER_CYCLE,
   CONTROLLER_LABELS,
   GAME_CONFIG,
+  GRAVITY_LABELS,
+  GRAVITY_STEPS,
   MAX_PLAYERS,
+  PHYSICS_DEFAULTS,
+  VISCOSITY_LABELS,
+  VISCOSITY_STEPS,
   WALL_LABELS,
   WALL_MODES,
   type ControllerKind,
+  type PhysicsSettings,
   type WallMode
 } from '../types/GameTypes';
 
@@ -20,6 +26,7 @@ export interface MenuResult {
   /** Parallel to controllers — null means "use default (PLAYER N)". */
   names: Array<string | null>;
   wallMode: WallMode;
+  physics: PhysicsSettings;
 }
 
 const MAX_NAME_LEN = 12;
@@ -41,6 +48,9 @@ export class MenuScene extends Phaser.Scene {
   private names: Array<string | null> = [null, null, null, null];
   private matchLengthIndex = 0; // index into MATCH_LENGTHS, default first
   private wallModeIndex = 0; // index into WALL_MODES, default first
+  private gravityIndex = GRAVITY_STEPS.indexOf(PHYSICS_DEFAULTS.gravity);
+  private viscosityIndex = VISCOSITY_STEPS.indexOf(PHYSICS_DEFAULTS.viscosity);
+  private tanksFall = PHYSICS_DEFAULTS.tanksFall;
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
 
@@ -49,6 +59,9 @@ export class MenuScene extends Phaser.Scene {
   private enterKey!: Phaser.Input.Keyboard.Key;
   private bKey!: Phaser.Input.Keyboard.Key;
   private wKey!: Phaser.Input.Keyboard.Key;
+  private gKey!: Phaser.Input.Keyboard.Key;
+  private aKey!: Phaser.Input.Keyboard.Key;
+  private fKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('MenuScene');
@@ -69,18 +82,25 @@ export class MenuScene extends Phaser.Scene {
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.bKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     this.wKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.gKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G);
+    this.aKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.fKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
     this.input.keyboard!.addCapture([
       ...keyCodes,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
       Phaser.Input.Keyboard.KeyCodes.ENTER,
       Phaser.Input.Keyboard.KeyCodes.B,
-      Phaser.Input.Keyboard.KeyCodes.W
+      Phaser.Input.Keyboard.KeyCodes.W,
+      Phaser.Input.Keyboard.KeyCodes.G,
+      Phaser.Input.Keyboard.KeyCodes.A,
+      Phaser.Input.Keyboard.KeyCodes.F
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
 
+    this.loadPhysicsFromStorage();
     this.render();
   }
 
@@ -102,6 +122,21 @@ export class MenuScene extends Phaser.Scene {
       soundSystem.playUiClick();
       this.render();
     }
+    if (Phaser.Input.Keyboard.JustDown(this.gKey)) {
+      this.cycleGravity();
+      soundSystem.playUiClick();
+      this.render();
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.aKey)) {
+      this.cycleViscosity();
+      soundSystem.playUiClick();
+      this.render();
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.fKey)) {
+      this.cycleTanksFall();
+      soundSystem.playUiClick();
+      this.render();
+    }
     if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
@@ -114,6 +149,18 @@ export class MenuScene extends Phaser.Scene {
 
   private cycleWallMode(): void {
     this.wallModeIndex = (this.wallModeIndex + 1) % WALL_MODES.length;
+  }
+
+  private cycleGravity(): void {
+    this.gravityIndex = (this.gravityIndex + 1) % GRAVITY_STEPS.length;
+  }
+
+  private cycleViscosity(): void {
+    this.viscosityIndex = (this.viscosityIndex + 1) % VISCOSITY_STEPS.length;
+  }
+
+  private cycleTanksFall(): void {
+    this.tanksFall = !this.tanksFall;
   }
 
   /**
@@ -173,9 +220,31 @@ export class MenuScene extends Phaser.Scene {
       this.render();
       return;
     }
+    // Physics buttons
+    const gravBtn = this.gravityRect();
+    if (x >= gravBtn.x && x <= gravBtn.x + gravBtn.w && y >= gravBtn.y && y <= gravBtn.y + gravBtn.h) {
+      this.cycleGravity();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    const viscBtn = this.viscosityRect();
+    if (x >= viscBtn.x && x <= viscBtn.x + viscBtn.w && y >= viscBtn.y && y <= viscBtn.y + viscBtn.h) {
+      this.cycleViscosity();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    const fallsBtn = this.tanksFallRect();
+    if (x >= fallsBtn.x && x <= fallsBtn.x + fallsBtn.w && y >= fallsBtn.y && y <= fallsBtn.y + fallsBtn.h) {
+      this.cycleTanksFall();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
     // Start button hitbox — see render() for matching geometry.
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 400;
+    const btnY = 430;
     if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 46 && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
@@ -203,11 +272,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hostButtonRect() {
-    return { x: GAME_CONFIG.width / 2 - 260, y: 458, w: 240, h: 32 };
+    return { x: GAME_CONFIG.width / 2 - 260, y: 488, w: 240, h: 32 };
   }
 
   private joinButtonRect() {
-    return { x: GAME_CONFIG.width / 2 + 20, y: 458, w: 240, h: 32 };
+    return { x: GAME_CONFIG.width / 2 + 20, y: 488, w: 240, h: 32 };
   }
 
   private matchLengthRect() {
@@ -216,6 +285,18 @@ export class MenuScene extends Phaser.Scene {
 
   private wallModeRect() {
     return { x: GAME_CONFIG.width / 2 + 10, y: 340, w: 260, h: 36 };
+  }
+
+  private gravityRect() {
+    return { x: GAME_CONFIG.width / 2 - 270, y: 384, w: 85, h: 32 };
+  }
+
+  private viscosityRect() {
+    return { x: GAME_CONFIG.width / 2 - 175, y: 384, w: 85, h: 32 };
+  }
+
+  private tanksFallRect() {
+    return { x: GAME_CONFIG.width / 2 - 80, y: 384, w: 85, h: 32 };
   }
 
   /**
@@ -260,12 +341,19 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startMatch(): void {
+    const physics: PhysicsSettings = {
+      gravity: GRAVITY_STEPS[this.gravityIndex],
+      viscosity: VISCOSITY_STEPS[this.viscosityIndex],
+      tanksFall: this.tanksFall
+    };
     const result: MenuResult = {
       controllers: this.participants(),
       names: this.participantNames(),
       roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
-      wallMode: WALL_MODES[this.wallModeIndex]
+      wallMode: WALL_MODES[this.wallModeIndex],
+      physics
     };
+    this.savePhysicsToStorage(physics);
     this.scene.start('GameScene', result);
   }
 
@@ -294,7 +382,7 @@ export class MenuScene extends Phaser.Scene {
     this.addText(
       GAME_CONFIG.width / 2 - 360,
       318,
-      'Tap name to rename · Tap box to cycle controller · B = match length · W = walls',
+      'Tap name to rename · Tap box to cycle · B = length · W = walls · G = gravity · A = air · F = falls',
       colors.white,
       GAME_CONFIG.font.small
     );
@@ -317,10 +405,35 @@ export class MenuScene extends Phaser.Scene {
     const wmLabel = `WALLS: ${WALL_LABELS[WALL_MODES[this.wallModeIndex]]}`;
     this.addText(wm.x + 40, wm.y + 8, wmLabel, colors.magenta, GAME_CONFIG.font.large);
 
+    // Physics selector buttons
+    const grav = this.gravityRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(grav.x, grav.y, grav.w, grav.h);
+    this.graphics.lineStyle(2, colors.green, 1);
+    this.graphics.strokeRect(grav.x, grav.y, grav.w, grav.h);
+    const gravLabel = GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]];
+    this.addText(grav.x + 8, grav.y + 6, gravLabel, colors.green, GAME_CONFIG.font.medium);
+
+    const visc = this.viscosityRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(visc.x, visc.y, visc.w, visc.h);
+    this.graphics.lineStyle(2, colors.cyan, 1);
+    this.graphics.strokeRect(visc.x, visc.y, visc.w, visc.h);
+    const viscLabel = VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]];
+    this.addText(visc.x + 8, visc.y + 6, viscLabel, colors.cyan, GAME_CONFIG.font.medium);
+
+    const falls = this.tanksFallRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(falls.x, falls.y, falls.w, falls.h);
+    this.graphics.lineStyle(2, colors.yellow, 1);
+    this.graphics.strokeRect(falls.x, falls.y, falls.w, falls.h);
+    const fallsLabel = this.tanksFall ? 'FALLS ON' : 'FALLS OFF';
+    this.addText(falls.x + 4, falls.y + 6, fallsLabel, colors.yellow, GAME_CONFIG.font.medium);
+
     // Start button (gated on canStart())
     const enabled = this.canStart();
     const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 400;
+    const btnY = 430;
     const btnW = 260;
     const btnH = 46;
     this.graphics.fillStyle(colors.panelDark, 1);
@@ -332,7 +445,7 @@ export class MenuScene extends Phaser.Scene {
     if (!enabled) {
       this.addText(
         GAME_CONFIG.width / 2 - 222,
-        434,
+        464,
         'Need at least 2 participants and 1 human.',
         colors.red,
         GAME_CONFIG.font.small
@@ -395,5 +508,34 @@ export class MenuScene extends Phaser.Scene {
   private clearTexts(): void {
     this.texts.forEach((t) => t.destroy());
     this.texts = [];
+  }
+
+  private loadPhysicsFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('cratercmd.physics');
+      if (stored) {
+        const physics = JSON.parse(stored) as PhysicsSettings;
+        // Find the index of the stored gravity in GRAVITY_STEPS
+        const gravityIdx = GRAVITY_STEPS.indexOf(physics.gravity);
+        if (gravityIdx !== -1) this.gravityIndex = gravityIdx;
+
+        // Find the index of the stored viscosity in VISCOSITY_STEPS
+        const viscosityIdx = VISCOSITY_STEPS.indexOf(physics.viscosity);
+        if (viscosityIdx !== -1) this.viscosityIndex = viscosityIdx;
+
+        // Set tanksFall
+        this.tanksFall = physics.tanksFall;
+      }
+    } catch (e) {
+      // If parsing fails, just use defaults (already initialized)
+    }
+  }
+
+  private savePhysicsToStorage(physics: PhysicsSettings): void {
+    try {
+      localStorage.setItem('cratercmd.physics', JSON.stringify(physics));
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
   }
 }
