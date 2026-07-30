@@ -8,6 +8,7 @@ import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
 import { TerrainSystem } from '../systems/TerrainSystem';
 import { TurnSystem } from '../systems/TurnSystem';
+import { adjustWindow, cycleWeapon } from '../systems/WeaponWindow';
 import {
   GAME_CONFIG,
   type ControllerKind,
@@ -81,6 +82,7 @@ export class GameScene extends Phaser.Scene {
   private pendingShopBuys: Record<string, number> = {};
   private pendingShopHistory: string[] = [];
   private shopPage = 0;
+  private weaponWindowStart = 0;
 
   // Ephemeral top-banner toast for fall events. Lives ~2s so the human can
   // see it. Cleared lazily during render.
@@ -114,6 +116,8 @@ export class GameScene extends Phaser.Scene {
   private escapeKey!: Phaser.Input.Keyboard.Key;
   private backspaceKey!: Phaser.Input.Keyboard.Key;
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
+  private weaponPrevKey!: Phaser.Input.Keyboard.Key;
+  private weaponNextKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('GameScene');
@@ -160,6 +164,7 @@ export class GameScene extends Phaser.Scene {
     this.pendingShopBuys = {};
     this.pendingShopHistory = [];
     this.shopPage = 0;
+    this.weaponWindowStart = 0;
     this.topToast = null;
     this.quitConfirmActive = false;
     this.aiDecision = null;
@@ -229,6 +234,8 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.ZERO
     ];
     this.weaponKeys = numberKeyCodes.map((code) => this.input.keyboard!.addKey(code));
+    this.weaponPrevKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+    this.weaponNextKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     GAME_CONFIG.items.forEach((item) => {
       const keyCode = Phaser.Input.Keyboard.KeyCodes[item.hotkey as keyof typeof Phaser.Input.Keyboard.KeyCodes];
       this.itemHotkeys.push({ key: this.input.keyboard!.addKey(keyCode), itemId: item.id });
@@ -416,6 +423,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     activeTank.selectedWeaponIndex = this.aiDecision.weaponIndex;
+    this.ensureWeaponVisible();
     this.aiStartAngle = activeTank.angle;
     this.aiStartPower = activeTank.power;
     this.aiTurnElapsedMs = 0;
@@ -480,6 +488,7 @@ export class GameScene extends Phaser.Scene {
       winnerId: null,
       wind: this.turnSystem.rollWind()
     };
+    this.weaponWindowStart = 0;
     if (this.terrainGraphics) this.renderAll();
   }
 
@@ -608,6 +617,7 @@ export class GameScene extends Phaser.Scene {
       case 'select-weapon':
         if (this.tankHasAmmo(activeTank, action.index)) {
           activeTank.selectedWeaponIndex = action.index;
+          this.ensureWeaponVisible();
           this.renderTanksAndHud();
         }
         break;
@@ -764,9 +774,30 @@ export class GameScene extends Phaser.Scene {
     // while key is held).
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
-        this.sendInput({ kind: 'select-weapon', index: i });
+        const weaponIndex = this.weaponWindowStart + i;
+        if (weaponIndex < GAME_CONFIG.weapons.length) {
+          this.sendInput({ kind: 'select-weapon', index: weaponIndex });
+          this.weaponWindowStart = adjustWindow(this.weaponWindowStart, weaponIndex, GAME_CONFIG.weapons.length);
+        }
       }
     }
+
+    if (Phaser.Input.Keyboard.JustDown(this.weaponPrevKey)) {
+      const next = cycleWeapon(tank.selectedWeaponIndex, -1, (i) => this.tankHasAmmo(tank, i), GAME_CONFIG.weapons.length);
+      if (next !== tank.selectedWeaponIndex) {
+        this.sendInput({ kind: 'select-weapon', index: next });
+        this.weaponWindowStart = adjustWindow(this.weaponWindowStart, next, GAME_CONFIG.weapons.length);
+      }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.weaponNextKey)) {
+      const next = cycleWeapon(tank.selectedWeaponIndex, 1, (i) => this.tankHasAmmo(tank, i), GAME_CONFIG.weapons.length);
+      if (next !== tank.selectedWeaponIndex) {
+        this.sendInput({ kind: 'select-weapon', index: next });
+        this.weaponWindowStart = adjustWindow(this.weaponWindowStart, next, GAME_CONFIG.weapons.length);
+      }
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
       this.sendInput({ kind: 'fire' });
     }
@@ -931,13 +962,36 @@ export class GameScene extends Phaser.Scene {
     const activeTank = this.tanks[this.turn.activePlayerId];
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
-        if (this.tankHasAmmo(activeTank, i)) {
-          activeTank.selectedWeaponIndex = i;
+        const weaponIndex = this.weaponWindowStart + i;
+        if (weaponIndex < GAME_CONFIG.weapons.length && this.tankHasAmmo(activeTank, weaponIndex)) {
+          activeTank.selectedWeaponIndex = weaponIndex;
+          this.ensureWeaponVisible();
           soundSystem.playUiClick();
           return true;
         }
       }
     }
+
+    if (Phaser.Input.Keyboard.JustDown(this.weaponPrevKey)) {
+      const next = cycleWeapon(activeTank.selectedWeaponIndex, -1, (i) => this.tankHasAmmo(activeTank, i), GAME_CONFIG.weapons.length);
+      if (next !== activeTank.selectedWeaponIndex) {
+        activeTank.selectedWeaponIndex = next;
+        this.ensureWeaponVisible();
+        soundSystem.playUiClick();
+        return true;
+      }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.weaponNextKey)) {
+      const next = cycleWeapon(activeTank.selectedWeaponIndex, 1, (i) => this.tankHasAmmo(activeTank, i), GAME_CONFIG.weapons.length);
+      if (next !== activeTank.selectedWeaponIndex) {
+        activeTank.selectedWeaponIndex = next;
+        this.ensureWeaponVisible();
+        soundSystem.playUiClick();
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -1076,9 +1130,11 @@ export class GameScene extends Phaser.Scene {
     // Weapon list: x=14..296, rows at top+36 + i*13, 8 rows.
     if (x >= 14 && x <= 296 && y >= top + 36 && y < top + 36 + 8 * 13) {
       const rowIdx = Math.floor((y - (top + 36)) / 13);
-      if (rowIdx >= 0 && rowIdx < GAME_CONFIG.weapons.length) {
-        if (this.tankHasAmmo(activeTank, rowIdx)) {
-          activeTank.selectedWeaponIndex = rowIdx;
+      const weaponIndex = this.weaponWindowStart + rowIdx;
+      if (weaponIndex >= 0 && weaponIndex < GAME_CONFIG.weapons.length) {
+        if (this.tankHasAmmo(activeTank, weaponIndex)) {
+          activeTank.selectedWeaponIndex = weaponIndex;
+          this.ensureWeaponVisible();
           this.renderTanksAndHud();
         }
       }
@@ -1269,6 +1325,10 @@ export class GameScene extends Phaser.Scene {
     return count === -1 || count > 0;
   }
 
+  private ensureWeaponVisible(): void {
+    this.weaponWindowStart = adjustWindow(this.weaponWindowStart, this.tanks[this.turn.activePlayerId].selectedWeaponIndex, GAME_CONFIG.weapons.length);
+  }
+
   private ensureSelectableWeapon(tank: TankState): void {
     if (this.tankHasAmmo(tank, tank.selectedWeaponIndex)) return;
     for (let i = 0; i < GAME_CONFIG.weapons.length; i += 1) {
@@ -1418,6 +1478,7 @@ export class GameScene extends Phaser.Scene {
     this.turn.wind = this.turnSystem.rollWind();
     this.tankSystem.refillMovement(this.tanks[this.turn.activePlayerId]);
     this.ensureSelectableWeapon(this.tanks[this.turn.activePlayerId]);
+    this.ensureWeaponVisible();
     this.turn.phase = 'aiming';
 
     this.renderAll();
@@ -1497,6 +1558,7 @@ export class GameScene extends Phaser.Scene {
         pageLabel: () => `PAGE ${this.shopPage + 1}/${this.economySystem.pageCount(SHOP_LAYOUT.pageSize)}`,
         shopPageCount: () => this.economySystem.pageCount(SHOP_LAYOUT.pageSize)
       },
+      this.weaponWindowStart,
       this.topToast,
       this.quitConfirmActive
     );

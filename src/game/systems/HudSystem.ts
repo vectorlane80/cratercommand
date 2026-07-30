@@ -11,6 +11,7 @@ import {
 } from '../types/GameTypes';
 import { soundSystem } from './SoundSystem';
 import { getPlayerPalette } from './TankSystem';
+import { WEAPON_WINDOW_SIZE } from './WeaponWindow';
 import type { ShopCatalogEntry } from './EconomySystem';
 
 /**
@@ -108,6 +109,7 @@ export class HudSystem {
     statusMessage: string | null,
     visualSystem: VisualSystem = 'classic',
     pendingShop: ShopPending = EMPTY_SHOP_PENDING,
+    weaponWindowStart = 0,
     topToast: { text: string; color: number } | null = null,
     quitConfirm = false
   ): void {
@@ -129,10 +131,10 @@ export class HudSystem {
 
     if (!inShop && !matchOver) {
       if (visualSystem === 'retroPixel') {
-        this.drawRetroPixelHud(turn, tanks, weapon, match);
+        this.drawRetroPixelHud(turn, tanks, weapon, match, weaponWindowStart);
       } else {
         this.drawTopHud(turn, tanks, match);
-        this.drawConsole(turn, tanks[turn.activePlayerId], weapon, match);
+        this.drawConsole(turn, tanks[turn.activePlayerId], weapon, match, weaponWindowStart);
       }
     }
 
@@ -323,7 +325,7 @@ export class HudSystem {
     this.addText(x, 68, `$${profile.cash}  W:${profile.wins}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
   }
 
-  private drawConsole(turn: TurnState, activeTank: TankState, weapon: WeaponDefinition, match: MatchState): void {
+  private drawConsole(turn: TurnState, activeTank: TankState, weapon: WeaponDefinition, match: MatchState, weaponWindowStart = 0): void {
     const colors = GAME_CONFIG.colors;
     const top = GAME_CONFIG.layout.consoleTop;
 
@@ -338,7 +340,7 @@ export class HudSystem {
     this.graphics.fillRect(710, top + 18, 238, 128);
 
     this.drawFireButton(top);
-    this.drawWeaponList(top, activeTank);
+    this.drawWeaponList(top, activeTank, weaponWindowStart);
     this.drawAimPowerPanel(activeTank, turn.phase, top);
     this.drawSelectedWeapon(weapon, activeTank, top);
     this.drawStatusPanel(activeTank, match, top);
@@ -346,9 +348,9 @@ export class HudSystem {
     const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 26);
-    this.addText(20, stripY + 4, '←→/↑↓ Aim·Power   A/D Move   SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
+    this.addText(20, stripY + 4, '←→/↑↓ Aim·Power   A/D Move   Q/E Weapon   SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
     const soundLabel = `F10 SOUND: ${soundSystem.enabled ? 'ON' : 'OFF'}`;
-    this.addText(560, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(650, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.small);
     // ESC quit button — fixed position so pointer routing in GameScene can hit-test it.
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(820, stripY + 2, 130, 22);
@@ -361,7 +363,8 @@ export class HudSystem {
     turn: TurnState,
     tanks: TankState[],
     weapon: WeaponDefinition,
-    match: MatchState
+    match: MatchState,
+    weaponWindowStart = 0
   ): void {
     const colors = GAME_CONFIG.colors;
     const activeTank = tanks[turn.activePlayerId];
@@ -395,7 +398,7 @@ export class HudSystem {
     this.graphics.strokeRect(0, top, GAME_CONFIG.width, 134);
 
     this.drawRetroPanelFrame(8, top + 8, 208, 122, 'WEAPONS');
-    this.drawRetroWeaponRows(18, top + 32, activeTank, activePalette.primary);
+    this.drawRetroWeaponRows(18, top + 32, activeTank, activePalette.primary, weaponWindowStart);
     this.drawRetroPanelFrame(220, top + 8, 176, 122, 'ANGLE');
     this.drawRetroAnglePanel(236, top + 42, activeTank, activePalette.primary);
     this.drawRetroPanelFrame(400, top + 8, 204, 122, 'POWER');
@@ -480,13 +483,17 @@ export class HudSystem {
     }
   }
 
-  private drawRetroWeaponRows(x: number, y: number, activeTank: TankState, highlightColor: number): void {
+  private drawRetroWeaponRows(x: number, y: number, activeTank: TankState, highlightColor: number, weaponWindowStart = 0): void {
     const rowStep = 11;
-    GAME_CONFIG.weapons.forEach((weapon, index) => {
+    for (let windowIdx = 0; windowIdx < WEAPON_WINDOW_SIZE; windowIdx += 1) {
+      const index = weaponWindowStart + windowIdx;
+      if (index >= GAME_CONFIG.weapons.length) break;
+
+      const weapon = GAME_CONFIG.weapons[index];
       const selected = activeTank.selectedWeaponIndex === index;
       const count = activeTank.ammo[weapon.id];
       const isEmpty = count === 0;
-      const rowY = y + index * rowStep;
+      const rowY = y + windowIdx * rowStep;
       if (selected) {
         this.graphics.fillStyle(highlightColor, 0.95);
         this.graphics.fillRect(x - 4, rowY - 1, 188, rowStep);
@@ -496,7 +503,7 @@ export class HudSystem {
         : isEmpty
           ? GAME_CONFIG.colors.dimGray
           : GAME_CONFIG.colors.green;
-      this.addText(x, rowY, `${index + 1}. ${weapon.name}`, labelColor, GAME_CONFIG.font.small);
+      this.addText(x, rowY, `${windowIdx + 1}. ${weapon.name}`, labelColor, GAME_CONFIG.font.small);
       this.addText(
         x + 148,
         rowY,
@@ -504,7 +511,7 @@ export class HudSystem {
         labelColor,
         GAME_CONFIG.font.small
       );
-    });
+    }
   }
 
   private drawRetroAnglePanel(x: number, y: number, activeTank: TankState, accentColor: number): void {
@@ -574,14 +581,23 @@ export class HudSystem {
     this.addText(406, top + 12, 'Fire', GAME_CONFIG.colors.red, GAME_CONFIG.font.title);
   }
 
-  private drawWeaponList(top: number, activeTank: TankState): void {
-    this.addText(20, top + 20, 'Weapon', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
+  private drawWeaponList(top: number, activeTank: TankState, weaponWindowStart = 0): void {
+    const hasScrollUp = weaponWindowStart > 0;
+    const hasScrollDown = weaponWindowStart + WEAPON_WINDOW_SIZE < GAME_CONFIG.weapons.length;
+
+    this.addText(20, top + 20, `Weapon ${activeTank.selectedWeaponIndex + 1}/${GAME_CONFIG.weapons.length}`, GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
+    if (hasScrollUp) this.addText(260, top + 20, '▲', GAME_CONFIG.colors.green, GAME_CONFIG.font.small);
+    if (hasScrollDown) this.addText(260, top + 20 + (WEAPON_WINDOW_SIZE - 1) * 13, '▼', GAME_CONFIG.colors.green, GAME_CONFIG.font.small);
     this.addText(210, top + 20, `Move ${Math.round(activeTank.moveRemaining)}`, GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
 
     const rowStep = 13;
-    GAME_CONFIG.weapons.forEach((weapon, index) => {
+    for (let windowIdx = 0; windowIdx < WEAPON_WINDOW_SIZE; windowIdx += 1) {
+      const weaponIdx = weaponWindowStart + windowIdx;
+      if (weaponIdx >= GAME_CONFIG.weapons.length) break;
+
+      const weapon = GAME_CONFIG.weapons[weaponIdx];
       const count = activeTank.ammo[weapon.id];
-      const isSelected = activeTank.selectedWeaponIndex === index;
+      const isSelected = activeTank.selectedWeaponIndex === weaponIdx;
       const isEmpty = count === 0;
       const labelColor = isSelected
         ? GAME_CONFIG.colors.yellow
@@ -591,13 +607,13 @@ export class HudSystem {
 
       if (isSelected) {
         this.graphics.fillStyle(GAME_CONFIG.colors.panelDark, 1);
-        this.graphics.fillRect(14, top + 36 + index * rowStep, 282, rowStep);
+        this.graphics.fillRect(14, top + 36 + windowIdx * rowStep, 282, rowStep);
       }
 
       const ammoText = count === -1 ? '--' : `${count}`;
-      this.addText(20, top + 38 + index * rowStep, `${index + 1} ${weapon.name}`, labelColor, GAME_CONFIG.font.small);
-      this.addText(258, top + 38 + index * rowStep, ammoText, labelColor, GAME_CONFIG.font.small);
-    });
+      this.addText(20, top + 38 + windowIdx * rowStep, `${windowIdx + 1} ${weapon.name}`, labelColor, GAME_CONFIG.font.small);
+      this.addText(258, top + 38 + windowIdx * rowStep, ammoText, labelColor, GAME_CONFIG.font.small);
+    }
   }
 
   private drawAimPowerPanel(activeTank: TankState, phase: string, top: number): void {
