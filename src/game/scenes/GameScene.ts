@@ -306,6 +306,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.renderAll();
+
+    // The joiner's network handler may not be registered yet when the host's
+    // first render-broadcast fires, leaving the joiner on its own local
+    // terrain/wind roll until the host next acts. A delayed re-broadcast
+    // converges the joiner shortly after match start.
+    if (this.isOnlineHost) {
+      this.time.delayedCall(1000, () => this.broadcastSnapshot());
+    }
   }
 
   update(_time: number, delta: number): void {
@@ -848,6 +856,13 @@ export class GameScene extends Phaser.Scene {
   /** Joiner-side: send an input action to the host. */
   private sendInput(action: NetInput): void {
     if (this.isOnlineJoiner) networkSystem.send({ type: 'input', action });
+  }
+
+  private tauntOnDeath(target: TankState): void {
+    const profile = this.match.profiles[target.id];
+    const name = profile.displayName ?? `PLAYER ${target.id + 1}`;
+    const taunt = GAME_CONFIG.taunts[Math.floor(Math.random() * GAME_CONFIG.taunts.length)];
+    this.topToast = { text: name + ': "' + taunt + '"', color: GAME_CONFIG.colors.red, expiresAt: Date.now() + 2600 };
   }
 
   /**
@@ -1614,7 +1629,9 @@ export class GameScene extends Phaser.Scene {
       if (hit) {
         // Shield-piercing damage
         const dmg = Math.min(weapon.damage, hit.health);
+        const wasAlive = hit.alive;
         this.tankSystem.applyDamage(hit, weapon.damage);
+        if (wasAlive && !hit.alive) this.tauntOnDeath(hit);
         if (hit.id !== activeTank.id) {
           activeTank.damageDealt += dmg;
         }
@@ -1784,7 +1801,9 @@ export class GameScene extends Phaser.Scene {
       }
 
       const damageDealt = Math.min(incoming, target.health);
+      const wasAlive = target.alive;
       this.tankSystem.applyDamage(target, incoming);
+      if (wasAlive && !target.alive) this.tauntOnDeath(target);
       // Don't credit the shooter for damaging themselves.
       if (target.id !== shooter.id) {
         shooter.damageDealt += damageDealt;

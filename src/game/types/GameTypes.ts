@@ -932,5 +932,19 @@ export const GAME_CONFIG = {
     { id: 'horizontal-guidance', name: 'Horizontal Guidance', price: 15000, bundleSize: 5, hotkey: 'L', description: 'Shots level off toward the target', category: 'utility', sidebarLabel: 'HORIZONTAL' },
     { id: 'vertical-guidance', name: 'Vertical Guidance', price: 20000, bundleSize: 5, hotkey: 'I', description: 'Shots dive when above the target', category: 'utility', sidebarLabel: 'VERTICAL' },
     { id: 'lazy-boy', name: 'Lazy Boy', price: 20000, bundleSize: 2, hotkey: 'Y', description: 'Auto-aim plus homing', category: 'utility', sidebarLabel: 'LAZY BOYS' }
-  ] satisfies ItemDefinition[]
+  ] satisfies ItemDefinition[],
+  taunts: [
+    'AAARGH!',
+    'MEDIC!',
+    "I'LL BE BACK!",
+    'SO LONG, WORLD!',
+    'THAT LEFT A MARK.',
+    'REVENGE WILL BE MINE!',
+    'WHY ME?!',
+    'BLAST IT!',
+    'MY PAINT JOB!',
+    'I REGRET NOTHING!',
+    'TELL MY STORY!',
+    'OUT WITH A BANG!'
+  ]
 } as const;

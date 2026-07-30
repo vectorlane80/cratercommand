@@ -170,9 +170,10 @@ export class HudSystem {
 
     // Fall-event toast — sits at the top-center under the player cards so
     // chute deployments and fall damage are unmissable. Suppressed during
-    // the shop and round-over screens (those have their own panels covering
-    // the area) and behind the forfeit-confirm modal.
-    if (topToast && !quitConfirm && !inShop && turn.phase !== 'roundOver' && !matchOver) {
+    // the shop (its panel covers the area), behind the forfeit-confirm modal,
+    // and on the match-over screen. Deliberately shown during round-over so
+    // death taunts from a round-ending kill are visible above the banner.
+    if (topToast && !quitConfirm && !inShop && !matchOver) {
       const labelW = topToast.text.length * 11;
       const x = (GAME_CONFIG.width - labelW) / 2;
       const y = 96;
