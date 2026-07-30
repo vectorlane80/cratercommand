@@ -31,7 +31,6 @@ import {
 const AI_TURN_THINK_MS = 700;
 const AI_TURN_AIM_MS = 900;
 const AI_TURN_FIRE_DELAY_MS = 250;
-const AI_SHOP_DELAY_MS = 350;
 
 // Retro pixel backdrop: the single full-width panorama from Sprites 2,
 // scaled to cover the battlefield. Cacti sit on the procedural terrain.
@@ -76,6 +75,7 @@ export class GameScene extends Phaser.Scene {
   private aiTurnElapsedMs = 0;
   private aiHasFired = false;
   private aiShopElapsedMs = 0;
+  private aiShopPlanned = false;
   private pendingControllers: ControllerKind[] = ['human', 'cpu-tosser'];
   private pendingNames: Array<string | null> = [];
   private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
@@ -431,9 +431,26 @@ export class GameScene extends Phaser.Scene {
 
   private startAITurn(): void {
     const activeTank = this.tanks[this.turn.activePlayerId];
+    const profile = this.match.profiles[activeTank.id];
+
+    // AI battery healing: if health < 60, use batteries to heal
+    if (activeTank.health < 60 && activeTank.batteries > 0) {
+      const healthNeeded = GAME_CONFIG.tank.maxHealth - activeTank.health;
+      const batteriesNeeded = Math.ceil(healthNeeded / GAME_CONFIG.match.batteryHealAmount);
+      const batteriesToUse = Math.min(activeTank.batteries, batteriesNeeded, 4);
+
+      for (let i = 0; i < batteriesToUse; i++) {
+        activeTank.health = Math.min(
+          GAME_CONFIG.tank.maxHealth,
+          activeTank.health + GAME_CONFIG.match.batteryHealAmount
+        );
+        activeTank.batteries--;
+      }
+    }
+
     const opponents = this.tanks.filter((t) => t.id !== activeTank.id);
     this.aiDecision = this.aiSystem.decide(
-      this.match.profiles[activeTank.id].controller,
+      profile.controller,
       activeTank,
       opponents,
       this.turn.wind,
@@ -457,7 +474,7 @@ export class GameScene extends Phaser.Scene {
     this.aiStartPower = activeTank.power;
     this.aiTurnElapsedMs = 0;
     this.aiHasFired = false;
-    this.statusMessage = `${this.match.profiles[activeTank.id].controller.replace('cpu-', '').toUpperCase()} IS THINKING…`;
+    this.statusMessage = `${profile.controller.replace('cpu-', '').toUpperCase()} IS THINKING…`;
     this.renderAll();
   }
 
@@ -497,9 +514,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tickAIShop(delta: number): void {
+    const shopper = this.match.profiles[this.turn.activePlayerId];
+
+    // Plan shopping on first tick if not done yet
+    if (!this.aiShopPlanned) {
+      this.aiShopPlanned = true;
+      const plan = this.aiSystem.planShopping(
+        shopper.controller,
+        shopper,
+        this.economySystem,
+        this.match.round,
+        this.match.currentSale
+      );
+
+      // Queue each planned bundle
+      for (const [key, bundles] of Object.entries(plan)) {
+        for (let i = 0; i < bundles; i++) {
+          this.tryQueueShopBuy(shopper, key);
+        }
+      }
+
+      this.renderAll();
+    }
+
     this.aiShopElapsedMs += delta;
-    if (this.aiShopElapsedMs >= AI_SHOP_DELAY_MS) {
+    if (this.aiShopElapsedMs >= 900) {
       this.aiShopElapsedMs = 0;
+      this.aiShopPlanned = false;
+      this.commitPendingShop(shopper);
       this.finishShoppingForCurrentPlayer();
     }
   }

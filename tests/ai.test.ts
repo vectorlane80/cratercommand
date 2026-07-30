@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AISystem, isAIController } from '../src/game/systems/AISystem';
+import { EconomySystem } from '../src/game/systems/EconomySystem';
 import { TerrainSystem } from '../src/game/systems/TerrainSystem';
 import { TankSystem } from '../src/game/systems/TankSystem';
 import { GAME_CONFIG, PHYSICS_DEFAULTS } from '../src/game/types/GameTypes';
@@ -208,5 +209,85 @@ describe('AISystem', () => {
     // Aim direction should be > 90 (facing left)
     expect(decision.angle).toBeGreaterThan(90);
     expect(decision.angle).toBeLessThanOrEqual(155);
+  });
+
+  it('planShopping(cyborg) with cash 60000 round 1 no sale includes nuke >= 1 bundle', () => {
+    const economy = new EconomySystem();
+    const profile = makeProfile({ cash: 60000 });
+
+    const plan = aiSystem.planShopping('cpu-cyborg', profile, economy, 1, null);
+
+    expect(plan['nuke'] ?? 0).toBeGreaterThanOrEqual(1);
+    let totalCost = 0;
+    for (const [key, bundles] of Object.entries(plan)) {
+      const price = economy.priceFor(key, 1, null);
+      totalCost += price * bundles;
+    }
+    expect(totalCost).toBeLessThanOrEqual(60000);
+  });
+
+  it('planShopping(moron) with cash 3000 only affordable picks; max 4 bundles; never price-0', () => {
+    const economy = new EconomySystem();
+    const profile = makeProfile({ cash: 3000 });
+
+    const plan = aiSystem.planShopping('cpu-moron', profile, economy, 1, null);
+
+    let bundleCount = 0;
+    for (const [key, bundles] of Object.entries(plan)) {
+      const price = economy.priceFor(key, 1, null);
+      expect(price).toBeGreaterThan(0);
+      expect(price * bundles).toBeLessThanOrEqual(3000);
+      bundleCount += bundles;
+    }
+    expect(bundleCount).toBeLessThanOrEqual(4);
+  });
+
+  it('planShopping respects sales: 50% sale on nuke, cash 7000, cyborg includes nuke', () => {
+    const economy = new EconomySystem();
+    const profile = makeProfile({ cash: 7000 });
+    const sale = { itemKey: 'nuke', discount: 0.5 };
+
+    const plan = aiSystem.planShopping('cpu-cyborg', profile, economy, 1, sale);
+
+    // Nuke should be affordable with 50% discount
+    expect(plan['nuke'] ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  it('planShopping purity: profile object unchanged after call', () => {
+    const economy = new EconomySystem();
+    const profile = makeProfile({ cash: 50000 });
+    const profileBefore = JSON.stringify(profile);
+
+    aiSystem.planShopping('cpu-cyborg', profile, economy, 1, null);
+
+    const profileAfter = JSON.stringify(profile);
+    expect(profileAfter).toBe(profileBefore);
+  });
+
+  it('planShopping plan → purchase: after applyPurchases, profile cash decreases and inventory increases', () => {
+    const economy = new EconomySystem();
+    const profile = makeProfile({ cash: 30000 });
+    const cashBefore = profile.cash;
+
+    const plan = aiSystem.planShopping('cpu-tosser', profile, economy, 1, null);
+
+    // Apply the plan via economySystem
+    economy.applyPurchases(profile, plan, 1, null);
+
+    // Cash should have decreased
+    expect(profile.cash).toBeLessThan(cashBefore);
+    // Inventory should have increased for planned items
+    for (const [key, bundles] of Object.entries(plan)) {
+      if (bundles > 0) {
+        const weapon = GAME_CONFIG.weapons.find((w) => w.id === key);
+        if (weapon) {
+          expect(profile.ammo[key]).toBeGreaterThan(0);
+        } else if (key === 'parachute') {
+          expect(profile.parachutes).toBeGreaterThan(0);
+        } else if (key === 'battery') {
+          expect(profile.batteries).toBeGreaterThan(0);
+        }
+      }
+    }
   });
 });

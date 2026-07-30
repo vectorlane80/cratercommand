@@ -10,6 +10,7 @@ export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 export type WallMode = 'none' | 'concrete' | 'padded' | 'rubber' | 'spring' | 'wraparound' | 'random' | 'erratic';
+export type Sale = { itemKey: string; discount: number } | null;
 
 export const WALL_MODES: WallMode[] = ['none', 'concrete', 'padded', 'rubber', 'spring', 'wraparound', 'random', 'erratic'];
 
@@ -144,7 +145,7 @@ export interface MatchState {
    * round's shop, plus the discount fraction (0..1). Re-rolled in
    * enterShoppingPhase. Null when there's no sale.
    */
-  currentSale: { itemKey: string; discount: number } | null;
+  currentSale: Sale;
   wallMode: WallMode;
   activeWallMode: Exclude<WallMode, 'random' | 'erratic'>;
   physics: PhysicsSettings;

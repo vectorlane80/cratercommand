@@ -6,11 +6,13 @@ import {
   type PhysicsSettings,
   type PlayerId,
   type PlayerProfile,
+  type Sale,
   type TankState,
   type TerrainData,
   type WeaponDefinition,
   type WindState
 } from '../types/GameTypes';
+import { EconomySystem } from './EconomySystem';
 import { TerrainSystem } from './TerrainSystem';
 
 export interface AIDecision {
@@ -71,6 +73,82 @@ export class AISystem {
    */
   resetRound(): void {
     this.tosserMemory.clear();
+  }
+
+  /**
+   * Plan shopping for an AI player. Returns a record of planned buys
+   * {key: bundles} that respects affordability and personality strategy.
+   * Pure function: does not mutate the profile.
+   */
+  planShopping(controller: ControllerKind, profile: PlayerProfile, economy: EconomySystem, round: number, sale: Sale): Record<string, number> {
+    const plan: Record<string, number> = {};
+    let budget = profile.cash;
+    let bundleCount = 0;
+    const maxBundles = 8;
+
+    // Priority lists by personality
+    let priorities: string[];
+
+    if (controller === 'cpu-moron') {
+      // Random affordable weapons until < $2000 left
+      const affordableWeapons: string[] = [];
+      GAME_CONFIG.weapons.forEach(w => {
+        if (w.price > 0) {
+          const price = economy.priceFor(w.id, round, sale);
+          if (price > 0 && price <= budget && price >= 2000) {
+            affordableWeapons.push(w.id);
+          }
+        }
+      });
+      // Pick up to 4 random entries
+      const picks = Math.min(4, affordableWeapons.length);
+      for (let i = 0; i < picks; i++) {
+        if (budget < 2000) break;
+        const randomIdx = Math.floor(Math.random() * affordableWeapons.length);
+        const key = affordableWeapons[randomIdx];
+        const price = economy.priceFor(key, round, sale);
+        if (price <= budget) {
+          plan[key] = (plan[key] ?? 0) + 1;
+          budget -= price;
+          bundleCount++;
+        }
+      }
+      return plan;
+    }
+
+    if (controller === 'cpu-shooter') {
+      priorities = ['missile', 'big-missile', 'bullet'];
+    } else if (controller === 'cpu-tosser') {
+      priorities = ['big-missile', 'baby-nuke', 'parachute', 'shield'];
+    } else if (controller === 'cpu-spoiler') {
+      priorities = ['baby-nuke', 'mirv', 'shield', 'parachute', 'battery'];
+    } else if (controller === 'cpu-cyborg') {
+      priorities = ['nuke', 'deaths-head', 'super-mag', 'heavy-shield', 'parachute', 'battery'];
+    } else {
+      return plan;
+    }
+
+    // Loop through priority list, buying one bundle of each affordable entry
+    while (bundleCount < maxBundles) {
+      let boughtInLoop = false;
+
+      for (const key of priorities) {
+        if (bundleCount >= maxBundles) break;
+
+        const price = economy.priceFor(key, round, sale);
+        if (price > 0 && price <= budget) {
+          plan[key] = (plan[key] ?? 0) + 1;
+          budget -= price;
+          bundleCount++;
+          boughtInLoop = true;
+        }
+      }
+
+      // Stop if nothing was affordable in this loop
+      if (!boughtInLoop) break;
+    }
+
+    return plan;
   }
 
   /**
