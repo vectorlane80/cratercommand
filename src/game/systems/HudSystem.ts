@@ -563,15 +563,16 @@ export class HudSystem {
     );
     this.addText(x, y + 28, `CHUTES ${activeTank.parachutes}`, colors.yellow, GAME_CONFIG.font.small);
     this.addText(x, y + 42, `BATT   ${activeTank.batteries}`, colors.cyan, GAME_CONFIG.font.small);
-    this.addText(x, y + 56, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
+    this.addText(x, y + 56, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, colors.cyan, GAME_CONFIG.font.small);
+    this.addText(x, y + 70, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
     this.addText(
       x,
-      y + 70,
+      y + 84,
       `WINS   ${match.profiles[0].wins}-${match.profiles[1].wins}  (to ${match.roundsToWin})`,
       colors.cyan,
       GAME_CONFIG.font.small
     );
-    this.addText(x, y + 84, `WEAPON ${GAME_CONFIG.weapons[activeTank.selectedWeaponIndex].name}`, colors.white, GAME_CONFIG.font.small);
+    this.addText(x, y + 98, `WEAPON ${GAME_CONFIG.weapons[activeTank.selectedWeaponIndex].name}`, colors.white, GAME_CONFIG.font.small);
   }
 
   private drawFireButton(top: number): void {
@@ -676,7 +677,7 @@ export class HudSystem {
     this.addText(728, top + 60, `HP   ${activeTank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
     this.addText(728, top + 74, `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
     this.addText(728, top + 88, `CHUTES  ${activeTank.parachutes}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
-    this.addText(728, top + 102, `SHIELDS ${activeTank.shields}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+    this.addText(728, top + 102, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
     this.addText(
       728,
       top + 116,

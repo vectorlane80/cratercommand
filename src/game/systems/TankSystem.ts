@@ -77,7 +77,9 @@ export class TankSystem {
         selectedWeaponIndex: this.firstAvailableWeapon(profile.ammo),
         moveRemaining: GAME_CONFIG.movement.perTurn,
         parachutes: profile.parachutes,
-        shields: profile.shields,
+        defenses: { ...profile.defenses },
+        armedShieldId: null,
+        armedShieldHp: 0,
         batteries: profile.batteries,
         damageDealt: 0
       };
@@ -215,9 +217,9 @@ export class TankSystem {
       graphics.lineStyle(1, GAME_CONFIG.colors.black, 1);
       graphics.strokeRect(bodyX + 4, bodyY + 4, GAME_CONFIG.tank.width - 8, 4);
 
-      // Faint cyan dome above the tank while shields are up — the at-a-glance
-      // "I'm protected" cue. Per-charge HUD count still lives in the status panel.
-      if (tank.shields > 0) {
+      // Faint cyan dome above the tank while shields are armed — the at-a-glance
+      // "I'm protected" cue. Armed shield HP still lives in the status panel.
+      if (tank.armedShieldHp > 0) {
         graphics.lineStyle(2, GAME_CONFIG.colors.cyan, 0.55);
         graphics.beginPath();
         graphics.arc(tank.x, tank.y - GAME_CONFIG.tank.height / 2, GAME_CONFIG.tank.hitRadius + 4, Math.PI, 0);

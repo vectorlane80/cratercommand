@@ -116,6 +116,7 @@ export class GameScene extends Phaser.Scene {
   private moveLeftKey!: Phaser.Input.Keyboard.Key;
   private moveRightKey!: Phaser.Input.Keyboard.Key;
   private batteryUseKey!: Phaser.Input.Keyboard.Key;
+  private shieldArmKey!: Phaser.Input.Keyboard.Key;
   private itemHotkeys: Array<{ key: Phaser.Input.Keyboard.Key; itemId: string }> = [];
   private soundToggleKey!: Phaser.Input.Keyboard.Key;
   private escapeKey!: Phaser.Input.Keyboard.Key;
@@ -243,6 +244,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponPrevKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.weaponNextKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.batteryUseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
+    this.shieldArmKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
     GAME_CONFIG.items.forEach((item) => {
       const keyCode = Phaser.Input.Keyboard.KeyCodes[item.hotkey as keyof typeof Phaser.Input.Keyboard.KeyCodes];
       this.itemHotkeys.push({ key: this.input.keyboard!.addKey(keyCode), itemId: item.id });
@@ -257,6 +259,7 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.A,
       Phaser.Input.Keyboard.KeyCodes.D,
       Phaser.Input.Keyboard.KeyCodes.B,
+      Phaser.Input.Keyboard.KeyCodes.X,
       Phaser.Input.Keyboard.KeyCodes.P,
       Phaser.Input.Keyboard.KeyCodes.S,
       Phaser.Input.Keyboard.KeyCodes.V,
@@ -491,6 +494,16 @@ export class GameScene extends Phaser.Scene {
     this.laserResolving = false;
     this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
+
+    // Auto-arm shields for players with autoDefense or AI
+    for (const tank of this.tanks) {
+      const profile = this.match.profiles[tank.id];
+      const isAI = profile.controller.startsWith('cpu-');
+      if (profile.autoDefense || isAI) {
+        this.tryArmShield(tank);
+      }
+    }
+
     this.turn = {
       activePlayerId: startingPlayer,
       phase: 'aiming',
@@ -638,6 +651,12 @@ export class GameScene extends Phaser.Scene {
           activeTank.batteries -= 1;
           activeTank.health = Math.min(GAME_CONFIG.tank.maxHealth, activeTank.health + GAME_CONFIG.match.batteryHealAmount);
           this.renderTanksAndHud();
+        }
+        break;
+      case 'arm-shield':
+        if (this.turn.phase === 'aiming' && this.tryArmShield(activeTank)) {
+          this.renderTanksAndHud();
+          this.endTurn();
         }
         break;
       case 'shop-buy':
@@ -830,6 +849,9 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.batteryUseKey)) {
       this.sendInput({ kind: 'use-battery' });
     }
+    if (Phaser.Input.Keyboard.JustDown(this.shieldArmKey)) {
+      this.sendInput({ kind: 'arm-shield' });
+    }
     if (this.moveLeftKey.isDown) this.sendInput({ kind: 'move-step', direction: -1 });
     if (this.moveRightKey.isDown) this.sendInput({ kind: 'move-step', direction: 1 });
   }
@@ -893,6 +915,7 @@ export class GameScene extends Phaser.Scene {
    * aren't purchasable anyway (the unlimited Small Missile).
    */
   private tryQueueShopBuy(profile: PlayerProfile, key: string): boolean {
+    if (key === 'auto-defense' && profile.autoDefense) return false;
     const basePrice = this.basePriceFor(key);
     if (basePrice <= 0) return false;
     const price = this.effectivePrice(basePrice, key);
@@ -971,6 +994,13 @@ export class GameScene extends Phaser.Scene {
         activeTank.health = Math.min(GAME_CONFIG.tank.maxHealth, activeTank.health + GAME_CONFIG.match.batteryHealAmount);
         soundSystem.playUiSelect();
         changed = true;
+      }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.shieldArmKey)) {
+      if (this.tryArmShield(activeTank)) {
+        this.renderTanksAndHud();
+        this.endTurn();
       }
     }
 
@@ -1470,6 +1500,28 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private tryArmShield(tank: TankState): boolean {
+    // Already armed
+    if (tank.armedShieldHp > 0) return false;
+
+    // Find strongest available shield (absorb DESC, sorted)
+    const defenseItems = GAME_CONFIG.items
+      .filter((i) => i.absorb !== undefined && i.category === 'defense')
+      .sort((a, b) => (b.absorb ?? 0) - (a.absorb ?? 0));
+
+    for (const item of defenseItems) {
+      if ((tank.defenses[item.id] ?? 0) > 0) {
+        tank.defenses[item.id] -= 1;
+        tank.armedShieldId = item.id;
+        tank.armedShieldHp = item.absorb ?? 40;
+        soundSystem.playUiSelect();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // -------- PROJECTILE TICK --------
 
   private tickProjectiles(delta: number): void {
@@ -1558,14 +1610,14 @@ export class GameScene extends Phaser.Scene {
     if (impact.kind === 'tank' && impact.targetTankId !== undefined && weapon.damage > 0) {
       const target = this.tanks[impact.targetTankId];
 
-      // Shield absorbs up to shieldAbsorbAmount and is consumed on any hit.
+      // Armed shield absorbs damage from the armed pool.
       let incoming = Math.round(weapon.damage * scale);
-      let shieldUsed = false;
-      if (target.shields > 0) {
-        const absorbed = Math.min(incoming, GAME_CONFIG.match.shieldAbsorbAmount);
+      if (target.armedShieldHp > 0 && incoming > 0) {
+        const absorbed = Math.min(incoming, target.armedShieldHp);
+        target.armedShieldHp -= absorbed;
         incoming -= absorbed;
-        target.shields -= 1;
-        shieldUsed = true;
+        if (target.armedShieldHp <= 0) target.armedShieldId = null;
+        soundSystem.playShieldHit();
       }
 
       const damageDealt = Math.min(incoming, target.health);
@@ -1575,7 +1627,6 @@ export class GameScene extends Phaser.Scene {
         shooter.damageDealt += damageDealt;
       }
 
-      if (shieldUsed) soundSystem.playShieldHit();
       if (incoming > 0) soundSystem.playTankHit();
     } else if (impact.kind === 'terrain') {
       soundSystem.playExplosion(weapon.craterRadius > 40 ? 1.3 : 0.85);

@@ -168,4 +168,16 @@ describe('TankSystem', () => {
     expect(tanks[0].batteries).toBe(5);
     expect(tanks[1].batteries).toBe(3);
   });
+
+  it('createTanks copies defenses record and initializes armed shield fields', () => {
+    const terrain = makeFlatTerrain(250);
+    const profiles = [makeProfile({ defenses: { 'shield': 2, 'force-shield': 1 } })];
+
+    const tanks = tankSystem.createTanks(terrainSystem, terrain, profiles);
+
+    expect(tanks[0].defenses['shield']).toBe(2);
+    expect(tanks[0].defenses['force-shield']).toBe(1);
+    expect(tanks[0].armedShieldId).toBeNull();
+    expect(tanks[0].armedShieldHp).toBe(0);
+  });
 });

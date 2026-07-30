@@ -97,18 +97,18 @@ describe('TurnSystem', () => {
   it('saveTanksToProfiles copies ammo and makes it a separate copy', () => {
     const match = system.createMatchState(['human', 'cpu-cadet']);
     const tanks = [
-      makeTank({ id: 0, ammo: { 'small-missile': -1, 'big-missile': 5 }, parachutes: 2, shields: 1 }),
-      makeTank({ id: 1, ammo: { 'small-missile': -1, 'big-missile': 3 }, parachutes: 0, shields: 2 })
+      makeTank({ id: 0, ammo: { 'small-missile': -1, 'big-missile': 5 }, parachutes: 2, defenses: { 'shield': 1 } }),
+      makeTank({ id: 1, ammo: { 'small-missile': -1, 'big-missile': 3 }, parachutes: 0, defenses: { 'shield': 2 } })
     ];
 
     system.saveTanksToProfiles(tanks, match);
 
     expect(match.profiles[0].ammo['big-missile']).toBe(5);
     expect(match.profiles[0].parachutes).toBe(2);
-    expect(match.profiles[0].shields).toBe(1);
+    expect(match.profiles[0].defenses['shield']).toBe(1);
     expect(match.profiles[1].ammo['big-missile']).toBe(3);
     expect(match.profiles[1].parachutes).toBe(0);
-    expect(match.profiles[1].shields).toBe(2);
+    expect(match.profiles[1].defenses['shield']).toBe(2);
 
     tanks[0].ammo['big-missile'] = 999;
     expect(match.profiles[0].ammo['big-missile']).toBe(5);

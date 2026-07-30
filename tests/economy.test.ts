@@ -332,4 +332,60 @@ describe('EconomySystem', () => {
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'laser')!.batteryCost).toBe(2);
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'laser')!.behavior).toBe('laser');
   });
+
+  it('new defense items have correct prices and bundles', () => {
+    expect(system.basePriceFor('force-shield')).toBe(25000);
+    expect(system.bundleSizeFor('force-shield')).toBe(3);
+    expect(system.basePriceFor('heavy-shield')).toBe(30000);
+    expect(system.bundleSizeFor('heavy-shield')).toBe(2);
+    expect(system.basePriceFor('super-mag')).toBe(40000);
+    expect(system.bundleSizeFor('super-mag')).toBe(2);
+    expect(system.basePriceFor('mag-deflector')).toBe(10000);
+    expect(system.bundleSizeFor('mag-deflector')).toBe(2);
+    expect(system.basePriceFor('auto-defense')).toBe(1500);
+    expect(system.bundleSizeFor('auto-defense')).toBe(1);
+  });
+
+  it('defense items have correct absorb values', () => {
+    expect(GAME_CONFIG.items.find((i) => i.id === 'shield')!.absorb).toBe(40);
+    expect(GAME_CONFIG.items.find((i) => i.id === 'force-shield')!.absorb).toBe(65);
+    expect(GAME_CONFIG.items.find((i) => i.id === 'heavy-shield')!.absorb).toBe(90);
+    expect(GAME_CONFIG.items.find((i) => i.id === 'super-mag')!.absorb).toBe(100);
+  });
+
+  it('deflects shield items have deflects flag', () => {
+    expect(GAME_CONFIG.items.find((i) => i.id === 'super-mag')!.deflects).toBe(true);
+    expect(GAME_CONFIG.items.find((i) => i.id === 'mag-deflector')!.deflects).toBe(true);
+  });
+
+  it('auto-defense has oneTime flag', () => {
+    expect(GAME_CONFIG.items.find((i) => i.id === 'auto-defense')!.oneTime).toBe(true);
+  });
+
+  it('ownedCount handles defense items', () => {
+    const profile = makeProfile({ defenses: { 'shield': 2, 'force-shield': 1 } });
+    expect(system.ownedCount(profile, 'shield')).toBe(2);
+    expect(system.ownedCount(profile, 'force-shield')).toBe(1);
+  });
+
+  it('ownedCount handles auto-defense flag', () => {
+    const profile1 = makeProfile({ autoDefense: false });
+    const profile2 = makeProfile({ autoDefense: true });
+    expect(system.ownedCount(profile1, 'auto-defense')).toBe(0);
+    expect(system.ownedCount(profile2, 'auto-defense')).toBe(1);
+  });
+
+  it('applyPurchases adds defense items to defenses record', () => {
+    const profile = makeProfile({ cash: 100000, defenses: { 'shield': 0 } });
+    const pending = { 'force-shield': 1 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.defenses['force-shield']).toBe(3);
+  });
+
+  it('applyPurchases sets autoDefense flag when purchasing auto-defense', () => {
+    const profile = makeProfile({ autoDefense: false });
+    const pending = { 'auto-defense': 1 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.autoDefense).toBe(true);
+  });
 });

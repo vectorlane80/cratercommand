@@ -32,7 +32,9 @@ export interface TankState {
   selectedWeaponIndex: number;
   moveRemaining: number;
   parachutes: number;
-  shields: number;
+  defenses: Record<string, number>;
+  armedShieldId: string | null;
+  armedShieldHp: number;
   batteries: number;
   damageDealt: number;
 }
@@ -65,7 +67,8 @@ export interface PlayerProfile {
   wins: number;
   ammo: Record<string, number>;
   parachutes: number;
-  shields: number;
+  defenses: Record<string, number>;
+  autoDefense: boolean;
   batteries: number;
   controller: ControllerKind;
   /** Custom display name. Falls back to "PLAYER N" when null. */
@@ -130,6 +133,9 @@ export interface ItemDefinition {
   description: string;
   category: ItemCategory;
   sidebarLabel?: string;
+  absorb?: number;
+  deflects?: boolean;
+  oneTime?: boolean;
 }
 
 export interface ProjectileState {
@@ -302,9 +308,7 @@ export const GAME_CONFIG = {
     roundsToWin: 2,
     startingCash: 15000,
     startingParachutes: 1,
-    startingShields: 0,
     startingBatteries: 0,
-    shieldAbsorbAmount: 40,
     batteryHealAmount: 10,
     damageCashMultiplier: 30,
     roundWinBonus: 5000,
@@ -828,7 +832,12 @@ export const GAME_CONFIG = {
   ] satisfies WeaponDefinition[],
   items: [
     { id: 'parachute', name: 'Parachute', price: 10000, bundleSize: 8, hotkey: 'P', description: 'Auto-deploys on falls', category: 'defense' },
-    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage', category: 'defense' },
-    { id: 'battery', name: 'Battery', price: 5000, bundleSize: 10, hotkey: 'B', description: '+10 HP or fuels energy weapons', category: 'energy', sidebarLabel: 'BATTERIES' }
+    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage', category: 'defense', absorb: 40 },
+    { id: 'battery', name: 'Battery', price: 5000, bundleSize: 10, hotkey: 'B', description: '+10 HP or fuels energy weapons', category: 'energy', sidebarLabel: 'BATTERIES' },
+    { id: 'force-shield', name: 'Force Shield', price: 25000, bundleSize: 3, hotkey: 'F', description: 'Absorbs 65 damage when armed', category: 'defense', absorb: 65 },
+    { id: 'heavy-shield', name: 'Heavy Shield', price: 30000, bundleSize: 2, hotkey: 'H', description: 'Absorbs 90 damage when armed', category: 'defense', absorb: 90 },
+    { id: 'super-mag', name: 'Super Mag', price: 40000, bundleSize: 2, hotkey: 'M', description: 'Absorbs 100 + deflects shots', category: 'defense', absorb: 100, deflects: true },
+    { id: 'mag-deflector', name: 'Mag Deflector', price: 10000, bundleSize: 2, hotkey: 'G', description: 'Deflects nearby shots upward', category: 'defense', deflects: true },
+    { id: 'auto-defense', name: 'Auto Defense', price: 1500, bundleSize: 1, hotkey: 'O', description: 'Shields auto-arm each round', category: 'defense', oneTime: true }
   ] satisfies ItemDefinition[]
 } as const;

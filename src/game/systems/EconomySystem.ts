@@ -57,8 +57,10 @@ export class EconomySystem {
       profile.cash -= cost;
       if (key === 'parachute') {
         profile.parachutes += qty * this.bundleSizeFor(key);
-      } else if (key === 'shield') {
-        profile.shields += qty * this.bundleSizeFor(key);
+      } else if (key === 'auto-defense') {
+        profile.autoDefense = true;
+      } else if (GAME_CONFIG.items.some((i) => i.id === key && i.category === 'defense' && !i.oneTime)) {
+        profile.defenses[key] = (profile.defenses[key] ?? 0) + qty * this.bundleSizeFor(key);
       } else if (key === 'battery') {
         profile.batteries += qty * this.bundleSizeFor(key);
       } else {
@@ -118,8 +120,11 @@ export class EconomySystem {
     if (key === 'parachute') {
       return profile.parachutes;
     }
-    if (key === 'shield') {
-      return profile.shields;
+    if (key === 'auto-defense') {
+      return profile.autoDefense ? 1 : 0;
+    }
+    if (GAME_CONFIG.items.some((i) => i.id === key && i.category === 'defense')) {
+      return profile.defenses[key] ?? 0;
     }
     if (key === 'battery') {
       return profile.batteries;
