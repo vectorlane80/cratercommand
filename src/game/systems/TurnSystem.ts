@@ -33,7 +33,8 @@ export class TurnSystem {
     roundsToWin: number = GAME_CONFIG.match.roundsToWin,
     names: Array<string | null> = [],
     wallMode: WallMode = 'none',
-    physics: PhysicsSettings = PHYSICS_DEFAULTS
+    physics: PhysicsSettings = PHYSICS_DEFAULTS,
+    marketFactors: Record<string, number> = {}
   ): MatchState {
     const active = controllers.filter((c): c is ControllerKind => !!c);
     const activeWallMode = this.resolveActiveWallMode(wallMode);
@@ -47,7 +48,8 @@ export class TurnSystem {
       currentSale: null,
       wallMode,
       activeWallMode,
-      physics
+      physics,
+      marketFactors
     };
   }
 

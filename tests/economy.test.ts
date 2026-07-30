@@ -453,4 +453,43 @@ describe('EconomySystem', () => {
     expect(profile.guidance['lazy-boy']).toBe(4);
     expect(profile.cash).toBe(100000 - 10000 - 40000);
   });
+
+  it('effectivePrice with marketFactor 1.5: base 1000 round 1 no sale → 1500', () => {
+    const price = system.effectivePrice(1000, 'nuke', 1, null, 1.5);
+    expect(price).toBe(1500);
+  });
+
+  it('effectivePrice with marketFactor 1.5 and 50% sale → 750', () => {
+    const price = system.effectivePrice(1000, 'nuke', 1, { itemKey: 'nuke', discount: 0.5 }, 1.5);
+    expect(price).toBe(750);
+  });
+
+  it('updateMarket bump: {} + purchases {nuke: 2} → factors.nuke ≈ 1.16 (drift * bundles)', () => {
+    const factors: Record<string, number> = {};
+    system.updateMarket(factors, { nuke: 2 });
+    expect(Math.abs(factors.nuke - (1 + 0.08 * 2))).toBeLessThan(1e-9);
+  });
+
+  it('updateMarket relaxation order: {nuke: 2.0} + purchases {nuke: 1} → nuke ≈ 1.98 (relax first, then bump)', () => {
+    const factors: Record<string, number> = { nuke: 2.0 };
+    system.updateMarket(factors, { nuke: 1 });
+    // Relax first: 2.0 + (1 - 2.0) * 0.1 = 2.0 - 0.1 = 1.9
+    // Then bump: 1.9 + 0.08 * 1 = 1.98
+    expect(Math.abs(factors.nuke - 1.98)).toBeLessThan(1e-9);
+  });
+
+  it('applyPurchases with marketFactors threads drifted prices into cash deduction', () => {
+    const profile = makeProfile({ cash: 25000 });
+    const pending = { nuke: 1 };
+    const marketFactors = { nuke: 1.5 };
+    system.applyPurchases(profile, pending, 1, null, marketFactors);
+    // nuke base 12000, market factor 1.5 → 18000
+    expect(profile.cash).toBe(25000 - 18000);
+  });
+
+  it('loadMarket guards against invalid values and returns {} in node (no localStorage)', () => {
+    // In node test environment, localStorage is undefined
+    const factors = system.loadMarket();
+    expect(factors).toEqual({});
+  });
 });

@@ -149,6 +149,8 @@ export interface MatchState {
   wallMode: WallMode;
   activeWallMode: Exclude<WallMode, 'random' | 'erratic'>;
   physics: PhysicsSettings;
+  // Free-market price factors: item/weapon key → multiplier. Missing keys default to 1.
+  marketFactors: Record<string, number>;
 }
 
 export const MAX_PLAYERS = 4;
@@ -398,7 +400,15 @@ export const GAME_CONFIG = {
     // maxSaleDiscount]. Sales display alongside the price in the shop.
     saleChance: 0.25,
     minSaleDiscount: 0.3,
-    maxSaleDiscount: 0.5
+    maxSaleDiscount: 0.5,
+    // Interest paid on held cash at round end (5% per round).
+    interestRate: 0.05,
+    // Free-market price drift: demand bumps, neglect decays toward 1.
+    freeMarket: {
+      drift: 0.08, // per-purchase demand bump
+      min: 0.5,    // price-factor floor
+      max: 2.0     // price-factor ceiling
+    }
   },
   weapons: [
     {

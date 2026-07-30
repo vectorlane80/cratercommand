@@ -80,6 +80,8 @@ export interface ShopPending {
   pageLabel: () => string;
   /** Total number of shop pages. */
   shopPageCount: () => number;
+  /** Market price factor for an item (demand/neglect). */
+  marketFactor: (key: string) => number;
 }
 
 export const EMPTY_SHOP_PENDING: ShopPending = {
@@ -93,7 +95,8 @@ export const EMPTY_SHOP_PENDING: ShopPending = {
   ownedFor: () => 0,
   visibleRows: () => [],
   pageLabel: () => '',
-  shopPageCount: () => 1
+  shopPageCount: () => 1,
+  marketFactor: () => 1
 };
 
 export class HudSystem {
@@ -878,6 +881,13 @@ export class HudSystem {
       this.addText(colPrice, rowY, buyable ? `$${price}` : 'FREE', rowColor, GAME_CONFIG.font.medium);
       if (onSale) {
         this.addText(colPrice + 76, rowY + 2, `-${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+      }
+      // Market price indicator: ▲ if up, ▼ if down
+      const factor = pending.marketFactor(itemKey);
+      if (factor > 1.1) {
+        this.addText(colPrice + 100, rowY, '▲', colors.red, GAME_CONFIG.font.medium);
+      } else if (factor < 0.9) {
+        this.addText(colPrice + 100, rowY, '▼', colors.green, GAME_CONFIG.font.medium);
       }
       const ownedText = ownedDisplay === -1 ? '--' : `${ownedDisplay}`;
       this.addText(colOwn + 20, rowY, ownedText, rowColor, GAME_CONFIG.font.medium);

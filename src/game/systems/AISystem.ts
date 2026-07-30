@@ -80,7 +80,7 @@ export class AISystem {
    * {key: bundles} that respects affordability and personality strategy.
    * Pure function: does not mutate the profile.
    */
-  planShopping(controller: ControllerKind, profile: PlayerProfile, economy: EconomySystem, round: number, sale: Sale): Record<string, number> {
+  planShopping(controller: ControllerKind, profile: PlayerProfile, economy: EconomySystem, round: number, sale: Sale, marketFactors?: Record<string, number>): Record<string, number> {
     const plan: Record<string, number> = {};
     let budget = profile.cash;
     let bundleCount = 0;
@@ -94,7 +94,7 @@ export class AISystem {
       const affordableWeapons: string[] = [];
       GAME_CONFIG.weapons.forEach(w => {
         if (w.price > 0) {
-          const price = economy.priceFor(w.id, round, sale);
+          const price = economy.priceFor(w.id, round, sale, marketFactors);
           if (price > 0 && price <= budget && price >= 2000) {
             affordableWeapons.push(w.id);
           }

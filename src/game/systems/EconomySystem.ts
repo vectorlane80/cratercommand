@@ -1,6 +1,4 @@
-import { GAME_CONFIG, type PlayerProfile, type ItemCategory } from '../types/GameTypes';
-
-export type Sale = { itemKey: string; discount: number } | null;
+import { GAME_CONFIG, type PlayerProfile, type ItemCategory, type Sale } from '../types/GameTypes';
 
 export const GUIDANCE_IDS = ['heat-guidance', 'ballistic-guidance', 'horizontal-guidance', 'vertical-guidance', 'lazy-boy'] as const;
 
@@ -30,32 +28,33 @@ export class EconomySystem {
     return 1;
   }
 
-  effectivePrice(basePrice: number, itemKey: string, round: number, sale: Sale): number {
+  effectivePrice(basePrice: number, itemKey: string, round: number, sale: Sale, marketFactor: number = 1): number {
     if (basePrice <= 0) return 0;
     const inflated = basePrice * (1 + (round - 1) * GAME_CONFIG.match.roundPriceInflation);
-    const final = sale && sale.itemKey === itemKey ? inflated * (1 - sale.discount) : inflated;
+    const withMarket = inflated * marketFactor;
+    const final = sale && sale.itemKey === itemKey ? withMarket * (1 - sale.discount) : withMarket;
     return Math.max(1, Math.round(final));
   }
 
-  priceFor(key: string, round: number, sale: Sale): number {
-    return this.effectivePrice(this.basePriceFor(key), key, round, sale);
+  priceFor(key: string, round: number, sale: Sale, marketFactors?: Record<string, number>): number {
+    return this.effectivePrice(this.basePriceFor(key), key, round, sale, marketFactors?.[key] ?? 1);
   }
 
-  totalPendingCost(pending: Record<string, number>, round: number, sale: Sale): number {
+  totalPendingCost(pending: Record<string, number>, round: number, sale: Sale, marketFactors?: Record<string, number>): number {
     let total = 0;
     for (const [key, qty] of Object.entries(pending)) {
-      total += qty * this.priceFor(key, round, sale);
+      total += qty * this.priceFor(key, round, sale, marketFactors);
     }
     return total;
   }
 
-  effectiveCash(profile: PlayerProfile, pending: Record<string, number>, round: number, sale: Sale): number {
-    return profile.cash - this.totalPendingCost(pending, round, sale);
+  effectiveCash(profile: PlayerProfile, pending: Record<string, number>, round: number, sale: Sale, marketFactors?: Record<string, number>): number {
+    return profile.cash - this.totalPendingCost(pending, round, sale, marketFactors);
   }
 
-  applyPurchases(profile: PlayerProfile, pending: Record<string, number>, round: number, sale: Sale): void {
+  applyPurchases(profile: PlayerProfile, pending: Record<string, number>, round: number, sale: Sale, marketFactors?: Record<string, number>): void {
     for (const [key, qty] of Object.entries(pending)) {
-      const cost = qty * this.priceFor(key, round, sale);
+      const cost = qty * this.priceFor(key, round, sale, marketFactors);
       profile.cash -= cost;
       if (key === 'parachute') {
         profile.parachutes += qty * this.bundleSizeFor(key);
@@ -159,5 +158,52 @@ export class EconomySystem {
     const clampedPage = Math.max(0, Math.min(page, maxPage));
     const start = clampedPage * pageSize;
     return entries.slice(start, start + pageSize);
+  }
+
+  /** Bump demand on purchased keys, decay all known factors slightly toward 1, clamp to band. */
+  updateMarket(factors: Record<string, number>, purchases: Record<string, number>): void {
+    const { drift, min, max } = GAME_CONFIG.match.freeMarket;
+
+    // Relaxation first: 10% decay toward 1 for all known factors (no immediate re-decay on fresh demand)
+    for (const key of Object.keys(factors)) {
+      factors[key] = Math.max(min, Math.min(max, factors[key] + (1 - factors[key]) * 0.1));
+    }
+
+    // Then bump: demand increases on purchased keys
+    for (const [key, bundles] of Object.entries(purchases)) {
+      if (bundles > 0) {
+        factors[key] = Math.max(min, Math.min(max, (factors[key] ?? 1) + drift * bundles));
+      }
+    }
+  }
+
+  /** Load market factors from localStorage. Guards against invalid values; returns {} on any error. */
+  loadMarket(): Record<string, number> {
+    try {
+      if (typeof localStorage === 'undefined') return {};
+      const stored = localStorage.getItem('cratercmd.market');
+      if (!stored) return {};
+      const loaded = JSON.parse(stored) as Record<string, unknown>;
+      const { min, max } = GAME_CONFIG.match.freeMarket;
+      const factors: Record<string, number> = {};
+      for (const [key, value] of Object.entries(loaded)) {
+        if (typeof value === 'number' && isFinite(value) && value >= min && value <= max) {
+          factors[key] = value;
+        }
+      }
+      return factors;
+    } catch {
+      return {};
+    }
+  }
+
+  /** Save market factors to localStorage. Silently fails if unavailable. */
+  saveMarket(factors: Record<string, number>): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem('cratercmd.market', JSON.stringify(factors));
+    } catch {
+      // Silently fail
+    }
   }
 }

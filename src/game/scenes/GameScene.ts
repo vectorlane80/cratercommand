@@ -228,7 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.hudSystem = new HudSystem(this);
     this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode, this.pendingPhysics);
+    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode, this.pendingPhysics, this.economySystem.loadMarket());
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -524,7 +524,8 @@ export class GameScene extends Phaser.Scene {
         shopper,
         this.economySystem,
         this.match.round,
-        this.match.currentSale
+        this.match.currentSale,
+        this.match.marketFactors
       );
 
       // Queue each planned bundle
@@ -582,6 +583,12 @@ export class GameScene extends Phaser.Scene {
     this.tanks.forEach((tank) => {
       const earned = tank.damageDealt * GAME_CONFIG.match.damageCashMultiplier;
       this.match.profiles[tank.id].cash += earned;
+    });
+
+    // SE interest on held cash
+    this.match.profiles.forEach((profile) => {
+      const interest = Math.round(profile.cash * GAME_CONFIG.match.interestRate);
+      profile.cash += interest;
     });
 
     if (winnerId !== null) {
@@ -647,7 +654,7 @@ export class GameScene extends Phaser.Scene {
    * price. Minimum 1 to keep it a real transaction.
    */
   private effectivePrice(basePrice: number, itemKey: string): number {
-    return this.economySystem.effectivePrice(basePrice, itemKey, this.match.round, this.match.currentSale);
+    return this.economySystem.effectivePrice(basePrice, itemKey, this.match.round, this.match.currentSale, this.match.marketFactors[itemKey] ?? 1);
   }
 
   private returnToMenu(): void {
@@ -970,7 +977,7 @@ export class GameScene extends Phaser.Scene {
    * affordability checks both stay consistent.
    */
   effectiveCash(profile: PlayerProfile): number {
-    return this.economySystem.effectiveCash(profile, this.pendingShopBuys, this.match.round, this.match.currentSale);
+    return this.economySystem.effectiveCash(profile, this.pendingShopBuys, this.match.round, this.match.currentSale, this.match.marketFactors);
   }
 
   /** Pending count of an item — what's in the cart but not yet committed. */
@@ -1015,7 +1022,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private commitPendingShop(profile: PlayerProfile): void {
-    this.economySystem.applyPurchases(profile, this.pendingShopBuys, this.match.round, this.match.currentSale);
+    const committed = { ...this.pendingShopBuys };
+    this.economySystem.applyPurchases(profile, this.pendingShopBuys, this.match.round, this.match.currentSale, this.match.marketFactors);
+    this.economySystem.updateMarket(this.match.marketFactors, committed);
+    this.economySystem.saveMarket(this.match.marketFactors);
     this.clearPendingShop();
   }
 
@@ -1910,7 +1920,8 @@ export class GameScene extends Phaser.Scene {
         },
         visibleRows: () => this.economySystem.pageSlice(this.shopPage, SHOP_LAYOUT.pageSize),
         pageLabel: () => `PAGE ${this.shopPage + 1}/${this.economySystem.pageCount(SHOP_LAYOUT.pageSize)}`,
-        shopPageCount: () => this.economySystem.pageCount(SHOP_LAYOUT.pageSize)
+        shopPageCount: () => this.economySystem.pageCount(SHOP_LAYOUT.pageSize),
+        marketFactor: (key) => this.match.marketFactors[key] ?? 1
       },
       this.weaponWindowStart,
       this.topToast,
