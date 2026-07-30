@@ -117,6 +117,7 @@ export interface ItemDefinition {
   bundleSize: number;
   hotkey: string;
   description: string;
+  category: ItemCategory;
 }
 
 export interface ProjectileState {
@@ -400,7 +401,7 @@ export const GAME_CONFIG = {
     }
   ] satisfies WeaponDefinition[],
   items: [
-    { id: 'parachute', name: 'Parachute', price: 10000, bundleSize: 8, hotkey: 'P', description: 'Auto-deploys on falls' },
-    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage' }
+    { id: 'parachute', name: 'Parachute', price: 10000, bundleSize: 8, hotkey: 'P', description: 'Auto-deploys on falls', category: 'defense' },
+    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage', category: 'defense' }
   ] satisfies ItemDefinition[]
 } as const;

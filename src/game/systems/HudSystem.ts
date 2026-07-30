@@ -11,6 +11,7 @@ import {
 } from '../types/GameTypes';
 import { soundSystem } from './SoundSystem';
 import { getPlayerPalette } from './TankSystem';
+import type { ShopCatalogEntry } from './EconomySystem';
 
 /**
  * Shop overlay layout constants. Click hit-tests in GameScene must match
@@ -29,8 +30,12 @@ export const SHOP_LAYOUT = {
   tableY: 110,
   listYStart: 150,        // tableY + 40 (column-header strip)
   rowH: 28,
-  weaponCount: 8,
-  parachuteGap: 10,
+  pageSize: 10,
+  pagePrevX: 400,
+  pageNextX: 560,
+  pageY: 444,
+  pageBtnW: 36,
+  pageBtnH: 24,
   // Rocker buttons (absolute x)
   colMinus: 624,
   colPlus: 716,
@@ -62,6 +67,14 @@ export interface ShopPending {
   saleDiscount: () => number;
   /** Bundle size for an item — units added per single purchase. */
   bundleSize: (key: string) => number;
+  /** Owned count for an item (units, not bundles). */
+  ownedFor: (key: string) => number;
+  /** Visible catalog entries for the current page. */
+  visibleRows: () => ShopCatalogEntry[];
+  /** Page label (e.g. "PAGE 1/2"). */
+  pageLabel: () => string;
+  /** Total number of shop pages. */
+  shopPageCount: () => number;
 }
 
 export const EMPTY_SHOP_PENDING: ShopPending = {
@@ -71,7 +84,11 @@ export const EMPTY_SHOP_PENDING: ShopPending = {
   effectivePrice: (basePrice) => basePrice,
   saleItem: () => null,
   saleDiscount: () => 0,
-  bundleSize: () => 1
+  bundleSize: () => 1,
+  ownedFor: () => 0,
+  visibleRows: () => [],
+  pageLabel: () => '',
+  shopPageCount: () => 1
 };
 
 export class HudSystem {
@@ -730,15 +747,17 @@ export class HudSystem {
       if (owned === -1) return sum; // skip unlimited (Small Missile)
       return sum + owned + pending.pendingFor(w.id) * pending.bundleSize(w.id);
     }, 0);
-    const totalChutes = profile.parachutes + pending.pendingFor('parachute') * pending.bundleSize('parachute');
-    const totalShields = profile.shields + pending.pendingFor('shield') * pending.bundleSize('shield');
 
     this.addText(sideX + 12, sideY + 46, 'WEAPONS', colors.magenta, GAME_CONFIG.font.small);
     this.addText(sideX + sideW - 40, sideY + 46, `${totalWeapons}`, colors.white, GAME_CONFIG.font.small);
-    this.addText(sideX + 12, sideY + 72, 'PARACHUTES', colors.yellow, GAME_CONFIG.font.small);
-    this.addText(sideX + sideW - 30, sideY + 72, `${totalChutes}`, colors.white, GAME_CONFIG.font.small);
-    this.addText(sideX + 12, sideY + 98, 'SHIELDS', colors.cyan, GAME_CONFIG.font.small);
-    this.addText(sideX + sideW - 30, sideY + 98, `${totalShields}`, colors.white, GAME_CONFIG.font.small);
+
+    GAME_CONFIG.items.forEach((item, idx) => {
+      const itemTotal = pending.ownedFor(item.id) + pending.pendingFor(item.id) * pending.bundleSize(item.id);
+      const itemColor = item.id === 'parachute' ? colors.yellow : colors.cyan;
+      const itemY = sideY + 72 + idx * 26;
+      this.addText(sideX + 12, itemY, item.name.toUpperCase() + 'S', itemColor, GAME_CONFIG.font.small);
+      this.addText(sideX + sideW - 30, itemY, `${itemTotal}`, colors.white, GAME_CONFIG.font.small);
+    });
 
     // UNDO button at the bottom of the sidebar (only when something to undo).
     if (hasPending) {
@@ -819,25 +838,19 @@ export class HudSystem {
       rowY += SHOP_LAYOUT.rowH;
     };
 
-    GAME_CONFIG.weapons.forEach((weapon, index) => {
-      drawRow(String(index + 1), weapon.id, weapon.name, weapon.price, profile.ammo[weapon.id], colors.white);
+    const visibleRows = pending.visibleRows();
+    visibleRows.forEach((entry, idx) => {
+      const keyLabel = entry.kind === 'weapon' ? String((idx + 1) % 10) : (GAME_CONFIG.items.find((it) => it.id === entry.key)?.hotkey ?? String((idx + 1) % 10));
+      const owned = pending.ownedFor(entry.key);
+      const tint = entry.kind === 'weapon' ? colors.white : (entry.key === 'parachute' ? colors.yellow : colors.cyan);
+      drawRow(keyLabel, entry.key, entry.name, entry.basePrice, owned, tint);
     });
 
-    // Dashed divider before specials
-    rowY += SHOP_LAYOUT.parachuteGap;
-    this.graphics.lineStyle(1, colors.panelLight, 0.6);
-    for (let dx = tableX + 8; dx < tableX + tableW - 8; dx += 12) {
-      this.graphics.beginPath();
-      this.graphics.moveTo(dx, rowY - 4);
-      this.graphics.lineTo(dx + 6, rowY - 4);
-      this.graphics.strokePath();
-    }
-
-    GAME_CONFIG.items.forEach((item) => {
-      const owned = item.id === 'parachute' ? profile.parachutes : profile.shields;
-      const color = item.id === 'parachute' ? colors.yellow : colors.cyan;
-      drawRow(item.hotkey, item.id, item.name, item.price, owned, color);
-    });
+    // ----- PAGE STRIP -----
+    const pageButtonColor = pending.shopPageCount() > 1 ? colors.white : colors.dimGray;
+    this.drawRockerButton(SHOP_LAYOUT.pagePrevX, SHOP_LAYOUT.pageY, '<', pageButtonColor);
+    this.addText(SHOP_LAYOUT.pagePrevX + 52, SHOP_LAYOUT.pageY + 2, pending.pageLabel(), colors.white, GAME_CONFIG.font.medium);
+    this.drawRockerButton(SHOP_LAYOUT.pageNextX, SHOP_LAYOUT.pageY, '>', pageButtonColor);
 
     // ----- FOOTER -----
     const footerY = panelY + panelH - 38;

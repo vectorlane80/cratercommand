@@ -97,4 +97,70 @@ describe('EconomySystem', () => {
       }
     }
   });
+
+  it('catalog returns weapons then items', () => {
+    const entries = system.catalog();
+    expect(entries.length).toBe(GAME_CONFIG.weapons.length + GAME_CONFIG.items.length);
+    expect(entries[0].key).toBe('small-missile');
+    expect(entries[0].kind).toBe('weapon');
+    const parachuteEntry = entries.find((e) => e.key === 'parachute');
+    expect(parachuteEntry).toBeDefined();
+    expect(parachuteEntry!.kind).toBe('item');
+    const shieldEntry = entries.find((e) => e.key === 'shield');
+    expect(shieldEntry).toBeDefined();
+    expect(shieldEntry!.kind).toBe('item');
+    entries.forEach((entry) => {
+      expect(entry.basePrice).toBe(system.basePriceFor(entry.key));
+      expect(entry.bundleSize).toBe(system.bundleSizeFor(entry.key));
+    });
+  });
+
+  it('ownedCount returns weapon ammo', () => {
+    const profile = makeProfile();
+    expect(system.ownedCount(profile, 'big-missile')).toBe(8);
+  });
+
+  it('ownedCount returns parachutes', () => {
+    const profile = makeProfile();
+    expect(system.ownedCount(profile, 'parachute')).toBe(1);
+  });
+
+  it('ownedCount returns shields', () => {
+    const profile = makeProfile();
+    expect(system.ownedCount(profile, 'shield')).toBe(0);
+  });
+
+  it('ownedCount returns 0 for unknown', () => {
+    const profile = makeProfile();
+    expect(system.ownedCount(profile, 'unknown')).toBe(0);
+  });
+
+  it('pageCount with pageSize 10 returns 1 for 10 entries', () => {
+    expect(system.pageCount(10)).toBe(1);
+  });
+
+  it('pageCount with pageSize 4 returns 3 for 10 entries', () => {
+    expect(system.pageCount(4)).toBe(3);
+  });
+
+  it('pageCount with pageSize 100 returns 1', () => {
+    expect(system.pageCount(100)).toBe(1);
+  });
+
+  it('pageSlice returns correct entries per page', () => {
+    const page0 = system.pageSlice(0, 4);
+    expect(page0.length).toBe(4);
+    const page2 = system.pageSlice(2, 4);
+    expect(page2.length).toBe(2);
+  });
+
+  it('pageSlice clamps out-of-range page', () => {
+    const lastPage = system.pageSlice(99, 4);
+    expect(lastPage.length).toBe(2);
+  });
+
+  it('pageSlice clamps negative page to 0', () => {
+    const page0 = system.pageSlice(-1, 4);
+    expect(page0[0].key).toBe('small-missile');
+  });
 });

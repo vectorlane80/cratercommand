@@ -80,6 +80,7 @@ export class GameScene extends Phaser.Scene {
   // discarded on ESC. Keys: weapon ids + 'parachute' + 'shield'.
   private pendingShopBuys: Record<string, number> = {};
   private pendingShopHistory: string[] = [];
+  private shopPage = 0;
 
   // Ephemeral top-banner toast for fall events. Lives ~2s so the human can
   // see it. Cleared lazily during render.
@@ -108,8 +109,7 @@ export class GameScene extends Phaser.Scene {
   private restartKey!: Phaser.Input.Keyboard.Key;
   private moveLeftKey!: Phaser.Input.Keyboard.Key;
   private moveRightKey!: Phaser.Input.Keyboard.Key;
-  private parachuteBuyKey!: Phaser.Input.Keyboard.Key;
-  private shieldBuyKey!: Phaser.Input.Keyboard.Key;
+  private itemHotkeys: Array<{ key: Phaser.Input.Keyboard.Key; itemId: string }> = [];
   private soundToggleKey!: Phaser.Input.Keyboard.Key;
   private escapeKey!: Phaser.Input.Keyboard.Key;
   private backspaceKey!: Phaser.Input.Keyboard.Key;
@@ -159,6 +159,7 @@ export class GameScene extends Phaser.Scene {
     // match.
     this.pendingShopBuys = {};
     this.pendingShopHistory = [];
+    this.shopPage = 0;
     this.topToast = null;
     this.quitConfirmActive = false;
     this.aiDecision = null;
@@ -210,8 +211,6 @@ export class GameScene extends Phaser.Scene {
     this.restartKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     this.moveLeftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.moveRightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.parachuteBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
-    this.shieldBuyKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.soundToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F10);
     this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.backspaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.BACKSPACE);
@@ -225,9 +224,15 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.FIVE,
       Phaser.Input.Keyboard.KeyCodes.SIX,
       Phaser.Input.Keyboard.KeyCodes.SEVEN,
-      Phaser.Input.Keyboard.KeyCodes.EIGHT
+      Phaser.Input.Keyboard.KeyCodes.EIGHT,
+      Phaser.Input.Keyboard.KeyCodes.NINE,
+      Phaser.Input.Keyboard.KeyCodes.ZERO
     ];
     this.weaponKeys = numberKeyCodes.map((code) => this.input.keyboard!.addKey(code));
+    GAME_CONFIG.items.forEach((item) => {
+      const keyCode = Phaser.Input.Keyboard.KeyCodes[item.hotkey as keyof typeof Phaser.Input.Keyboard.KeyCodes];
+      this.itemHotkeys.push({ key: this.input.keyboard!.addKey(keyCode), itemId: item.id });
+    });
     this.input.keyboard!.addCapture([
       Phaser.Input.Keyboard.KeyCodes.LEFT,
       Phaser.Input.Keyboard.KeyCodes.RIGHT,
@@ -517,6 +522,7 @@ export class GameScene extends Phaser.Scene {
     this.statusMessage = null;
     this.clearPendingShop();
     this.rollShopSale();
+    this.shopPage = 0;
     // Drop any lingering fall toast from the round that just ended so it
     // doesn't bleed into the shop overlay.
     this.topToast = null;
@@ -764,14 +770,21 @@ export class GameScene extends Phaser.Scene {
   private handleJoinerShoppingInput(): void {
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
-        this.sendInput({ kind: 'shop-buy', itemKey: GAME_CONFIG.weapons[i].id });
+        const key = this.shopSlotKey(i);
+        if (key) this.sendInput({ kind: 'shop-buy', itemKey: key });
       }
     }
-    if (Phaser.Input.Keyboard.JustDown(this.parachuteBuyKey)) {
-      this.sendInput({ kind: 'shop-buy', itemKey: 'parachute' });
+    for (const hotkey of this.itemHotkeys) {
+      if (Phaser.Input.Keyboard.JustDown(hotkey.key)) {
+        this.sendInput({ kind: 'shop-buy', itemKey: hotkey.itemId });
+      }
     }
-    if (Phaser.Input.Keyboard.JustDown(this.shieldBuyKey)) {
-      this.sendInput({ kind: 'shop-buy', itemKey: 'shield' });
+    const pageCount = this.economySystem.pageCount(SHOP_LAYOUT.pageSize);
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+      this.shopPage = Math.max(0, this.shopPage - 1);
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+      this.shopPage = Math.min(pageCount - 1, this.shopPage + 1);
     }
     if (Phaser.Input.Keyboard.JustDown(this.backspaceKey)) {
       this.sendInput({ kind: 'shop-undo' });
@@ -799,6 +812,11 @@ export class GameScene extends Phaser.Scene {
   /** Pending count of an item — what's in the cart but not yet committed. */
   pendingFor(key: string): number {
     return this.pendingShopBuys[key] ?? 0;
+  }
+
+  private shopSlotKey(slotIndex: number): string | null {
+    const slice = this.economySystem.pageSlice(this.shopPage, SHOP_LAYOUT.pageSize);
+    return slice[slotIndex]?.key ?? null;
   }
 
   /**
@@ -842,6 +860,7 @@ export class GameScene extends Phaser.Scene {
     // after transitioning to make sure stale buys don't leak between
     // shoppers.
     this.clearPendingShop();
+    this.shopPage = 0;
     this.match.shopVisitsRemaining -= 1;
     if (this.match.shopVisitsRemaining <= 0) {
       this.match.shoppingPlayerId = null;
@@ -922,26 +941,31 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
-        const weapon = GAME_CONFIG.weapons[i];
-        if (this.tryQueueShopBuy(profile, weapon.id)) {
+        const key = this.shopSlotKey(i);
+        if (key && this.tryQueueShopBuy(profile, key)) {
           soundSystem.playUiSelect();
           changed = true;
         }
       }
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.parachuteBuyKey)) {
-      if (this.tryQueueShopBuy(profile, 'parachute')) {
-        soundSystem.playUiSelect();
-        changed = true;
+    for (const hotkey of this.itemHotkeys) {
+      if (Phaser.Input.Keyboard.JustDown(hotkey.key)) {
+        if (this.tryQueueShopBuy(profile, hotkey.itemId)) {
+          soundSystem.playUiSelect();
+          changed = true;
+        }
       }
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.shieldBuyKey)) {
-      if (this.tryQueueShopBuy(profile, 'shield')) {
-        soundSystem.playUiSelect();
-        changed = true;
-      }
+    const pageCount = this.economySystem.pageCount(SHOP_LAYOUT.pageSize);
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+      this.shopPage = Math.max(0, this.shopPage - 1);
+      changed = true;
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+      this.shopPage = Math.min(pageCount - 1, this.shopPage + 1);
+      changed = true;
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.backspaceKey)) {
@@ -1119,29 +1143,42 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Item rows. Order matches HudSystem.drawShopOverlay's render order.
-    const rowKeys = [
-      ...GAME_CONFIG.weapons.map((w) => w.id),
-      'parachute',
-      'shield'
-    ];
-    const weaponRowY = (i: number) => SHOP_LAYOUT.listYStart + i * SHOP_LAYOUT.rowH;
-    const chuteRowY = SHOP_LAYOUT.listYStart + GAME_CONFIG.weapons.length * SHOP_LAYOUT.rowH + SHOP_LAYOUT.parachuteGap;
-    const shieldRowY = chuteRowY + SHOP_LAYOUT.rowH;
-    const rowYs = [
-      ...GAME_CONFIG.weapons.map((_, i) => weaponRowY(i)),
-      chuteRowY,
-      shieldRowY
-    ];
+    // Page navigation buttons
+    const pageCount = this.economySystem.pageCount(SHOP_LAYOUT.pageSize);
+    if (
+      x >= SHOP_LAYOUT.pagePrevX &&
+      x < SHOP_LAYOUT.pagePrevX + SHOP_LAYOUT.pageBtnW &&
+      y >= SHOP_LAYOUT.pageY &&
+      y < SHOP_LAYOUT.pageY + SHOP_LAYOUT.pageBtnH &&
+      pageCount > 1
+    ) {
+      this.shopPage = Math.max(0, this.shopPage - 1);
+      this.renderAll();
+      return;
+    }
+    if (
+      x >= SHOP_LAYOUT.pageNextX &&
+      x < SHOP_LAYOUT.pageNextX + SHOP_LAYOUT.pageBtnW &&
+      y >= SHOP_LAYOUT.pageY &&
+      y < SHOP_LAYOUT.pageY + SHOP_LAYOUT.pageBtnH &&
+      pageCount > 1
+    ) {
+      this.shopPage = Math.min(pageCount - 1, this.shopPage + 1);
+      this.renderAll();
+      return;
+    }
 
-    for (let i = 0; i < rowKeys.length; i += 1) {
-      const rowY = rowYs[i];
+    // Item rows from visible slice
+    const visibleRows = this.economySystem.pageSlice(this.shopPage, SHOP_LAYOUT.pageSize);
+    for (let i = 0; i < visibleRows.length; i += 1) {
+      const entry = visibleRows[i];
+      const rowY = SHOP_LAYOUT.listYStart + i * SHOP_LAYOUT.rowH;
       const inRowYBounds = y >= rowY - 6 && y < rowY + SHOP_LAYOUT.rowH - 4;
       if (!inRowYBounds) continue;
 
       // Minus button
       if (x >= SHOP_LAYOUT.colMinus && x < SHOP_LAYOUT.colMinus + SHOP_LAYOUT.buttonW) {
-        if (this.removeFromCart(rowKeys[i])) {
+        if (this.removeFromCart(entry.key)) {
           soundSystem.playUiClick();
           this.renderAll();
         }
@@ -1149,7 +1186,7 @@ export class GameScene extends Phaser.Scene {
       }
       // Plus button
       if (x >= SHOP_LAYOUT.colPlus && x < SHOP_LAYOUT.colPlus + SHOP_LAYOUT.buttonW) {
-        if (this.tryQueueShopBuy(profile, rowKeys[i])) {
+        if (this.tryQueueShopBuy(profile, entry.key)) {
           soundSystem.playUiSelect();
           this.renderAll();
         }
@@ -1157,7 +1194,7 @@ export class GameScene extends Phaser.Scene {
       }
       // Quick-add for taps on the row's left half (name/price area).
       if (x >= SHOP_LAYOUT.rowClickX && x < SHOP_LAYOUT.colMinus - 4) {
-        if (this.tryQueueShopBuy(profile, rowKeys[i])) {
+        if (this.tryQueueShopBuy(profile, entry.key)) {
           soundSystem.playUiSelect();
           this.renderAll();
         }
@@ -1445,7 +1482,14 @@ export class GameScene extends Phaser.Scene {
         effectivePrice: (basePrice, key) => this.effectivePrice(basePrice, key),
         saleItem: () => this.match.currentSale?.itemKey ?? null,
         saleDiscount: () => this.match.currentSale?.discount ?? 0,
-        bundleSize: (key) => this.economySystem.bundleSizeFor(key)
+        bundleSize: (key) => this.economySystem.bundleSizeFor(key),
+        ownedFor: (key) => {
+          const id = this.match.shoppingPlayerId;
+          return id === null ? 0 : this.economySystem.ownedCount(this.match.profiles[id], key);
+        },
+        visibleRows: () => this.economySystem.pageSlice(this.shopPage, SHOP_LAYOUT.pageSize),
+        pageLabel: () => `PAGE ${this.shopPage + 1}/${this.economySystem.pageCount(SHOP_LAYOUT.pageSize)}`,
+        shopPageCount: () => this.economySystem.pageCount(SHOP_LAYOUT.pageSize)
       },
       this.topToast,
       this.quitConfirmActive

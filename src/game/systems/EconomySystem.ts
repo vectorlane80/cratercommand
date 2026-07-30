@@ -1,6 +1,15 @@
-import { GAME_CONFIG, type PlayerProfile } from '../types/GameTypes';
+import { GAME_CONFIG, type PlayerProfile, type ItemCategory } from '../types/GameTypes';
 
 export type Sale = { itemKey: string; discount: number } | null;
+
+export interface ShopCatalogEntry {
+  key: string;
+  name: string;
+  basePrice: number;
+  bundleSize: number;
+  kind: 'weapon' | 'item';
+  category: ItemCategory;
+}
 
 export class EconomySystem {
   basePriceFor(key: string): number {
@@ -72,5 +81,56 @@ export class EconomySystem {
     const range = GAME_CONFIG.match.maxSaleDiscount - GAME_CONFIG.match.minSaleDiscount;
     const discount = GAME_CONFIG.match.minSaleDiscount + Math.random() * range;
     return { itemKey, discount };
+  }
+
+  catalog(): ShopCatalogEntry[] {
+    const entries: ShopCatalogEntry[] = [];
+    GAME_CONFIG.weapons.forEach((w) => {
+      entries.push({
+        key: w.id,
+        name: w.name,
+        basePrice: w.price,
+        bundleSize: w.bundleSize,
+        kind: 'weapon',
+        category: w.category
+      });
+    });
+    GAME_CONFIG.items.forEach((i) => {
+      entries.push({
+        key: i.id,
+        name: i.name,
+        basePrice: i.price,
+        bundleSize: i.bundleSize,
+        kind: 'item',
+        category: i.category
+      });
+    });
+    return entries;
+  }
+
+  ownedCount(profile: PlayerProfile, key: string): number {
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === key);
+    if (weapon) {
+      return profile.ammo[key] ?? 0;
+    }
+    if (key === 'parachute') {
+      return profile.parachutes;
+    }
+    if (key === 'shield') {
+      return profile.shields;
+    }
+    return 0;
+  }
+
+  pageCount(pageSize: number): number {
+    return Math.max(1, Math.ceil(this.catalog().length / pageSize));
+  }
+
+  pageSlice(page: number, pageSize: number): ShopCatalogEntry[] {
+    const entries = this.catalog();
+    const maxPage = this.pageCount(pageSize) - 1;
+    const clampedPage = Math.max(0, Math.min(page, maxPage));
+    const start = clampedPage * pageSize;
+    return entries.slice(start, start + pageSize);
   }
 }
