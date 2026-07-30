@@ -1432,7 +1432,17 @@ export class GameScene extends Phaser.Scene {
         this.terrainSystem.applyMound(this.terrainData, impact.x, impact.y, radius);
         terrainChanged = true;
       } else if (weapon.craterRadius > 0) {
-        this.terrainSystem.applyCrater(this.terrainData, impact.x, impact.y, weapon.craterRadius * scale);
+        let craterX = impact.x;
+        let craterY = impact.y;
+        const bias = weapon.craterForwardBias ?? 0;
+        if (bias > 0) {
+          const speed = Math.hypot(projectile.velocityX, projectile.velocityY);
+          if (speed > 0) {
+            craterX += (projectile.velocityX / speed) * weapon.craterRadius * scale * bias;
+            craterY += (projectile.velocityY / speed) * weapon.craterRadius * scale * bias;
+          }
+        }
+        this.terrainSystem.applyCrater(this.terrainData, craterX, craterY, weapon.craterRadius * scale);
         terrainChanged = true;
       }
     }

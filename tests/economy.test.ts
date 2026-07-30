@@ -219,4 +219,32 @@ describe('EconomySystem', () => {
     const page0 = system.pageSlice(-1, 4);
     expect(page0[0].key).toBe('small-missile');
   });
+
+  it('basePriceFor looks up riot weapons', () => {
+    expect(system.basePriceFor('riot-charge')).toBe(2000);
+    expect(system.basePriceFor('riot-blast')).toBe(5000);
+    expect(system.basePriceFor('riot-bomb')).toBe(5000);
+    expect(system.basePriceFor('heavy-riot-bomb')).toBe(8750);
+  });
+
+  it('bundleSizeFor looks up riot weapons', () => {
+    expect(system.bundleSizeFor('riot-charge')).toBe(10);
+    expect(system.bundleSizeFor('riot-blast')).toBe(5);
+    expect(system.bundleSizeFor('riot-bomb')).toBe(5);
+    expect(system.bundleSizeFor('heavy-riot-bomb')).toBe(2);
+  });
+
+  it('riot weapons have zero damage', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-charge')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-blast')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-bomb')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'heavy-riot-bomb')!.damage).toBe(0);
+  });
+
+  it('riot-charge and riot-blast have forward bias', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-charge')!.craterForwardBias).toBe(0.6);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-blast')!.craterForwardBias).toBe(0.6);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-bomb')!.craterForwardBias).toBeUndefined();
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'heavy-riot-bomb')!.craterForwardBias).toBeUndefined();
+  });
 });

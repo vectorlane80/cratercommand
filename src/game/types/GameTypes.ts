@@ -112,6 +112,7 @@ export interface WeaponDefinition {
   funkySpawnCount?: number;
   tunnelLength?: number;
   tunnelRadius?: number;
+  craterForwardBias?: number;
 }
 
 export interface ItemDefinition {
@@ -623,6 +624,56 @@ export const GAME_CONFIG = {
       bundleSize: 2,
       tunnelLength: 150,
       tunnelRadius: 11
+    },
+    {
+      id: 'riot-charge',
+      name: 'Riot Charge',
+      startingAmmo: 0,
+      price: 2000,
+      damage: 0,
+      craterRadius: 36,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'terrain',
+      bundleSize: 10,
+      craterForwardBias: 0.6
+    },
+    {
+      id: 'riot-blast',
+      name: 'Riot Blast',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 60,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'terrain',
+      bundleSize: 5,
+      craterForwardBias: 0.6
+    },
+    {
+      id: 'riot-bomb',
+      name: 'Riot Bomb',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 40,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'terrain',
+      bundleSize: 5
+    },
+    {
+      id: 'heavy-riot-bomb',
+      name: 'Heavy Riot Bomb',
+      startingAmmo: 0,
+      price: 8750,
+      damage: 0,
+      craterRadius: 60,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'terrain',
+      bundleSize: 2
     }
   ] satisfies WeaponDefinition[],
   items: [
