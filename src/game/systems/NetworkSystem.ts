@@ -41,6 +41,7 @@ export type NetInput =
   | { kind: 'move-step'; direction: -1 | 1 }
   | { kind: 'select-weapon'; index: number }
   | { kind: 'fire' }
+  | { kind: 'use-battery' }
   | { kind: 'shop-buy'; itemKey: string }
   | { kind: 'shop-remove'; itemKey: string }
   | { kind: 'shop-undo' }

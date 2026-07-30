@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle' | 'napalm';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle' | 'napalm' | 'laser';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -33,6 +33,7 @@ export interface TankState {
   moveRemaining: number;
   parachutes: number;
   shields: number;
+  batteries: number;
   damageDealt: number;
 }
 
@@ -65,6 +66,7 @@ export interface PlayerProfile {
   ammo: Record<string, number>;
   parachutes: number;
   shields: number;
+  batteries: number;
   controller: ControllerKind;
   /** Custom display name. Falls back to "PLAYER N" when null. */
   displayName: string | null;
@@ -116,6 +118,7 @@ export interface WeaponDefinition {
   liquidVolume?: number;
   settleRadius?: number;
   flameCount?: number;
+  batteryCost?: number;
 }
 
 export interface ItemDefinition {
@@ -126,6 +129,7 @@ export interface ItemDefinition {
   hotkey: string;
   description: string;
   category: ItemCategory;
+  sidebarLabel?: string;
 }
 
 export interface ProjectileState {
@@ -299,7 +303,9 @@ export const GAME_CONFIG = {
     startingCash: 15000,
     startingParachutes: 1,
     startingShields: 0,
+    startingBatteries: 0,
     shieldAbsorbAmount: 40,
+    batteryHealAmount: 10,
     damageCashMultiplier: 30,
     roundWinBonus: 5000,
     survivalBonus: 1500,
@@ -792,10 +798,37 @@ export const GAME_CONFIG = {
       category: 'fire',
       bundleSize: 5,
       flameCount: 10
+    },
+    {
+      id: 'plasma-blast',
+      name: 'Plasma Blast',
+      startingAmmo: 0,
+      price: 9000,
+      damage: 60,
+      craterRadius: 40,
+      projectileSpeedScale: 1.15,
+      behavior: 'single',
+      category: 'energy',
+      bundleSize: 5,
+      batteryCost: 1
+    },
+    {
+      id: 'laser',
+      name: 'Laser',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 45,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'laser',
+      category: 'energy',
+      bundleSize: 5,
+      batteryCost: 2
     }
   ] satisfies WeaponDefinition[],
   items: [
     { id: 'parachute', name: 'Parachute', price: 10000, bundleSize: 8, hotkey: 'P', description: 'Auto-deploys on falls', category: 'defense' },
-    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage', category: 'defense' }
+    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage', category: 'defense' },
+    { id: 'battery', name: 'Battery', price: 5000, bundleSize: 10, hotkey: 'B', description: '+10 HP or fuels energy weapons', category: 'energy', sidebarLabel: 'BATTERIES' }
   ] satisfies ItemDefinition[]
 } as const;

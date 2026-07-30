@@ -59,6 +59,8 @@ export class EconomySystem {
         profile.parachutes += qty * this.bundleSizeFor(key);
       } else if (key === 'shield') {
         profile.shields += qty * this.bundleSizeFor(key);
+      } else if (key === 'battery') {
+        profile.batteries += qty * this.bundleSizeFor(key);
       } else {
         if (profile.ammo[key] === -1) profile.ammo[key] = 0;
         profile.ammo[key] = (profile.ammo[key] ?? 0) + (qty * this.bundleSizeFor(key));
@@ -118,6 +120,9 @@ export class EconomySystem {
     }
     if (key === 'shield') {
       return profile.shields;
+    }
+    if (key === 'battery') {
+      return profile.batteries;
     }
     return 0;
   }

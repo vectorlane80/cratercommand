@@ -158,4 +158,14 @@ describe('TankSystem', () => {
     expect(tank.health).toBe(0);
     expect(tank.alive).toBe(false);
   });
+
+  it('createTanks copies profile batteries onto tank', () => {
+    const terrain = makeFlatTerrain(250);
+    const profiles = [makeProfile({ batteries: 5 }), makeProfile({ batteries: 3 })];
+
+    const tanks = tankSystem.createTanks(terrainSystem, terrain, profiles);
+
+    expect(tanks[0].batteries).toBe(5);
+    expect(tanks[1].batteries).toBe(3);
+  });
 });

@@ -53,6 +53,7 @@ export class TurnSystem {
       ammo,
       parachutes: GAME_CONFIG.match.startingParachutes,
       shields: GAME_CONFIG.match.startingShields,
+      batteries: GAME_CONFIG.match.startingBatteries,
       controller,
       displayName
     };
@@ -63,6 +64,7 @@ export class TurnSystem {
       match.profiles[tank.id].ammo = { ...tank.ammo };
       match.profiles[tank.id].parachutes = tank.parachutes;
       match.profiles[tank.id].shields = tank.shields;
+      match.profiles[tank.id].batteries = tank.batteries;
     });
   }
 

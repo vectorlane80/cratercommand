@@ -94,6 +94,10 @@ export class GameScene extends Phaser.Scene {
   private yesKey!: Phaser.Input.Keyboard.Key;
   private noKey!: Phaser.Input.Keyboard.Key;
 
+  // Laser beam rendering. When true, tickProjectiles is skipped so the beam
+  // lingers until the delayed callback resolves it.
+  private laserResolving = false;
+
   // Online mode. If isOnlineHost is true we run the sim and broadcast.
   // If isOnlineJoiner is true we run no sim; we just render snapshots and
   // forward local inputs (when it's our turn) to the host.
@@ -111,6 +115,7 @@ export class GameScene extends Phaser.Scene {
   private restartKey!: Phaser.Input.Keyboard.Key;
   private moveLeftKey!: Phaser.Input.Keyboard.Key;
   private moveRightKey!: Phaser.Input.Keyboard.Key;
+  private batteryUseKey!: Phaser.Input.Keyboard.Key;
   private itemHotkeys: Array<{ key: Phaser.Input.Keyboard.Key; itemId: string }> = [];
   private soundToggleKey!: Phaser.Input.Keyboard.Key;
   private escapeKey!: Phaser.Input.Keyboard.Key;
@@ -167,6 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponWindowStart = 0;
     this.topToast = null;
     this.quitConfirmActive = false;
+    this.laserResolving = false;
     this.aiDecision = null;
     this.aiHasFired = false;
     this.aiTurnElapsedMs = 0;
@@ -236,6 +242,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponKeys = numberKeyCodes.map((code) => this.input.keyboard!.addKey(code));
     this.weaponPrevKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.weaponNextKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.batteryUseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     GAME_CONFIG.items.forEach((item) => {
       const keyCode = Phaser.Input.Keyboard.KeyCodes[item.hotkey as keyof typeof Phaser.Input.Keyboard.KeyCodes];
       this.itemHotkeys.push({ key: this.input.keyboard!.addKey(keyCode), itemId: item.id });
@@ -249,6 +256,7 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.ENTER,
       Phaser.Input.Keyboard.KeyCodes.A,
       Phaser.Input.Keyboard.KeyCodes.D,
+      Phaser.Input.Keyboard.KeyCodes.B,
       Phaser.Input.Keyboard.KeyCodes.P,
       Phaser.Input.Keyboard.KeyCodes.S,
       Phaser.Input.Keyboard.KeyCodes.V,
@@ -480,6 +488,7 @@ export class GameScene extends Phaser.Scene {
   private beginRound(startingPlayer: PlayerId): void {
     this.statusMessage = null;
     this.activeProjectiles = [];
+    this.laserResolving = false;
     this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
     this.turn = {
@@ -623,6 +632,13 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'fire':
         if (this.turn.phase === 'aiming') this.fireActiveWeapon();
+        break;
+      case 'use-battery':
+        if (this.turn.phase === 'aiming' && activeTank.batteries > 0 && activeTank.health < GAME_CONFIG.tank.maxHealth) {
+          activeTank.batteries -= 1;
+          activeTank.health = Math.min(GAME_CONFIG.tank.maxHealth, activeTank.health + GAME_CONFIG.match.batteryHealAmount);
+          this.renderTanksAndHud();
+        }
         break;
       case 'shop-buy':
         if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === remoteId) {
@@ -811,6 +827,9 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
       this.sendInput({ kind: 'fire' });
     }
+    if (Phaser.Input.Keyboard.JustDown(this.batteryUseKey)) {
+      this.sendInput({ kind: 'use-battery' });
+    }
     if (this.moveLeftKey.isDown) this.sendInput({ kind: 'move-step', direction: -1 });
     if (this.moveRightKey.isDown) this.sendInput({ kind: 'move-step', direction: 1 });
   }
@@ -944,6 +963,15 @@ export class GameScene extends Phaser.Scene {
     if (this.cursors.down.isDown) {
       activeTank.power = Math.max(GAME_CONFIG.aiming.minPower, activeTank.power - GAME_CONFIG.aiming.powerStep);
       changed = true;
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.batteryUseKey)) {
+      if (activeTank.batteries > 0 && activeTank.health < GAME_CONFIG.tank.maxHealth) {
+        activeTank.batteries -= 1;
+        activeTank.health = Math.min(GAME_CONFIG.tank.maxHealth, activeTank.health + GAME_CONFIG.match.batteryHealAmount);
+        soundSystem.playUiSelect();
+        changed = true;
+      }
     }
 
     return changed;
@@ -1359,8 +1387,21 @@ export class GameScene extends Phaser.Scene {
     const weapon = this.activeWeapon();
     if (!this.tankHasAmmo(activeTank, activeTank.selectedWeaponIndex)) return;
 
+    const batteryCost = weapon.batteryCost ?? 0;
+    if (batteryCost > activeTank.batteries) {
+      this.topToast = { text: 'NEEDS ' + batteryCost + ' BATTERIES', color: GAME_CONFIG.colors.red, expiresAt: Date.now() + 1600 };
+      this.renderTanksAndHud();
+      return;
+    }
+    activeTank.batteries -= batteryCost;
+
     if (activeTank.ammo[weapon.id] !== -1) {
       activeTank.ammo[weapon.id] -= 1;
+    }
+
+    if (weapon.behavior === 'laser') {
+      this.fireLaser(activeTank, weapon);
+      return;
     }
 
     this.activeProjectiles = this.projectileSystem.launch(activeTank, weapon, this.tankSystem);
@@ -1370,9 +1411,70 @@ export class GameScene extends Phaser.Scene {
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
   }
 
+  private fireLaser(activeTank: TankState, weapon: WeaponDefinition): void {
+    const tip = this.tankSystem.getTurretTip(activeTank);
+    const radians = Phaser.Math.DegToRad(activeTank.angle);
+    const cosA = Math.cos(radians);
+    const sinA = Math.sin(radians);
+
+    let beamEndX = tip.x;
+    let beamEndY = tip.y;
+    let x = tip.x;
+    let y = tip.y;
+
+    // Step along the beam in 4px increments
+    while (x >= -40 && x <= this.terrainData.width + 40 && y >= -40 && y <= this.terrainData.height + 40) {
+      x += cosA * 4;
+      y -= sinA * 4;
+
+      // Carve terrain where underground
+      if (this.terrainSystem.isBelowTerrain(this.terrainData, x, y)) {
+        this.terrainSystem.applyTunnel(this.terrainData, x, y, 6);
+      }
+
+      // Tank check
+      const hit = this.tankSystem.findHitTank(this.tanks, x, y, activeTank.id);
+      if (hit) {
+        // Shield-piercing damage
+        const dmg = Math.min(weapon.damage, hit.health);
+        this.tankSystem.applyDamage(hit, weapon.damage);
+        if (hit.id !== activeTank.id) {
+          activeTank.damageDealt += dmg;
+        }
+        soundSystem.playTankHit();
+        beamEndX = x;
+        beamEndY = y;
+        break;
+      }
+
+      beamEndX = x;
+      beamEndY = y;
+    }
+
+    // Draw the beam
+    this.projectileGraphics.clear();
+    this.projectileGraphics.lineStyle(3, GAME_CONFIG.colors.red, 1);
+    this.projectileGraphics.lineBetween(tip.x, tip.y, beamEndX, beamEndY);
+    this.projectileGraphics.strokePath();
+
+    this.settleTerrainAndTanks(activeTank);
+    this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
+    this.renderTanksAndHud();
+
+    this.laserResolving = true;
+    this.turn.phase = 'projectileInFlight';
+    this.time.delayedCall(350, () => {
+      this.laserResolving = false;
+      this.projectileSystem.drawAll(this.projectileGraphics, []);
+      this.endTurn();
+    });
+  }
+
   // -------- PROJECTILE TICK --------
 
   private tickProjectiles(delta: number): void {
+    if (this.laserResolving) return;
+
     const remaining: ProjectileState[] = [];
     const spawnedThisFrame: ProjectileState[] = [];
     let anyTerrainChanged = false;

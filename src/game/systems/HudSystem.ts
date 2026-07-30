@@ -562,15 +562,16 @@ export class HudSystem {
       GAME_CONFIG.font.small
     );
     this.addText(x, y + 28, `CHUTES ${activeTank.parachutes}`, colors.yellow, GAME_CONFIG.font.small);
-    this.addText(x, y + 42, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
+    this.addText(x, y + 42, `BATT   ${activeTank.batteries}`, colors.cyan, GAME_CONFIG.font.small);
+    this.addText(x, y + 56, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
     this.addText(
       x,
-      y + 56,
+      y + 70,
       `WINS   ${match.profiles[0].wins}-${match.profiles[1].wins}  (to ${match.roundsToWin})`,
       colors.cyan,
       GAME_CONFIG.font.small
     );
-    this.addText(x, y + 70, `WEAPON ${GAME_CONFIG.weapons[activeTank.selectedWeaponIndex].name}`, colors.white, GAME_CONFIG.font.small);
+    this.addText(x, y + 84, `WEAPON ${GAME_CONFIG.weapons[activeTank.selectedWeaponIndex].name}`, colors.white, GAME_CONFIG.font.small);
   }
 
   private drawFireButton(top: number): void {
@@ -771,7 +772,8 @@ export class HudSystem {
       const itemTotal = pending.ownedFor(item.id) + pending.pendingFor(item.id) * pending.bundleSize(item.id);
       const itemColor = item.id === 'parachute' ? colors.yellow : colors.cyan;
       const itemY = sideY + 72 + idx * 26;
-      this.addText(sideX + 12, itemY, item.name.toUpperCase() + 'S', itemColor, GAME_CONFIG.font.small);
+      const label = item.sidebarLabel ?? item.name.toUpperCase() + 'S';
+      this.addText(sideX + 12, itemY, label, itemColor, GAME_CONFIG.font.small);
       this.addText(sideX + sideW - 30, itemY, `${itemTotal}`, colors.white, GAME_CONFIG.font.small);
     });
 

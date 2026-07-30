@@ -305,4 +305,31 @@ describe('EconomySystem', () => {
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'napalm')!.flameCount).toBe(7);
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'hot-napalm')!.flameCount).toBe(10);
   });
+
+  it('battery item: basePriceFor 5000, bundleSizeFor 10', () => {
+    expect(system.basePriceFor('battery')).toBe(5000);
+    expect(system.bundleSizeFor('battery')).toBe(10);
+  });
+
+  it('ownedCount returns batteries for battery item', () => {
+    const profile = makeProfile({ batteries: 3 });
+    expect(system.ownedCount(profile, 'battery')).toBe(3);
+  });
+
+  it('applyPurchases applies battery purchases to profile', () => {
+    const profile = makeProfile({ cash: 30000, batteries: 0 });
+    const pending = { battery: 1 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.cash).toBe(30000 - 5000);
+    expect(profile.batteries).toBe(10);
+  });
+
+  it('plasma-blast has batteryCost 1', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'plasma-blast')!.batteryCost).toBe(1);
+  });
+
+  it('laser has batteryCost 2 and behavior laser', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'laser')!.batteryCost).toBe(2);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'laser')!.behavior).toBe('laser');
+  });
 });

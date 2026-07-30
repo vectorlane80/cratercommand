@@ -146,4 +146,24 @@ describe('TurnSystem', () => {
 
     expect(system.isRoundOver(tanks)).toBe(true);
   });
+
+  it('createMatchState profiles have batteries === startingBatteries', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet']);
+    match.profiles.forEach((profile) => {
+      expect(profile.batteries).toBe(GAME_CONFIG.match.startingBatteries);
+    });
+  });
+
+  it('saveTanksToProfiles copies batteries', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet']);
+    const tanks = [
+      makeTank({ id: 0, batteries: 5 }),
+      makeTank({ id: 1, batteries: 3 })
+    ];
+
+    system.saveTanksToProfiles(tanks, match);
+
+    expect(match.profiles[0].batteries).toBe(5);
+    expect(match.profiles[1].batteries).toBe(3);
+  });
 });

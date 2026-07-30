@@ -78,6 +78,7 @@ export class TankSystem {
         moveRemaining: GAME_CONFIG.movement.perTurn,
         parachutes: profile.parachutes,
         shields: profile.shields,
+        batteries: profile.batteries,
         damageDealt: 0
       };
     });

@@ -25,6 +25,7 @@ export function makeTank(overrides: Partial<TankState> = {}): TankState {
     moveRemaining: 70,
     parachutes: 0,
     shields: 0,
+    batteries: 0,
     damageDealt: 0,
     color: 0,
     accentColor: 0,
@@ -44,6 +45,7 @@ export function makeProfile(overrides: Partial<PlayerProfile> = {}): PlayerProfi
     ammo,
     parachutes: 1,
     shields: 0,
+    batteries: 0,
     controller: 'human',
     displayName: null,
     ...overrides
