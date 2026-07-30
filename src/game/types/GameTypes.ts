@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -135,6 +135,7 @@ export interface ProjectileState {
   hasSplit?: boolean;
   hopsLeft?: number;
   damageScale?: number;
+  rolling?: boolean;
 }
 
 export interface WindState {
@@ -256,7 +257,11 @@ export const GAME_CONFIG = {
     windAccelerationScale: 0.55,
     trailSpacingMs: 70,
     maxAgeMs: 14000,
-    launchSpeedBase: 80
+    launchSpeedBase: 80,
+    // Roller surface physics — see ProjectileSystem
+    rollerFriction: 0.4,
+    rollerMinSpeed: 9,
+    rollerMaxSpeed: 260
   },
   wind: {
     min: 0,
@@ -492,6 +497,42 @@ export const GAME_CONFIG = {
       category: 'missile',
       bundleSize: 2,
       funkySpawnCount: 6
+    },
+    {
+      id: 'baby-roller',
+      name: 'Baby Roller',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 30,
+      craterRadius: 22,
+      projectileSpeedScale: 1,
+      behavior: 'roller',
+      category: 'terrain',
+      bundleSize: 10
+    },
+    {
+      id: 'roller',
+      name: 'Roller',
+      startingAmmo: 0,
+      price: 6750,
+      damage: 45,
+      craterRadius: 32,
+      projectileSpeedScale: 1,
+      behavior: 'roller',
+      category: 'terrain',
+      bundleSize: 5
+    },
+    {
+      id: 'heavy-roller',
+      name: 'Heavy Roller',
+      startingAmmo: 0,
+      price: 6750,
+      damage: 70,
+      craterRadius: 45,
+      projectileSpeedScale: 1,
+      behavior: 'roller',
+      category: 'terrain',
+      bundleSize: 2
     }
   ] satisfies WeaponDefinition[],
   items: [

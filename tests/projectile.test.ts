@@ -302,4 +302,132 @@ describe('ProjectileSystem', () => {
     expect(tick.impact!.kind).toBe('terrain');
     expect(tick.spawned.length).toBe(0);
   });
+
+  it('launch roller creates 1 projectile without rolling flag', () => {
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+
+    expect(projectiles.length).toBe(1);
+    expect(projectiles[0].rolling).toBeUndefined();
+  });
+
+  it('ballistic roller transitions to rolling on terrain contact', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).toBeNull();
+    expect(projectile.rolling).toBe(true);
+    expect(projectile.y).toBe(247);
+    expect(projectile.velocityY).toBe(0);
+  });
+
+  it('rolling projectile accelerates downhill', () => {
+    const terrain: typeof import('../src/game/types/GameTypes').TerrainData = {
+      heights: Array.from({ length: 161 }, (_, i) => 200 + i),
+      width: 960,
+      height: 356,
+      segmentWidth: 6
+    };
+    const tank = makeTank({ angle: 0, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.rolling = true;
+    projectile.x = 480;
+    projectile.y = terrainSystem.getHeightAtX(terrain, projectile.x) - 3;
+    projectile.velocityX = 0;
+
+    let velocityAfterTicks = projectile.velocityX;
+    for (let i = 0; i < 5; i += 1) {
+      projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+      velocityAfterTicks = projectile.velocityX;
+    }
+
+    expect(velocityAfterTicks).toBeGreaterThan(0);
+    expect(projectile.x).toBeGreaterThan(480);
+    expect(projectile.rolling).toBe(true);
+  });
+
+  it('rolling projectile detonates at rest in valley', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 0, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.rolling = true;
+    projectile.velocityX = 5;
+    projectile.y = 247;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+  });
+
+  it('rolling projectile keeps rolling on steep slope despite slow speed', () => {
+    const terrain: typeof import('../src/game/types/GameTypes').TerrainData = {
+      heights: Array.from({ length: 161 }, (_, i) => 200 + i * 2),
+      width: 960,
+      height: 356,
+      segmentWidth: 6
+    };
+    const tank = makeTank({ angle: 0, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.rolling = true;
+    projectile.x = 480;
+    projectile.y = terrainSystem.getHeightAtX(terrain, projectile.x) - 3;
+    projectile.velocityX = 5;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).toBeNull();
+  });
+
+  it('rolling projectile hits tank', () => {
+    const terrain = makeFlatTerrain(250);
+    const targetTank = makeTank({ id: 2, x: 482, y: 248, alive: true });
+    const attacker = makeTank({ id: 0, angle: 0, power: 50, x: 100, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+    const projectiles = projectileSystem.launch(attacker, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.rolling = true;
+    projectile.x = 480;
+    projectile.y = 247;
+    projectile.velocityX = 100;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('tank');
+  });
+
+  it('rolling projectile ignores wind', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 0, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'roller')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.rolling = true;
+    projectile.y = 247;
+    projectile.velocityX = 0;
+    const wind = { direction: 1 as const, magnitude: 18 };
+
+    projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const velocityAfterNoWind = projectile.velocityX;
+    projectile.velocityX = 0;
+    projectileSystem.update(projectile, 16, wind, terrainSystem, terrain, tankSystem, []);
+    const velocityAfterWind = projectile.velocityX;
+
+    expect(Math.abs(velocityAfterWind - velocityAfterNoWind)).toBeLessThan(0.5);
+  });
 });

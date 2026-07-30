@@ -77,6 +77,18 @@ describe('EconomySystem', () => {
     expect(system.bundleSizeFor('funky-bomb')).toBe(2);
   });
 
+  it('basePriceFor looks up roller weapons', () => {
+    expect(system.basePriceFor('baby-roller')).toBe(5000);
+    expect(system.basePriceFor('roller')).toBe(6750);
+    expect(system.basePriceFor('heavy-roller')).toBe(6750);
+  });
+
+  it('bundleSizeFor looks up roller weapons', () => {
+    expect(system.bundleSizeFor('baby-roller')).toBe(10);
+    expect(system.bundleSizeFor('roller')).toBe(5);
+    expect(system.bundleSizeFor('heavy-roller')).toBe(2);
+  });
+
   it('totalPendingCost sums pending costs', () => {
     const pending = { parachute: 2, 'big-missile': 1 };
     const cost = system.totalPendingCost(pending, 1, null);

@@ -80,6 +80,15 @@ export class ProjectileSystem {
   ): ProjectileTick {
     const deltaSeconds = deltaMs / 1000;
     projectile.ageMs += deltaMs;
+    const spawned: ProjectileState[] = [];
+    const weapon = projectile.weapon;
+
+    // Rolling physics: takes priority over ballistic
+    if (projectile.rolling === true) {
+      return this.updateRolling(projectile, deltaSeconds, terrainSystem, terrainData, tankSystem, tanks);
+    }
+
+    // Ballistic projectile physics
     projectile.velocityX += wind.direction * wind.magnitude * GAME_CONFIG.projectile.windAccelerationScale * deltaSeconds;
     projectile.velocityY += GAME_CONFIG.projectile.gravity * deltaSeconds;
     projectile.x += projectile.velocityX * deltaSeconds;
@@ -90,9 +99,6 @@ export class ProjectileSystem {
       projectile.trail.push({ x: projectile.x, y: projectile.y });
       this.trailTimerMs = 0;
     }
-
-    const spawned: ProjectileState[] = [];
-    const weapon = projectile.weapon;
 
     // Split at apex
     if (
@@ -161,7 +167,86 @@ export class ProjectileSystem {
         projectile.y = terrainSystem.getHeightAtX(terrainData, projectile.x) - 6;
         return { impact: null, spawned };
       }
+      // Roller transition: start rolling instead of impacting
+      if (weapon.behavior === 'roller') {
+        projectile.rolling = true;
+        projectile.y = terrainSystem.getHeightAtX(terrainData, projectile.x) - 3;
+        projectile.velocityX = Phaser.Math.Clamp(
+          projectile.velocityX,
+          -GAME_CONFIG.projectile.rollerMaxSpeed,
+          GAME_CONFIG.projectile.rollerMaxSpeed
+        );
+        projectile.velocityY = 0;
+        return { impact: null, spawned };
+      }
       this.spawnOnImpact(projectile, spawned);
+      return { impact: { kind: 'terrain', x: projectile.x, y: projectile.y }, spawned };
+    }
+
+    return { impact: null, spawned };
+  }
+
+  /** Rolling physics: projectile rolls along terrain surface until it hits a tank or comes to rest. */
+  private updateRolling(
+    projectile: ProjectileState,
+    deltaSeconds: number,
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData,
+    tankSystem: TankSystem,
+    tanks: TankState[]
+  ): ProjectileTick {
+    const spawned: ProjectileState[] = [];
+
+    // Trail update on same timer as ballistic
+    this.trailTimerMs += deltaSeconds * 1000;
+    if (this.trailTimerMs >= GAME_CONFIG.projectile.trailSpacingMs) {
+      projectile.trail.push({ x: projectile.x, y: projectile.y });
+      this.trailTimerMs = 0;
+    }
+
+    // Sample slope at current position
+    const h1 = terrainSystem.getHeightAtX(terrainData, projectile.x - 4);
+    const h2 = terrainSystem.getHeightAtX(terrainData, projectile.x + 4);
+    const slope = (h2 - h1) / 8;
+
+    // Accelerate downhill, apply friction, clamp speed
+    projectile.velocityX += slope * GAME_CONFIG.projectile.gravity * deltaSeconds;
+    projectile.velocityX *= Math.max(0, 1 - GAME_CONFIG.projectile.rollerFriction * deltaSeconds);
+    projectile.velocityX = Phaser.Math.Clamp(
+      projectile.velocityX,
+      -GAME_CONFIG.projectile.rollerMaxSpeed,
+      GAME_CONFIG.projectile.rollerMaxSpeed
+    );
+
+    // Move along surface
+    projectile.x += projectile.velocityX * deltaSeconds;
+    projectile.y = terrainSystem.getHeightAtX(terrainData, projectile.x) - 3;
+
+    // Tank check
+    const hitTank = tankSystem.findHitTank(tanks, projectile.x, projectile.y, projectile.ownerId);
+    if (hitTank) {
+      this.spawnOnImpact(projectile, spawned);
+      return {
+        impact: { kind: 'tank', x: projectile.x, y: projectile.y, targetTankId: hitTank.id },
+        spawned
+      };
+    }
+
+    // Off-field check
+    if (projectile.x < -40 || projectile.x > terrainData.width + 40) {
+      return { impact: { kind: 'outOfBounds', x: projectile.x, y: projectile.y }, spawned };
+    }
+
+    // Max age check
+    if (projectile.ageMs > GAME_CONFIG.projectile.maxAgeMs) {
+      return { impact: { kind: 'outOfBounds', x: projectile.x, y: projectile.y }, spawned };
+    }
+
+    // Detonation at rest: must be slow AND on a gentle slope
+    if (
+      Math.abs(projectile.velocityX) < GAME_CONFIG.projectile.rollerMinSpeed &&
+      Math.abs(slope) < 0.08
+    ) {
       return { impact: { kind: 'terrain', x: projectile.x, y: projectile.y }, spawned };
     }
 

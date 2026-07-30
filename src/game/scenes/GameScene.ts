@@ -674,7 +674,8 @@ export class GameScene extends Phaser.Scene {
         bouncesLeft: p.bouncesLeft,
         hasSplit: p.hasSplit,
         hopsLeft: p.hopsLeft,
-        damageScale: p.damageScale
+        damageScale: p.damageScale,
+        rolling: p.rolling
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -716,7 +717,8 @@ export class GameScene extends Phaser.Scene {
         bouncesLeft: p.bouncesLeft,
         hasSplit: p.hasSplit,
         hopsLeft: p.hopsLeft,
-        damageScale: p.damageScale
+        damageScale: p.damageScale,
+        rolling: p.rolling
       };
     });
     this.statusMessage = snap.statusMessage;
