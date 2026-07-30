@@ -28,6 +28,8 @@ export function makeTank(overrides: Partial<TankState> = {}): TankState {
     armedShieldId: null,
     armedShieldHp: 0,
     batteries: 0,
+    fuel: 0,
+    contactTriggers: 0,
     damageDealt: 0,
     color: 0,
     accentColor: 0,
@@ -49,6 +51,8 @@ export function makeProfile(overrides: Partial<PlayerProfile> = {}): PlayerProfi
     defenses: {},
     autoDefense: false,
     batteries: 0,
+    fuel: 0,
+    contactTriggers: 0,
     controller: 'human',
     displayName: null,
     ...overrides

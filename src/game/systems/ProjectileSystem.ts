@@ -100,6 +100,22 @@ export class ProjectileSystem {
     projectile.x += projectile.velocityX * deltaSeconds;
     projectile.y += projectile.velocityY * deltaSeconds;
 
+    // Mag deflection: push projectiles upward when near enemy tanks with mag-deflectors
+    tanks.forEach((tank) => {
+      if (!tank.alive || tank.id === projectile.ownerId) return; // Skip dead tanks and owner
+      const dx = tank.x - projectile.x;
+      const dy = (tank.y - GAME_CONFIG.tank.height / 2) - projectile.y;
+      const distanceSq = dx * dx + dy * dy;
+      const deflectRadiusSq = GAME_CONFIG.projectile.deflectRadius * GAME_CONFIG.projectile.deflectRadius;
+      if (distanceSq <= deflectRadiusSq) {
+        const hasMagDeflector = (tank.defenses['mag-deflector'] ?? 0) > 0;
+        const hasSuperMag = tank.armedShieldId === 'super-mag';
+        if (hasMagDeflector || hasSuperMag) {
+          projectile.velocityY -= GAME_CONFIG.projectile.deflectAcceleration * deltaSeconds;
+        }
+      }
+    });
+
     this.trailTimerMs += deltaMs;
     if (this.trailTimerMs >= GAME_CONFIG.projectile.trailSpacingMs) {
       projectile.trail.push({ x: projectile.x, y: projectile.y });
@@ -187,6 +203,13 @@ export class ProjectileSystem {
       }
       // Digger/Sandhog transition: start tunneling instead of impacting
       if (weapon.behavior === 'digger' || weapon.behavior === 'sandhog') {
+        // Contact triggers: if owner tank has them, detonate immediately instead of tunneling
+        const ownerTank = tanks.find((t) => t.id === projectile.ownerId);
+        if (ownerTank && ownerTank.contactTriggers > 0) {
+          ownerTank.contactTriggers -= 1;
+          this.spawnOnImpact(projectile, spawned);
+          return { impact: { kind: 'terrain', x: projectile.x, y: projectile.y }, spawned };
+        }
         projectile.tunneling = true;
         projectile.tunnelRemaining = weapon.tunnelLength ?? 60;
         const speed = Math.hypot(projectile.velocityX, projectile.velocityY) || 1;

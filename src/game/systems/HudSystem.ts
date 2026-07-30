@@ -554,10 +554,13 @@ export class HudSystem {
   private drawRetroStatusPanel(x: number, y: number, activeTank: TankState, match: MatchState): void {
     const colors = GAME_CONFIG.colors;
     this.addText(x, y, `HP     ${activeTank.health} / ${GAME_CONFIG.tank.maxHealth}`, colors.white, GAME_CONFIG.font.small);
+    const moveStr = activeTank.fuel > 0
+      ? `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}+${Math.round(activeTank.fuel)}`
+      : `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}`;
     this.addText(
       x,
       y + 14,
-      `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}`,
+      moveStr,
       colors.white,
       GAME_CONFIG.font.small
     );
@@ -675,7 +678,10 @@ export class HudSystem {
     this.addText(728, top + 22, 'STATUS', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.medium);
     this.addText(728, top + 46, `P${activeTank.id + 1} TURN`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
     this.addText(728, top + 60, `HP   ${activeTank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
-    this.addText(728, top + 74, `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+    const moveStr = activeTank.fuel > 0
+      ? `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}+${Math.round(activeTank.fuel)}`
+      : `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}`;
+    this.addText(728, top + 74, moveStr, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
     this.addText(728, top + 88, `CHUTES  ${activeTank.parachutes}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
     this.addText(728, top + 102, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
     this.addText(

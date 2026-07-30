@@ -580,4 +580,76 @@ describe('ProjectileSystem', () => {
     expect(smokeTracer.damage).toBe(0);
     expect(smokeTracer.craterRadius).toBe(0);
   });
+
+  it('ballistic deflection: projectile deflects upward when near enemy tank with mag-deflector', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, angle: 90, power: 50, x: 400, y: 248 });
+    const defenderTank = makeTank({ id: 1, x: 480, y: 200, alive: true, defenses: { 'mag-deflector': 1 } });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = 480;
+    projectile.y = 150;
+    projectile.velocityY = 50;
+
+    const initialVelocityY = projectile.velocityY;
+    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, defenderTank]);
+
+    expect(projectile.velocityY).toBeLessThan(initialVelocityY);
+    expect(tick.impact).toBeNull();
+  });
+
+  it('ballistic deflection: dead tank with mag-deflector does not deflect', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, angle: 90, power: 50, x: 400, y: 248 });
+    const deadDefenderTank = makeTank({ id: 1, x: 480, y: 200, alive: false, defenses: { 'mag-deflector': 1 } });
+    const liveDefenderTank = makeTank({ id: 2, x: 500, y: 300, alive: true, defenses: {} });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = 480;
+    projectile.y = 150;
+    projectile.velocityY = 50;
+
+    const initialVelocityY = projectile.velocityY;
+    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, deadDefenderTank, liveDefenderTank]);
+
+    const gravity = GAME_CONFIG.projectile.gravity * 0.1;
+    const expectedVelocityY = initialVelocityY + gravity;
+    expect(Math.abs(projectile.velocityY - expectedVelocityY)).toBeLessThan(1e-6);
+    expect(tick.impact).toBeNull();
+  });
+
+  it('contact-trigger: digger with contactTriggers detonates on terrain contact instead of tunneling', () => {
+    const terrain = makeFlatTerrain(250);
+    const ownerTank = makeTank({ id: 0, angle: 0, power: 50, x: 480, y: 248, contactTriggers: 1 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'digger')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [ownerTank]);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(projectile.tunneling).not.toBe(true);
+    expect(ownerTank.contactTriggers).toBe(0);
+  });
+
+  it('contact-trigger: digger without contactTriggers enters tunneling mode on terrain contact', () => {
+    const terrain = makeFlatTerrain(250);
+    const ownerTank = makeTank({ id: 0, angle: 0, power: 50, x: 480, y: 248, contactTriggers: 0 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'digger')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [ownerTank]);
+
+    expect(tick.impact).toBeNull();
+    expect(projectile.tunneling).toBe(true);
+    expect(projectile.tunnelRemaining).toBe(weapon.tunnelLength ?? 60);
+  });
 });

@@ -63,6 +63,10 @@ export class EconomySystem {
         profile.defenses[key] = (profile.defenses[key] ?? 0) + qty * this.bundleSizeFor(key);
       } else if (key === 'battery') {
         profile.batteries += qty * this.bundleSizeFor(key);
+      } else if (key === 'fuel-tank') {
+        profile.fuel += qty * this.bundleSizeFor(key) * 10;
+      } else if (key === 'contact-trigger') {
+        profile.contactTriggers += qty * this.bundleSizeFor(key);
       } else {
         if (profile.ammo[key] === -1) profile.ammo[key] = 0;
         profile.ammo[key] = (profile.ammo[key] ?? 0) + (qty * this.bundleSizeFor(key));
@@ -128,6 +132,12 @@ export class EconomySystem {
     }
     if (key === 'battery') {
       return profile.batteries;
+    }
+    if (key === 'fuel-tank') {
+      return profile.fuel;
+    }
+    if (key === 'contact-trigger') {
+      return profile.contactTriggers;
     }
     return 0;
   }

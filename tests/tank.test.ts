@@ -180,4 +180,51 @@ describe('TankSystem', () => {
     expect(tanks[0].armedShieldId).toBeNull();
     expect(tanks[0].armedShieldHp).toBe(0);
   });
+
+  it('createTanks copies profile fuel and contactTriggers', () => {
+    const terrain = makeFlatTerrain(250);
+    const profiles = [makeProfile({ fuel: 100, contactTriggers: 5 }), makeProfile({ fuel: 50, contactTriggers: 3 })];
+
+    const tanks = tankSystem.createTanks(terrainSystem, terrain, profiles);
+
+    expect(tanks[0].fuel).toBe(100);
+    expect(tanks[0].contactTriggers).toBe(5);
+    expect(tanks[1].fuel).toBe(50);
+    expect(tanks[1].contactTriggers).toBe(3);
+  });
+
+  it('moveTank with fuel: when moveRemaining sufficient, does not touch fuel', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ x: 480, y: 248, moveRemaining: 200, fuel: 100 });
+    const initialFuel = tank.fuel;
+    const speedPerDelta = GAME_CONFIG.movement.speedPxPerSec * 0.5;
+
+    tankSystem.moveTank(tank, 1, 0.5, terrainSystem, terrain, [tank]);
+
+    expect(tank.moveRemaining).toBe(200 - speedPerDelta);
+    expect(tank.fuel).toBe(initialFuel);
+  });
+
+  it('moveTank with fuel: draws from fuel when moveRemaining exhausted', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ x: 480, y: 248, moveRemaining: 20, fuel: 100 });
+    const speedPerDelta = GAME_CONFIG.movement.speedPxPerSec * 1;
+
+    tankSystem.moveTank(tank, 1, 1, terrainSystem, terrain, [tank]);
+
+    expect(tank.moveRemaining).toBe(0);
+    expect(tank.fuel).toBeLessThan(100);
+  });
+
+  it('settleTanksAfterTerrainChange: safe fall distance has no damage, no parachute, no event', () => {
+    const safeDistance = GAME_CONFIG.fall.safeDistance;
+    const newTerrain = makeFlatTerrain(250 + safeDistance - 1);
+    const tank = makeTank({ id: 0, y: 250 - GAME_CONFIG.tank.placementOffsetY, health: 125, parachutes: 5 });
+
+    const events = tankSystem.settleTanksAfterTerrainChange([tank], terrainSystem, newTerrain);
+
+    expect(events.length).toBe(0);
+    expect(tank.health).toBe(125);
+    expect(tank.parachutes).toBe(5);
+  });
 });

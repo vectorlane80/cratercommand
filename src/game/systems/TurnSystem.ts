@@ -55,6 +55,8 @@ export class TurnSystem {
       defenses: {},
       autoDefense: false,
       batteries: GAME_CONFIG.match.startingBatteries,
+      fuel: 0,
+      contactTriggers: 0,
       controller,
       displayName
     };
@@ -66,6 +68,8 @@ export class TurnSystem {
       match.profiles[tank.id].parachutes = tank.parachutes;
       match.profiles[tank.id].defenses = { ...tank.defenses };
       match.profiles[tank.id].batteries = tank.batteries;
+      match.profiles[tank.id].fuel = tank.fuel;
+      match.profiles[tank.id].contactTriggers = tank.contactTriggers;
     });
   }
 

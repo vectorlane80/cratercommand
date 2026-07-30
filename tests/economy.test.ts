@@ -388,4 +388,40 @@ describe('EconomySystem', () => {
     system.applyPurchases(profile, pending, 1, null);
     expect(profile.autoDefense).toBe(true);
   });
+
+  it('fuel-tank item: basePriceFor 10000, bundleSizeFor 10', () => {
+    expect(system.basePriceFor('fuel-tank')).toBe(10000);
+    expect(system.bundleSizeFor('fuel-tank')).toBe(10);
+  });
+
+  it('contact-trigger item: basePriceFor 1000, bundleSizeFor 25', () => {
+    expect(system.basePriceFor('contact-trigger')).toBe(1000);
+    expect(system.bundleSizeFor('contact-trigger')).toBe(25);
+  });
+
+  it('ownedCount returns fuel for fuel-tank item', () => {
+    const profile = makeProfile({ fuel: 50 });
+    expect(system.ownedCount(profile, 'fuel-tank')).toBe(50);
+  });
+
+  it('ownedCount returns contactTriggers for contact-trigger item', () => {
+    const profile = makeProfile({ contactTriggers: 75 });
+    expect(system.ownedCount(profile, 'contact-trigger')).toBe(75);
+  });
+
+  it('applyPurchases applies fuel-tank purchases: fuel += qty * bundleSize * 10', () => {
+    const profile = makeProfile({ cash: 30000, fuel: 0 });
+    const pending = { 'fuel-tank': 2 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.cash).toBe(30000 - 20000);
+    expect(profile.fuel).toBe(2 * 10 * 10);
+  });
+
+  it('applyPurchases applies contact-trigger purchases: contactTriggers += qty * bundleSize', () => {
+    const profile = makeProfile({ cash: 10000, contactTriggers: 0 });
+    const pending = { 'contact-trigger': 2 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.cash).toBe(10000 - 2000);
+    expect(profile.contactTriggers).toBe(2 * 25);
+  });
 });

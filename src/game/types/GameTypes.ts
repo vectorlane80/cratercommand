@@ -36,6 +36,8 @@ export interface TankState {
   armedShieldId: string | null;
   armedShieldHp: number;
   batteries: number;
+  fuel: number;
+  contactTriggers: number;
   damageDealt: number;
 }
 
@@ -70,6 +72,8 @@ export interface PlayerProfile {
   defenses: Record<string, number>;
   autoDefense: boolean;
   batteries: number;
+  fuel: number;
+  contactTriggers: number;
   controller: ControllerKind;
   /** Custom display name. Falls back to "PLAYER N" when null. */
   displayName: string | null;
@@ -281,7 +285,10 @@ export const GAME_CONFIG = {
     rollerMinSpeed: 9,
     rollerMaxSpeed: 260,
     // Tunneling weapons bore through terrain at constant speed
-    tunnelSpeed: 90
+    tunnelSpeed: 90,
+    // Mag deflector upward push
+    deflectRadius: 70,
+    deflectAcceleration: 420
   },
   wind: {
     min: 0,
@@ -301,6 +308,8 @@ export const GAME_CONFIG = {
     // because the threshold was too high relative to the typical crater
     // drop at one side of the tank.
     threshold: 6,
+    // Harmless drop band — falls this short never hurt nor deploy a chute.
+    safeDistance: 18,
     damagePerPixel: 0.85,
     maxDamage: 75
   },
@@ -838,6 +847,8 @@ export const GAME_CONFIG = {
     { id: 'heavy-shield', name: 'Heavy Shield', price: 30000, bundleSize: 2, hotkey: 'H', description: 'Absorbs 90 damage when armed', category: 'defense', absorb: 90 },
     { id: 'super-mag', name: 'Super Mag', price: 40000, bundleSize: 2, hotkey: 'M', description: 'Absorbs 100 + deflects shots', category: 'defense', absorb: 100, deflects: true },
     { id: 'mag-deflector', name: 'Mag Deflector', price: 10000, bundleSize: 2, hotkey: 'G', description: 'Deflects nearby shots upward', category: 'defense', deflects: true },
-    { id: 'auto-defense', name: 'Auto Defense', price: 1500, bundleSize: 1, hotkey: 'O', description: 'Shields auto-arm each round', category: 'defense', oneTime: true }
+    { id: 'auto-defense', name: 'Auto Defense', price: 1500, bundleSize: 1, hotkey: 'O', description: 'Shields auto-arm each round', category: 'defense', oneTime: true },
+    { id: 'fuel-tank', name: 'Fuel Tank', price: 10000, bundleSize: 10, hotkey: 'U', description: '+10 movement fuel each', category: 'utility', sidebarLabel: 'FUEL TANKS' },
+    { id: 'contact-trigger', name: 'Contact Trigger', price: 1000, bundleSize: 25, hotkey: 'T', description: 'Warheads explode on contact while tunneling', category: 'utility', sidebarLabel: 'CONTACT TRIGGERS' }
   ] satisfies ItemDefinition[]
 } as const;

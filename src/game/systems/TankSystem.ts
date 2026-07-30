@@ -81,6 +81,8 @@ export class TankSystem {
         armedShieldId: null,
         armedShieldHp: 0,
         batteries: profile.batteries,
+        fuel: profile.fuel,
+        contactTriggers: profile.contactTriggers,
         damageDealt: 0
       };
     });
@@ -107,10 +109,11 @@ export class TankSystem {
     terrainData: TerrainData,
     otherTanks: TankState[]
   ): boolean {
-    if (tank.moveRemaining <= 0) return false;
+    const budget = tank.moveRemaining + tank.fuel;
+    if (budget <= 0) return false;
 
     const stepDistance = Math.min(
-      tank.moveRemaining,
+      budget,
       GAME_CONFIG.movement.speedPxPerSec * deltaSeconds
     );
     if (stepDistance <= 0.01) return false;
@@ -136,7 +139,15 @@ export class TankSystem {
 
     tank.x = targetX;
     tank.y = terrainSystem.getHeightAtX(terrainData, tank.x) - GAME_CONFIG.tank.placementOffsetY;
-    tank.moveRemaining = Math.max(0, tank.moveRemaining - actualStep);
+
+    // Deduct from moveRemaining first, overflow from fuel
+    if (actualStep <= tank.moveRemaining) {
+      tank.moveRemaining -= actualStep;
+    } else {
+      const overflow = actualStep - tank.moveRemaining;
+      tank.moveRemaining = 0;
+      tank.fuel = Math.max(0, tank.fuel - overflow);
+    }
 
     return true;
   }
@@ -159,21 +170,22 @@ export class TankSystem {
       const fallDistance = groundY - tank.y;
 
       if (fallDistance > GAME_CONFIG.fall.threshold) {
-        let damage = 0;
-        let usedParachute = false;
-
-        if (tank.parachutes > 0) {
+        // SE parachute logic: only deploy on falls that would cause damage
+        if (fallDistance <= GAME_CONFIG.fall.safeDistance) {
+          // Harmless drop band - no damage, no parachute, no event
+        } else if (tank.parachutes > 0) {
+          // Fall exceeds safe distance and parachutes available - deploy
           tank.parachutes -= 1;
-          usedParachute = true;
+          events.push({ tankId: tank.id, distance: fallDistance, damage: 0, usedParachute: true });
         } else {
-          damage = Math.min(
+          // Fall exceeds safe distance and no parachutes - take damage
+          const damage = Math.min(
             GAME_CONFIG.fall.maxDamage,
             Math.round(fallDistance * GAME_CONFIG.fall.damagePerPixel)
           );
           this.applyDamage(tank, damage);
+          events.push({ tankId: tank.id, distance: fallDistance, damage, usedParachute: false });
         }
-
-        events.push({ tankId: tank.id, distance: fallDistance, damage, usedParachute });
       }
 
       tank.y = groundY;
