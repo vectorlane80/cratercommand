@@ -70,6 +70,8 @@ export interface GameSnapshot {
     hopsLeft?: number;
     damageScale?: number;
     rolling?: boolean;
+    tunneling?: boolean;
+    tunnelRemaining?: number;
   }>;
   statusMessage: string | null;
   topToast: { text: string; color: number; expiresAt: number } | null;

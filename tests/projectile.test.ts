@@ -430,4 +430,100 @@ describe('ProjectileSystem', () => {
 
     expect(Math.abs(velocityAfterWind - velocityAfterNoWind)).toBeLessThan(0.5);
   });
+
+  it('digger transitions to tunneling on terrain contact', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'digger')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).toBeNull();
+    expect(projectile.tunneling).toBe(true);
+    expect(projectile.tunnelRemaining).toBe(100);
+    const speed = Math.hypot(projectile.velocityX, projectile.velocityY);
+    expect(Math.abs(speed - GAME_CONFIG.projectile.tunnelSpeed)).toBeLessThan(1e-6);
+  });
+
+  it('tunneling digger hits tank and fizzles (terrain impact)', () => {
+    const terrain = makeFlatTerrain(250);
+    const targetTank = makeTank({ id: 2, x: 482, y: 250, alive: true });
+    const attacker = makeTank({ id: 0, angle: 0, power: 50, x: 100, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'digger')!;
+    const projectiles = projectileSystem.launch(attacker, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.tunneling = true;
+    projectile.tunnelRemaining = 50;
+    projectile.x = 480;
+    projectile.y = 250;
+    projectile.velocityX = 90;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+  });
+
+  it('tunneling sandhog hits tank with tank impact', () => {
+    const terrain = makeFlatTerrain(250);
+    const targetTank = makeTank({ id: 2, x: 482, y: 250, alive: true });
+    const attacker = makeTank({ id: 0, angle: 0, power: 50, x: 100, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'sandhog')!;
+    const projectiles = projectileSystem.launch(attacker, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.tunneling = true;
+    projectile.tunnelRemaining = 50;
+    projectile.x = 480;
+    projectile.y = 250;
+    projectile.velocityX = 90;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('tank');
+    expect(tick.impact!.targetTankId).toBe(2);
+  });
+
+  it('tunneling projectile detonates when tunnel budget exhausted', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 0, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'digger')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.tunneling = true;
+    projectile.tunnelRemaining = 1;
+    projectile.x = 480;
+    projectile.y = 250;
+    projectile.velocityX = 90;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+  });
+
+  it('tunneling tick with bore near surface reports terrainChanged true', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 0, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'digger')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.tunneling = true;
+    projectile.tunnelRemaining = 50;
+    projectile.x = 480;
+    projectile.y = 250;
+    projectile.velocityX = 90;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.terrainChanged).toBe(true);
+    expect(tick.impact).toBeNull();
+  });
 });

@@ -80,4 +80,29 @@ describe('TerrainSystem', () => {
       expect(h).toBeLessThanOrEqual(GAME_CONFIG.terrain.craterMaxY);
     });
   });
+
+  it('applyTunnel carves surface near bore point and returns true', () => {
+    const terrain = makeFlatTerrain(250);
+
+    const changed = system.applyTunnel(terrain, 480, 250, 8);
+
+    expect(changed).toBe(true);
+    // Surface collapses DOWN to the tunnel floor: height value increases to y + radius.
+    expect(terrain.heights[80]).toBeCloseTo(258, 5);
+    expect(terrain.heights[80]).toBeGreaterThan(250);
+    // Heights far from tunnel should be unchanged
+    expect(terrain.heights[0]).toBe(250);
+    expect(terrain.heights[160]).toBe(250);
+  });
+
+  it('applyTunnel deep underground does not change surface and returns false', () => {
+    const terrain = makeFlatTerrain(250);
+
+    const changed = system.applyTunnel(terrain, 480, 320, 8);
+
+    expect(changed).toBe(false);
+    terrain.heights.forEach((h) => {
+      expect(h).toBe(250);
+    });
+  });
 });

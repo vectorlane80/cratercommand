@@ -675,7 +675,9 @@ export class GameScene extends Phaser.Scene {
         hasSplit: p.hasSplit,
         hopsLeft: p.hopsLeft,
         damageScale: p.damageScale,
-        rolling: p.rolling
+        rolling: p.rolling,
+        tunneling: p.tunneling,
+        tunnelRemaining: p.tunnelRemaining
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -718,7 +720,9 @@ export class GameScene extends Phaser.Scene {
         hasSplit: p.hasSplit,
         hopsLeft: p.hopsLeft,
         damageScale: p.damageScale,
-        rolling: p.rolling
+        rolling: p.rolling,
+        tunneling: p.tunneling,
+        tunnelRemaining: p.tunnelRemaining
       };
     });
     this.statusMessage = snap.statusMessage;
@@ -1371,6 +1375,8 @@ export class GameScene extends Phaser.Scene {
   private tickProjectiles(delta: number): void {
     const remaining: ProjectileState[] = [];
     const spawnedThisFrame: ProjectileState[] = [];
+    let anyTerrainChanged = false;
+    let terrainChangingShooter: TankState | null = null;
 
     for (const projectile of this.activeProjectiles) {
       const tick = this.projectileSystem.update(
@@ -1385,11 +1391,24 @@ export class GameScene extends Phaser.Scene {
 
       if (tick.spawned.length) spawnedThisFrame.push(...tick.spawned);
 
+      if (tick.terrainChanged) {
+        anyTerrainChanged = true;
+        if (!terrainChangingShooter) {
+          terrainChangingShooter = this.tanks[projectile.ownerId];
+        }
+      }
+
       if (tick.impact) {
         this.applyImpact(projectile, tick.impact);
       } else {
         remaining.push(projectile);
       }
+    }
+
+    // Handle mid-flight terrain changes from tunneling
+    if (anyTerrainChanged && terrainChangingShooter) {
+      this.settleTerrainAndTanks(terrainChangingShooter);
+      this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
     }
 
     this.activeProjectiles = [...remaining, ...spawnedThisFrame];
@@ -1447,29 +1466,34 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (terrainChanged) {
-      const falls = this.tankSystem.settleTanksAfterTerrainChange(
-        this.tanks,
-        this.terrainSystem,
-        this.terrainData
-      );
-      falls.forEach((fall) => {
-        if (fall.damage > 0 && fall.tankId !== shooter.id) {
-          shooter.damageDealt += fall.damage;
-        }
-        if (fall.damage > 0 || fall.usedParachute) {
-          soundSystem.playFall();
-          const name = this.playerName(fall.tankId);
-          const text = fall.usedParachute
-            ? `${name} CHUTE DEPLOYED`
-            : `${name} FELL · ${fall.damage} DAMAGE`;
-          this.topToast = {
-            text,
-            color: fall.usedParachute ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.red,
-            expiresAt: Date.now() + 2200
-          };
-        }
-      });
+      this.settleTerrainAndTanks(shooter);
     }
+  }
+
+  /** Settle tanks after terrain changes, apply fall damage, and emit fall notifications. */
+  private settleTerrainAndTanks(shooter: TankState): void {
+    const falls = this.tankSystem.settleTanksAfterTerrainChange(
+      this.tanks,
+      this.terrainSystem,
+      this.terrainData
+    );
+    falls.forEach((fall) => {
+      if (fall.damage > 0 && fall.tankId !== shooter.id) {
+        shooter.damageDealt += fall.damage;
+      }
+      if (fall.damage > 0 || fall.usedParachute) {
+        soundSystem.playFall();
+        const name = this.playerName(fall.tankId);
+        const text = fall.usedParachute
+          ? `${name} CHUTE DEPLOYED`
+          : `${name} FELL · ${fall.damage} DAMAGE`;
+        this.topToast = {
+          text,
+          color: fall.usedParachute ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.red,
+          expiresAt: Date.now() + 2200
+        };
+      }
+    });
   }
 
   private endTurn(): void {

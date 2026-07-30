@@ -195,6 +195,39 @@ export class TerrainSystem {
     this.relaxCraterEdges(terrainData, centerIndex, sampleRadius + 4);
   }
 
+  /** Carve a narrow channel sample: lower any terrain above the bore point so the
+   *  surface opens around (x, y). Only affects columns within `radius` of x whose
+   *  surface is ABOVE y + radius (i.e. the bore is underground there). Returns
+   *  true when any height changed. */
+  applyTunnel(terrainData: TerrainData, x: number, y: number, radius: number): boolean {
+    const { heights, segmentWidth } = terrainData;
+    const centerIndex = Math.round(x / segmentWidth);
+    const sampleRadius = Math.ceil(radius / segmentWidth);
+    let changed = false;
+
+    for (let index = centerIndex - sampleRadius; index <= centerIndex + sampleRadius; index += 1) {
+      if (index < 0 || index >= heights.length) continue;
+
+      const sampleX = index * segmentWidth;
+      const dx = sampleX - x;
+      if (Math.abs(dx) > radius) continue;
+
+      const depth = Math.sqrt(radius * radius - dx * dx);
+      const floorY = y + depth;
+
+      // Carve if surface is above tunnel ceiling and within tunnel bounds
+      if (heights[index] >= y - depth && heights[index] < y + depth) {
+        const newHeight = Math.min(GAME_CONFIG.terrain.craterMaxY, Math.max(heights[index], floorY));
+        if (newHeight !== heights[index]) {
+          heights[index] = newHeight;
+          changed = true;
+        }
+      }
+    }
+
+    return changed;
+  }
+
   getHeightAtX(terrainData: TerrainData, x: number): number {
     const { heights, segmentWidth } = terrainData;
     const index = Phaser.Math.Clamp(Math.floor(x / segmentWidth), 0, heights.length - 2);

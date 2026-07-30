@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -110,6 +110,8 @@ export interface WeaponDefinition {
   moundRadius?: number;
   hopCount?: number;
   funkySpawnCount?: number;
+  tunnelLength?: number;
+  tunnelRadius?: number;
 }
 
 export interface ItemDefinition {
@@ -136,6 +138,8 @@ export interface ProjectileState {
   hopsLeft?: number;
   damageScale?: number;
   rolling?: boolean;
+  tunneling?: boolean;
+  tunnelRemaining?: number;
 }
 
 export interface WindState {
@@ -261,7 +265,9 @@ export const GAME_CONFIG = {
     // Roller surface physics — see ProjectileSystem
     rollerFriction: 0.4,
     rollerMinSpeed: 9,
-    rollerMaxSpeed: 260
+    rollerMaxSpeed: 260,
+    // Tunneling weapons bore through terrain at constant speed
+    tunnelSpeed: 90
   },
   wind: {
     min: 0,
@@ -533,6 +539,90 @@ export const GAME_CONFIG = {
       behavior: 'roller',
       category: 'terrain',
       bundleSize: 2
+    },
+    {
+      id: 'baby-digger',
+      name: 'Baby Digger',
+      startingAmmo: 0,
+      price: 3000,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'digger',
+      category: 'terrain',
+      bundleSize: 10,
+      tunnelLength: 60,
+      tunnelRadius: 7
+    },
+    {
+      id: 'digger',
+      name: 'Digger',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'digger',
+      category: 'terrain',
+      bundleSize: 5,
+      tunnelLength: 100,
+      tunnelRadius: 9
+    },
+    {
+      id: 'heavy-digger',
+      name: 'Heavy Digger',
+      startingAmmo: 0,
+      price: 6750,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'digger',
+      category: 'terrain',
+      bundleSize: 2,
+      tunnelLength: 150,
+      tunnelRadius: 11
+    },
+    {
+      id: 'baby-sandhog',
+      name: 'Baby Sandhog',
+      startingAmmo: 0,
+      price: 10000,
+      damage: 25,
+      craterRadius: 14,
+      projectileSpeedScale: 1,
+      behavior: 'sandhog',
+      category: 'terrain',
+      bundleSize: 10,
+      tunnelLength: 60,
+      tunnelRadius: 7
+    },
+    {
+      id: 'sandhog',
+      name: 'Sandhog',
+      startingAmmo: 0,
+      price: 16750,
+      damage: 40,
+      craterRadius: 18,
+      projectileSpeedScale: 1,
+      behavior: 'sandhog',
+      category: 'terrain',
+      bundleSize: 5,
+      tunnelLength: 100,
+      tunnelRadius: 9
+    },
+    {
+      id: 'heavy-sandhog',
+      name: 'Heavy Sandhog',
+      startingAmmo: 0,
+      price: 25000,
+      damage: 60,
+      craterRadius: 24,
+      projectileSpeedScale: 1,
+      behavior: 'sandhog',
+      category: 'terrain',
+      bundleSize: 2,
+      tunnelLength: 150,
+      tunnelRadius: 11
     }
   ] satisfies WeaponDefinition[],
   items: [

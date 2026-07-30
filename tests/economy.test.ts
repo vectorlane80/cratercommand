@@ -89,6 +89,24 @@ describe('EconomySystem', () => {
     expect(system.bundleSizeFor('heavy-roller')).toBe(2);
   });
 
+  it('basePriceFor looks up tunneling weapons', () => {
+    expect(system.basePriceFor('baby-digger')).toBe(3000);
+    expect(system.basePriceFor('digger')).toBe(5000);
+    expect(system.basePriceFor('heavy-digger')).toBe(6750);
+    expect(system.basePriceFor('baby-sandhog')).toBe(10000);
+    expect(system.basePriceFor('sandhog')).toBe(16750);
+    expect(system.basePriceFor('heavy-sandhog')).toBe(25000);
+  });
+
+  it('bundleSizeFor looks up tunneling weapons', () => {
+    expect(system.bundleSizeFor('baby-digger')).toBe(10);
+    expect(system.bundleSizeFor('digger')).toBe(5);
+    expect(system.bundleSizeFor('heavy-digger')).toBe(2);
+    expect(system.bundleSizeFor('baby-sandhog')).toBe(10);
+    expect(system.bundleSizeFor('sandhog')).toBe(5);
+    expect(system.bundleSizeFor('heavy-sandhog')).toBe(2);
+  });
+
   it('totalPendingCost sums pending costs', () => {
     const pending = { parachute: 2, 'big-missile': 1 };
     const cost = system.totalPendingCost(pending, 1, null);

@@ -14,6 +14,7 @@ import { TerrainSystem } from './TerrainSystem';
 export interface ProjectileTick {
   impact: ImpactResult | null;
   spawned: ProjectileState[];
+  terrainChanged?: boolean;
 }
 
 export class ProjectileSystem {
@@ -82,6 +83,11 @@ export class ProjectileSystem {
     projectile.ageMs += deltaMs;
     const spawned: ProjectileState[] = [];
     const weapon = projectile.weapon;
+
+    // Tunneling physics: takes priority over rolling and ballistic
+    if (projectile.tunneling === true) {
+      return this.updateTunneling(projectile, deltaSeconds, terrainSystem, terrainData, tankSystem, tanks);
+    }
 
     // Rolling physics: takes priority over ballistic
     if (projectile.rolling === true) {
@@ -179,6 +185,15 @@ export class ProjectileSystem {
         projectile.velocityY = 0;
         return { impact: null, spawned };
       }
+      // Digger/Sandhog transition: start tunneling instead of impacting
+      if (weapon.behavior === 'digger' || weapon.behavior === 'sandhog') {
+        projectile.tunneling = true;
+        projectile.tunnelRemaining = weapon.tunnelLength ?? 60;
+        const speed = Math.hypot(projectile.velocityX, projectile.velocityY) || 1;
+        projectile.velocityX = (projectile.velocityX / speed) * GAME_CONFIG.projectile.tunnelSpeed;
+        projectile.velocityY = (projectile.velocityY / speed) * GAME_CONFIG.projectile.tunnelSpeed;
+        return { impact: null, spawned, terrainChanged: false };
+      }
       this.spawnOnImpact(projectile, spawned);
       return { impact: { kind: 'terrain', x: projectile.x, y: projectile.y }, spawned };
     }
@@ -251,6 +266,81 @@ export class ProjectileSystem {
     }
 
     return { impact: null, spawned };
+  }
+
+  /** Tunneling physics: projectile bores through terrain in a straight line. */
+  private updateTunneling(
+    projectile: ProjectileState,
+    deltaSeconds: number,
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData,
+    tankSystem: TankSystem,
+    tanks: TankState[]
+  ): ProjectileTick {
+    const spawned: ProjectileState[] = [];
+    const weapon = projectile.weapon;
+    let terrainChanged = false;
+
+    // Trail update on same timer as ballistic
+    this.trailTimerMs += deltaSeconds * 1000;
+    if (this.trailTimerMs >= GAME_CONFIG.projectile.trailSpacingMs) {
+      projectile.trail.push({ x: projectile.x, y: projectile.y });
+      this.trailTimerMs = 0;
+    }
+
+    // Move in straight line
+    const distanceMoved = Math.hypot(projectile.velocityX, projectile.velocityY) * deltaSeconds;
+    projectile.x += projectile.velocityX * deltaSeconds;
+    projectile.y += projectile.velocityY * deltaSeconds;
+
+    // Carve tunnel
+    if (terrainSystem.applyTunnel(terrainData, projectile.x, projectile.y, weapon.tunnelRadius ?? 7)) {
+      terrainChanged = true;
+    }
+
+    // Decrement tunnel budget
+    projectile.tunnelRemaining = (projectile.tunnelRemaining ?? 0) - distanceMoved;
+
+    // Tank check
+    const hitTank = tankSystem.findHitTank(tanks, projectile.x, projectile.y, projectile.ownerId);
+    if (hitTank) {
+      this.spawnOnImpact(projectile, spawned);
+      // Digger fizzles on tank hit (terrain-kind impact means no tank damage applied)
+      if (weapon.behavior === 'digger') {
+        return {
+          impact: { kind: 'terrain', x: projectile.x, y: projectile.y },
+          spawned,
+          terrainChanged
+        };
+      }
+      // Sandhog blasts the tank (tank-kind impact)
+      return {
+        impact: { kind: 'tank', x: projectile.x, y: projectile.y, targetTankId: hitTank.id },
+        spawned,
+        terrainChanged
+      };
+    }
+
+    // Tunnel exhausted: detonate
+    if ((projectile.tunnelRemaining ?? 0) <= 0) {
+      return {
+        impact: { kind: 'terrain', x: projectile.x, y: projectile.y },
+        spawned,
+        terrainChanged
+      };
+    }
+
+    // Off-field check
+    if (projectile.x < -40 || projectile.x > terrainData.width + 40 || projectile.y > terrainData.height + 40 || projectile.y < -40) {
+      return { impact: { kind: 'outOfBounds', x: projectile.x, y: projectile.y }, spawned, terrainChanged };
+    }
+
+    // Max age check
+    if (projectile.ageMs > GAME_CONFIG.projectile.maxAgeMs) {
+      return { impact: { kind: 'outOfBounds', x: projectile.x, y: projectile.y }, spawned, terrainChanged };
+    }
+
+    return { impact: null, spawned, terrainChanged };
   }
 
   /** Continuation/child projectiles spawned when a special weapon detonates. */
