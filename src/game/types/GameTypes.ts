@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -109,6 +109,7 @@ export interface WeaponDefinition {
   salvoPowerSpread?: number;
   moundRadius?: number;
   hopCount?: number;
+  funkySpawnCount?: number;
 }
 
 export interface ItemDefinition {
@@ -133,6 +134,7 @@ export interface ProjectileState {
   bouncesLeft?: number;
   hasSplit?: boolean;
   hopsLeft?: number;
+  damageScale?: number;
 }
 
 export interface WindState {
@@ -449,6 +451,47 @@ export const GAME_CONFIG = {
       category: 'missile',
       bundleSize: 2,
       hopCount: 3
+    },
+    {
+      id: 'mirv',
+      name: 'MIRV',
+      startingAmmo: 0,
+      price: 10000,
+      damage: 35,
+      craterRadius: 28,
+      projectileSpeedScale: 1,
+      behavior: 'split',
+      category: 'missile',
+      bundleSize: 3,
+      splitCount: 5,
+      splitAngleSpread: 24
+    },
+    {
+      id: 'deaths-head',
+      name: "Death's Head",
+      startingAmmo: 0,
+      price: 20000,
+      damage: 60,
+      craterRadius: 44,
+      projectileSpeedScale: 1,
+      behavior: 'split',
+      category: 'missile',
+      bundleSize: 1,
+      splitCount: 9,
+      splitAngleSpread: 40
+    },
+    {
+      id: 'funky-bomb',
+      name: 'Funky Bomb',
+      startingAmmo: 0,
+      price: 7000,
+      damage: 50,
+      craterRadius: 34,
+      projectileSpeedScale: 1,
+      behavior: 'funky',
+      category: 'missile',
+      bundleSize: 2,
+      funkySpawnCount: 6
     }
   ] satisfies WeaponDefinition[],
   items: [

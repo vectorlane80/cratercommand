@@ -220,4 +220,86 @@ describe('ProjectileSystem', () => {
     expect(tick.spawned.length).toBe(1);
     expect(tick.spawned[0].hopsLeft).toBe(0);
   });
+
+  it('launch mirv creates 1 projectile with split behavior', () => {
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'mirv')!;
+
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+
+    expect(projectiles.length).toBe(1);
+    expect(projectiles[0].weapon.behavior).toBe('split');
+  });
+
+  it('update mirv at apex spawns split children', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'mirv')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.velocityY = 1;
+    projectile.y = 100;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.spawned.length).toBe(weapon.splitCount! - 1);
+    tick.spawned.forEach((p) => {
+      expect(p.hasSplit).toBe(true);
+    });
+  });
+
+  it("update death's head at apex spawns 8 split children", () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'deaths-head')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.velocityY = 1;
+    projectile.y = 100;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.spawned.length).toBe(8);
+    tick.spawned.forEach((p) => {
+      expect(p.hasSplit).toBe(true);
+    });
+  });
+
+  it('update funky bomb below terrain spawns bomblets', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'funky-bomb')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.spawned.length).toBe(weapon.funkySpawnCount ?? 6);
+    tick.spawned.forEach((bomblet) => {
+      expect(bomblet.hasSplit).toBe(true);
+      expect(bomblet.damageScale).toBe(0.5);
+      expect(bomblet.velocityY).toBeLessThan(0);
+      expect(Math.abs(bomblet.velocityX)).toBeLessThanOrEqual(160);
+      expect(bomblet.ageMs).toBe(0);
+    });
+  });
+
+  it('update funky bomblet (hasSplit true) does not re-chain', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'funky-bomb')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.hasSplit = true;
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.spawned.length).toBe(0);
+  });
 });

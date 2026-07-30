@@ -135,20 +135,7 @@ export class ProjectileSystem {
 
     const hitTank = tankSystem.findHitTank(tanks, projectile.x, projectile.y, projectile.ownerId);
     if (hitTank) {
-      // Leapfrog handling: spawn continuation before returning impact
-      if (weapon.behavior === 'leapfrog' && (projectile.hopsLeft ?? 0) > 0) {
-        spawned.push({
-          ownerId: projectile.ownerId,
-          weapon,
-          x: projectile.x,
-          y: projectile.y - 4,
-          velocityX: projectile.velocityX * 0.85,
-          velocityY: -Math.abs(projectile.velocityY) * 0.55,
-          trail: [{ x: projectile.x, y: projectile.y - 4 }],
-          ageMs: 0,
-          hopsLeft: (projectile.hopsLeft ?? 0) - 1
-        });
-      }
+      this.spawnOnImpact(projectile, spawned);
       return {
         impact: { kind: 'tank', x: projectile.x, y: projectile.y, targetTankId: hitTank.id },
         spawned
@@ -174,24 +161,50 @@ export class ProjectileSystem {
         projectile.y = terrainSystem.getHeightAtX(terrainData, projectile.x) - 6;
         return { impact: null, spawned };
       }
-      // Leapfrog handling: spawn continuation before returning impact
-      if (weapon.behavior === 'leapfrog' && (projectile.hopsLeft ?? 0) > 0) {
-        spawned.push({
-          ownerId: projectile.ownerId,
-          weapon,
-          x: projectile.x,
-          y: projectile.y - 4,
-          velocityX: projectile.velocityX * 0.85,
-          velocityY: -Math.abs(projectile.velocityY) * 0.55,
-          trail: [{ x: projectile.x, y: projectile.y - 4 }],
-          ageMs: 0,
-          hopsLeft: (projectile.hopsLeft ?? 0) - 1
-        });
-      }
+      this.spawnOnImpact(projectile, spawned);
       return { impact: { kind: 'terrain', x: projectile.x, y: projectile.y }, spawned };
     }
 
     return { impact: null, spawned };
+  }
+
+  /** Continuation/child projectiles spawned when a special weapon detonates. */
+  private spawnOnImpact(projectile: ProjectileState, spawned: ProjectileState[]): void {
+    const weapon = projectile.weapon;
+
+    // Leapfrog: spawn continuation hop
+    if (weapon.behavior === 'leapfrog' && (projectile.hopsLeft ?? 0) > 0) {
+      spawned.push({
+        ownerId: projectile.ownerId,
+        weapon,
+        x: projectile.x,
+        y: projectile.y - 4,
+        velocityX: projectile.velocityX * 0.85,
+        velocityY: -Math.abs(projectile.velocityY) * 0.55,
+        trail: [{ x: projectile.x, y: projectile.y - 4 }],
+        ageMs: 0,
+        hopsLeft: (projectile.hopsLeft ?? 0) - 1
+      });
+    }
+
+    // Funky: spawn bomblet chain reaction
+    if (weapon.behavior === 'funky' && !projectile.hasSplit) {
+      const count = weapon.funkySpawnCount ?? 6;
+      for (let i = 0; i < count; i += 1) {
+        spawned.push({
+          ownerId: projectile.ownerId,
+          weapon,
+          x: projectile.x,
+          y: projectile.y - 6,
+          velocityX: (Math.random() * 2 - 1) * 160,
+          velocityY: -(60 + Math.random() * 150),
+          trail: [{ x: projectile.x, y: projectile.y - 6 }],
+          ageMs: 0,
+          hasSplit: true,
+          damageScale: 0.5
+        });
+      }
+    }
   }
 
   drawAll(graphics: Phaser.GameObjects.Graphics, projectiles: ProjectileState[]): void {

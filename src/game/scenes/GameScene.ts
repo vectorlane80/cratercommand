@@ -673,7 +673,8 @@ export class GameScene extends Phaser.Scene {
         ageMs: p.ageMs,
         bouncesLeft: p.bouncesLeft,
         hasSplit: p.hasSplit,
-        hopsLeft: p.hopsLeft
+        hopsLeft: p.hopsLeft,
+        damageScale: p.damageScale
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -714,7 +715,8 @@ export class GameScene extends Phaser.Scene {
         ageMs: p.ageMs,
         bouncesLeft: p.bouncesLeft,
         hasSplit: p.hasSplit,
-        hopsLeft: p.hopsLeft
+        hopsLeft: p.hopsLeft,
+        damageScale: p.damageScale
       };
     });
     this.statusMessage = snap.statusMessage;
@@ -1400,6 +1402,7 @@ export class GameScene extends Phaser.Scene {
   private applyImpact(projectile: ProjectileState, impact: ImpactResult): void {
     const weapon = projectile.weapon;
     const shooter = this.tanks[projectile.ownerId];
+    const scale = projectile.damageScale ?? 1;
     let terrainChanged = false;
 
     if (impact.kind === 'terrain' || impact.kind === 'tank') {
@@ -1408,7 +1411,7 @@ export class GameScene extends Phaser.Scene {
         this.terrainSystem.applyMound(this.terrainData, impact.x, impact.y, radius);
         terrainChanged = true;
       } else if (weapon.craterRadius > 0) {
-        this.terrainSystem.applyCrater(this.terrainData, impact.x, impact.y, weapon.craterRadius);
+        this.terrainSystem.applyCrater(this.terrainData, impact.x, impact.y, weapon.craterRadius * scale);
         terrainChanged = true;
       }
     }
@@ -1417,7 +1420,7 @@ export class GameScene extends Phaser.Scene {
       const target = this.tanks[impact.targetTankId];
 
       // Shield absorbs up to shieldAbsorbAmount and is consumed on any hit.
-      let incoming = weapon.damage;
+      let incoming = Math.round(weapon.damage * scale);
       let shieldUsed = false;
       if (target.shields > 0) {
         const absorbed = Math.min(incoming, GAME_CONFIG.match.shieldAbsorbAmount);

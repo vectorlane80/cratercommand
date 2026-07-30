@@ -65,6 +65,18 @@ describe('EconomySystem', () => {
     expect(system.bundleSizeFor('leapfrog')).toBe(2);
   });
 
+  it('basePriceFor looks up M1 weapons', () => {
+    expect(system.basePriceFor('mirv')).toBe(10000);
+    expect(system.basePriceFor('deaths-head')).toBe(20000);
+    expect(system.basePriceFor('funky-bomb')).toBe(7000);
+  });
+
+  it('bundleSizeFor looks up M1 weapons', () => {
+    expect(system.bundleSizeFor('mirv')).toBe(3);
+    expect(system.bundleSizeFor('deaths-head')).toBe(1);
+    expect(system.bundleSizeFor('funky-bomb')).toBe(2);
+  });
+
   it('totalPendingCost sums pending costs', () => {
     const pending = { parachute: 2, 'big-missile': 1 };
     const cost = system.totalPendingCost(pending, 1, null);
