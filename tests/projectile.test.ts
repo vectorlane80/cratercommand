@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ProjectileSystem } from '../src/game/systems/ProjectileSystem';
 import { TankSystem } from '../src/game/systems/TankSystem';
 import { TerrainSystem } from '../src/game/systems/TerrainSystem';
-import { GAME_CONFIG, PHYSICS_DEFAULTS } from '../src/game/types/GameTypes';
+import { GAME_CONFIG, PHYSICS_DEFAULTS, type ProjectileState } from '../src/game/types/GameTypes';
 import { makeFlatTerrain, makeTank } from './helpers';
 
 describe('ProjectileSystem', () => {
@@ -908,5 +908,51 @@ describe('ProjectileSystem', () => {
 
     expect(Math.abs(projectile.velocityY - (initialVelocityY + PHYSICS_DEFAULTS.gravity * 0.1))).toBeLessThan(1e-6);
     expect(tick.impact).toBeNull();
+  });
+
+  it('snapshot round-trip: projectile with all optional fields survives JSON serialization', () => {
+    // Build a representative projectile record with ALL optional fields set.
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'bouncing-bomb')!;
+    const projectile: ProjectileState = {
+      ownerId: 0,
+      weapon,
+      x: 123.45,
+      y: 234.56,
+      velocityX: 45.67,
+      velocityY: -56.78,
+      trail: [{ x: 100, y: 200 }, { x: 110, y: 210 }],
+      ageMs: 789,
+      bouncesLeft: 2,
+      hasSplit: false,
+      hopsLeft: 1,
+      damageScale: 0.75,
+      rolling: true,
+      tunneling: false,
+      tunnelRemaining: 50,
+      guidanceId: 'heat-guidance',
+      wallBounces: 3
+    };
+
+    // Simulate snapshot serialization (JSON.parse/stringify round-trip).
+    const serialized = JSON.stringify(projectile);
+    const deserialized = JSON.parse(serialized);
+
+    // Verify all fields survive the round-trip.
+    expect(deserialized.ownerId).toBe(0);
+    expect(deserialized.x).toBe(123.45);
+    expect(deserialized.y).toBe(234.56);
+    expect(deserialized.velocityX).toBe(45.67);
+    expect(deserialized.velocityY).toBe(-56.78);
+    expect(deserialized.trail).toEqual([{ x: 100, y: 200 }, { x: 110, y: 210 }]);
+    expect(deserialized.ageMs).toBe(789);
+    expect(deserialized.bouncesLeft).toBe(2);
+    expect(deserialized.hasSplit).toBe(false);
+    expect(deserialized.hopsLeft).toBe(1);
+    expect(deserialized.damageScale).toBe(0.75);
+    expect(deserialized.rolling).toBe(true);
+    expect(deserialized.tunneling).toBe(false);
+    expect(deserialized.tunnelRemaining).toBe(50);
+    expect(deserialized.guidanceId).toBe('heat-guidance');
+    expect(deserialized.wallBounces).toBe(3);
   });
 });

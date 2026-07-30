@@ -253,10 +253,17 @@ export class MenuScene extends Phaser.Scene {
     const hostBtn = this.hostButtonRect();
     if (x >= hostBtn.x && x <= hostBtn.x + hostBtn.w && y >= hostBtn.y && y <= hostBtn.y + hostBtn.h) {
       soundSystem.playUiSelect();
+      const physics: PhysicsSettings = {
+        gravity: GRAVITY_STEPS[this.gravityIndex],
+        viscosity: VISCOSITY_STEPS[this.viscosityIndex],
+        tanksFall: this.tanksFall
+      };
       this.scene.start('LobbyScene', {
         mode: 'host',
         localName: this.names[0] ?? 'PLAYER 1',
-        roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin
+        roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
+        wallMode: WALL_MODES[this.wallModeIndex],
+        physics
       });
       return;
     }

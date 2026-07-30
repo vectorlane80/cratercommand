@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { networkSystem, type NetworkMessage } from '../systems/NetworkSystem';
 import { soundSystem } from '../systems/SoundSystem';
-import { GAME_CONFIG, type ControllerKind } from '../types/GameTypes';
+import { GAME_CONFIG, PHYSICS_DEFAULTS, type ControllerKind, type PhysicsSettings, type WallMode } from '../types/GameTypes';
 
 type LobbyMode = 'host' | 'join';
 type LobbyPhase =
@@ -22,6 +22,8 @@ export class LobbyScene extends Phaser.Scene {
   private code: string = '';
   private errorMsg: string = '';
   private roundsToWin = 2;
+  private wallMode: WallMode = 'none';
+  private pendingPhysics: PhysicsSettings = PHYSICS_DEFAULTS;
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
 
@@ -49,10 +51,12 @@ export class LobbyScene extends Phaser.Scene {
     super('LobbyScene');
   }
 
-  init(data: { mode: LobbyMode; localName: string; roundsToWin?: number }): void {
+  init(data: { mode: LobbyMode; localName: string; roundsToWin?: number; wallMode?: WallMode; physics?: PhysicsSettings }): void {
     this.mode = data.mode;
     this.localName = (data.localName || 'PLAYER 1').slice(0, MAX_NAME_LEN);
     if (data.roundsToWin) this.roundsToWin = data.roundsToWin;
+    if (data.wallMode) this.wallMode = data.wallMode;
+    if (data.physics) this.pendingPhysics = data.physics;
   }
 
   create(): void {
@@ -120,7 +124,9 @@ export class LobbyScene extends Phaser.Scene {
         type: 'lobby-ready',
         controllers: ['human', 'remote'],
         names: [this.localName, this.remoteName],
-        roundsToWin: this.roundsToWin
+        roundsToWin: this.roundsToWin,
+        wallMode: this.wallMode,
+        physics: this.pendingPhysics
       });
     }
     this.render();
@@ -174,7 +180,9 @@ export class LobbyScene extends Phaser.Scene {
         type: 'lobby-ready',
         controllers: ['human', 'remote'],
         names: [this.localName, msg.name],
-        roundsToWin: this.roundsToWin
+        roundsToWin: this.roundsToWin,
+        wallMode: this.wallMode,
+        physics: this.pendingPhysics
       });
       this.render();
     } else if (msg.type === 'lobby-name') {
@@ -183,6 +191,8 @@ export class LobbyScene extends Phaser.Scene {
     } else if (msg.type === 'lobby-ready' && !networkSystem.isHost) {
       this.remoteName = msg.names[0] ?? 'HOST';
       this.roundsToWin = msg.roundsToWin;
+      this.wallMode = msg.wallMode;
+      this.pendingPhysics = msg.physics;
       this.phase = 'lobby-ready';
       this.render();
     } else if (msg.type === 'lobby-start' && !networkSystem.isHost) {
@@ -212,6 +222,8 @@ export class LobbyScene extends Phaser.Scene {
       controllers,
       names,
       roundsToWin: this.roundsToWin,
+      wallMode: this.wallMode,
+      physics: this.pendingPhysics,
       online: { isHost: networkSystem.isHost }
     });
   }
