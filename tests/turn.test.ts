@@ -113,4 +113,37 @@ describe('TurnSystem', () => {
     tanks[0].ammo['big-missile'] = 999;
     expect(match.profiles[0].ammo['big-missile']).toBe(5);
   });
+
+  it('isRoundOver false with 2 alive', () => {
+    const tanks = [
+      makeTank({ id: 0, alive: true }),
+      makeTank({ id: 1, alive: true }),
+      makeTank({ id: 2, alive: false }),
+      makeTank({ id: 3, alive: false })
+    ];
+
+    expect(system.isRoundOver(tanks)).toBe(false);
+  });
+
+  it('isRoundOver true with exactly 1 alive', () => {
+    const tanks = [
+      makeTank({ id: 0, alive: false }),
+      makeTank({ id: 1, alive: true }),
+      makeTank({ id: 2, alive: false }),
+      makeTank({ id: 3, alive: false })
+    ];
+
+    expect(system.isRoundOver(tanks)).toBe(true);
+  });
+
+  it('isRoundOver true with 0 alive', () => {
+    const tanks = [
+      makeTank({ id: 0, alive: false }),
+      makeTank({ id: 1, alive: false }),
+      makeTank({ id: 2, alive: false }),
+      makeTank({ id: 3, alive: false })
+    ];
+
+    expect(system.isRoundOver(tanks)).toBe(true);
+  });
 });

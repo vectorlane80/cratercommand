@@ -88,4 +88,9 @@ export class TurnSystem {
 
     return livingTanks.length === 1 ? livingTanks[0].id : null;
   }
+
+  /** True when 0 or 1 tanks remain alive — the round cannot continue. */
+  isRoundOver(tanks: TankState[]): boolean {
+    return tanks.filter((tank) => tank.alive).length <= 1;
+  }
 }

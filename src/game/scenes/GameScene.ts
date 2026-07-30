@@ -483,7 +483,7 @@ export class GameScene extends Phaser.Scene {
     if (this.terrainGraphics) this.renderAll();
   }
 
-  private resolveRoundEnd(winnerId: PlayerId): void {
+  private resolveRoundEnd(winnerId: PlayerId | null): void {
     this.turnSystem.saveTanksToProfiles(this.tanks, this.match);
 
     this.tanks.forEach((tank) => {
@@ -491,22 +491,29 @@ export class GameScene extends Phaser.Scene {
       this.match.profiles[tank.id].cash += earned;
     });
 
-    this.match.profiles[winnerId].wins += 1;
-    this.match.profiles[winnerId].cash += GAME_CONFIG.match.roundWinBonus;
-    if (this.tanks[winnerId].alive) {
-      this.match.profiles[winnerId].cash += GAME_CONFIG.match.survivalBonus;
-    }
+    if (winnerId !== null) {
+      this.match.profiles[winnerId].wins += 1;
+      this.match.profiles[winnerId].cash += GAME_CONFIG.match.roundWinBonus;
+      if (this.tanks[winnerId].alive) {
+        this.match.profiles[winnerId].cash += GAME_CONFIG.match.survivalBonus;
+      }
 
-    this.turn.winnerId = winnerId;
+      this.turn.winnerId = winnerId;
 
-    if (this.match.profiles[winnerId].wins >= this.match.roundsToWin) {
-      this.match.matchWinnerId = winnerId;
-      this.turn.phase = 'matchOver';
-      soundSystem.playMatchWin();
+      if (this.match.profiles[winnerId].wins >= this.match.roundsToWin) {
+        this.match.matchWinnerId = winnerId;
+        this.turn.phase = 'matchOver';
+        soundSystem.playMatchWin();
+      } else {
+        this.turn.phase = 'roundOver';
+        this.statusMessage = `${this.playerName(winnerId)} WINS ROUND ${this.match.round}`;
+        soundSystem.playRoundWin();
+      }
     } else {
+      this.turn.winnerId = null;
       this.turn.phase = 'roundOver';
-      this.statusMessage = `${this.playerName(winnerId)} WINS ROUND ${this.match.round}`;
-      soundSystem.playRoundWin();
+      this.statusMessage = `NO SURVIVORS — ROUND ${this.match.round} IS A DRAW`;
+      soundSystem.playMiss();
     }
 
     this.renderAll();
@@ -1402,9 +1409,8 @@ export class GameScene extends Phaser.Scene {
     this.activeProjectiles = [];
     this.projectileSystem.drawAll(this.projectileGraphics, []);
 
-    const winnerId = this.turnSystem.findWinner(this.tanks);
-    if (winnerId !== null) {
-      this.resolveRoundEnd(winnerId);
+    if (this.turnSystem.isRoundOver(this.tanks)) {
+      this.resolveRoundEnd(this.turnSystem.findWinner(this.tanks));
       return;
     }
 
