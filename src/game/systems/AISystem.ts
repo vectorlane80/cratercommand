@@ -193,6 +193,49 @@ export class AISystem {
     return { angle, power, weaponIndex: bestWeaponIndex };
   }
 
+  /**
+   * Public method: solve for the best angle and power for a single weapon
+   * to hit a target. Used by ballistic-guidance and lazy-boy auto-aim.
+   * Returns angle and power, or null if no solution found.
+   */
+  solveShot(
+    shooter: TankState,
+    target: TankState,
+    weapon: WeaponDefinition,
+    wind: WindState,
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData
+  ): { angle: number; power: number } | null {
+    // Bias firing arc toward the target's direction
+    const facingLeft = target.x < shooter.x;
+    const angleStart = facingLeft ? 95 : 25;
+    const angleEnd = facingLeft ? 155 : 85;
+
+    let bestAngle = (angleStart + angleEnd) / 2;
+    let bestPower = 60;
+    let bestScore = -Infinity;
+    let foundSolution = false;
+
+    for (let angle = angleStart; angle <= angleEnd; angle += 4) {
+      for (let power = 25; power <= 100; power += 5) {
+        const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData);
+        if (result.hitOutOfBounds) continue;
+        const dx = result.landX - target.x;
+        const dy = result.landY - target.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const proximityScore = 200 / (dist + 10);
+        if (proximityScore > bestScore) {
+          bestScore = proximityScore;
+          bestAngle = angle;
+          bestPower = power;
+          foundSolution = true;
+        }
+      }
+    }
+
+    return foundSolution ? { angle: bestAngle, power: bestPower } : null;
+  }
+
   // -------- HELPERS --------
 
   private pickRandomAvailableWeapon(tank: TankState): number {

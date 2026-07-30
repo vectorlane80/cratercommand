@@ -57,6 +57,7 @@ export class TurnSystem {
       batteries: GAME_CONFIG.match.startingBatteries,
       fuel: 0,
       contactTriggers: 0,
+      guidance: {},
       controller,
       displayName
     };
@@ -70,6 +71,7 @@ export class TurnSystem {
       match.profiles[tank.id].batteries = tank.batteries;
       match.profiles[tank.id].fuel = tank.fuel;
       match.profiles[tank.id].contactTriggers = tank.contactTriggers;
+      match.profiles[tank.id].guidance = { ...tank.guidance };
     });
   }
 

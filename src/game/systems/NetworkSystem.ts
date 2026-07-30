@@ -43,6 +43,7 @@ export type NetInput =
   | { kind: 'fire' }
   | { kind: 'use-battery' }
   | { kind: 'arm-shield' }
+  | { kind: 'cycle-guidance' }
   | { kind: 'shop-buy'; itemKey: string }
   | { kind: 'shop-remove'; itemKey: string }
   | { kind: 'shop-undo' }
@@ -74,6 +75,7 @@ export interface GameSnapshot {
     rolling?: boolean;
     tunneling?: boolean;
     tunnelRemaining?: number;
+    guidanceId?: string;
   }>;
   statusMessage: string | null;
   topToast: { text: string; color: number; expiresAt: number } | null;

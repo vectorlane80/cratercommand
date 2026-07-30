@@ -116,6 +116,53 @@ export class ProjectileSystem {
       }
     });
 
+    // Guidance steering
+    if (projectile.guidanceId && projectile.guidanceId !== 'ballistic-guidance') {
+      // Find nearest alive enemy tank (not owner)
+      let nearestTank: TankState | null = null;
+      let nearestDistance = Infinity;
+      for (let i = 0; i < tanks.length; i++) {
+        const tank = tanks[i];
+        if (!tank.alive || tank.id === projectile.ownerId) continue;
+        const dx = tank.x - projectile.x;
+        const dy = (tank.y - GAME_CONFIG.tank.height / 2) - projectile.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestTank = tank;
+        }
+      }
+
+      if (nearestTank !== null) {
+        const targetX = nearestTank.x;
+        const targetY = nearestTank.y - GAME_CONFIG.tank.height / 2;
+        const dx = targetX - projectile.x;
+        const dy = targetY - projectile.y;
+
+        if (projectile.guidanceId === 'heat-guidance' || projectile.guidanceId === 'lazy-boy') {
+          // Heat seeking: accelerate toward target if within range
+          const distance = Math.hypot(dx, dy);
+          if (distance <= GAME_CONFIG.projectile.heatSeekRadius) {
+            const d = distance || 1;
+            projectile.velocityX += ((dx / d) * GAME_CONFIG.projectile.heatSeekAcceleration * deltaSeconds);
+            projectile.velocityY += ((dy / d) * GAME_CONFIG.projectile.heatSeekAcceleration * deltaSeconds);
+          }
+        } else if (projectile.guidanceId === 'horizontal-guidance') {
+          // Horizontal: level off toward target once past apex
+          if (projectile.velocityY >= 0 && Math.abs(dx) > 6) {
+            projectile.velocityY = 0;
+            projectile.velocityX = Math.sign(dx) * GAME_CONFIG.projectile.horizontalSpeed;
+          }
+        } else if (projectile.guidanceId === 'vertical-guidance') {
+          // Vertical: dive when roughly above target
+          if (Math.abs(dx) < 14) {
+            projectile.velocityX = 0;
+            projectile.velocityY = Math.max(projectile.velocityY, GAME_CONFIG.projectile.verticalDiveSpeed);
+          }
+        }
+      }
+    }
+
     this.trailTimerMs += deltaMs;
     if (this.trailTimerMs >= GAME_CONFIG.projectile.trailSpacingMs) {
       projectile.trail.push({ x: projectile.x, y: projectile.y });

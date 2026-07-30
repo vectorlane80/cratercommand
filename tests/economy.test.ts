@@ -424,4 +424,33 @@ describe('EconomySystem', () => {
     expect(profile.cash).toBe(10000 - 2000);
     expect(profile.contactTriggers).toBe(2 * 25);
   });
+
+  it('guidance items: heat-guidance 10000/6, ballistic 10000/2, horizontal 15000/5, vertical 20000/5, lazy-boy 20000/2', () => {
+    expect(system.basePriceFor('heat-guidance')).toBe(10000);
+    expect(system.bundleSizeFor('heat-guidance')).toBe(6);
+    expect(system.basePriceFor('ballistic-guidance')).toBe(10000);
+    expect(system.bundleSizeFor('ballistic-guidance')).toBe(2);
+    expect(system.basePriceFor('horizontal-guidance')).toBe(15000);
+    expect(system.bundleSizeFor('horizontal-guidance')).toBe(5);
+    expect(system.basePriceFor('vertical-guidance')).toBe(20000);
+    expect(system.bundleSizeFor('vertical-guidance')).toBe(5);
+    expect(system.basePriceFor('lazy-boy')).toBe(20000);
+    expect(system.bundleSizeFor('lazy-boy')).toBe(2);
+  });
+
+  it('ownedCount returns guidance counts from guidance record', () => {
+    const profile = makeProfile({ guidance: { 'heat-guidance': 6, 'lazy-boy': 2 } });
+    expect(system.ownedCount(profile, 'heat-guidance')).toBe(6);
+    expect(system.ownedCount(profile, 'lazy-boy')).toBe(2);
+    expect(system.ownedCount(profile, 'ballistic-guidance')).toBe(0);
+  });
+
+  it('applyPurchases applies guidance purchases to guidance record', () => {
+    const profile = makeProfile({ cash: 100000, guidance: {} });
+    const pending = { 'heat-guidance': 1, 'lazy-boy': 2 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.guidance['heat-guidance']).toBe(6);
+    expect(profile.guidance['lazy-boy']).toBe(4);
+    expect(profile.cash).toBe(100000 - 10000 - 40000);
+  });
 });

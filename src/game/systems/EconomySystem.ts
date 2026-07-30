@@ -2,6 +2,8 @@ import { GAME_CONFIG, type PlayerProfile, type ItemCategory } from '../types/Gam
 
 export type Sale = { itemKey: string; discount: number } | null;
 
+export const GUIDANCE_IDS = ['heat-guidance', 'ballistic-guidance', 'horizontal-guidance', 'vertical-guidance', 'lazy-boy'] as const;
+
 export interface ShopCatalogEntry {
   key: string;
   name: string;
@@ -67,6 +69,8 @@ export class EconomySystem {
         profile.fuel += qty * this.bundleSizeFor(key) * 10;
       } else if (key === 'contact-trigger') {
         profile.contactTriggers += qty * this.bundleSizeFor(key);
+      } else if (GUIDANCE_IDS.includes(key as any)) {
+        profile.guidance[key] = (profile.guidance[key] ?? 0) + qty * this.bundleSizeFor(key);
       } else {
         if (profile.ammo[key] === -1) profile.ammo[key] = 0;
         profile.ammo[key] = (profile.ammo[key] ?? 0) + (qty * this.bundleSizeFor(key));
@@ -138,6 +142,9 @@ export class EconomySystem {
     }
     if (key === 'contact-trigger') {
       return profile.contactTriggers;
+    }
+    if (GUIDANCE_IDS.includes(key as any)) {
+      return profile.guidance[key] ?? 0;
     }
     return 0;
   }

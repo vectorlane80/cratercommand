@@ -38,6 +38,8 @@ export interface TankState {
   batteries: number;
   fuel: number;
   contactTriggers: number;
+  guidance: Record<string, number>;
+  selectedGuidanceId: string | null;
   damageDealt: number;
 }
 
@@ -74,6 +76,7 @@ export interface PlayerProfile {
   batteries: number;
   fuel: number;
   contactTriggers: number;
+  guidance: Record<string, number>;
   controller: ControllerKind;
   /** Custom display name. Falls back to "PLAYER N" when null. */
   displayName: string | null;
@@ -158,6 +161,7 @@ export interface ProjectileState {
   rolling?: boolean;
   tunneling?: boolean;
   tunnelRemaining?: number;
+  guidanceId?: string;
 }
 
 export interface WindState {
@@ -288,7 +292,12 @@ export const GAME_CONFIG = {
     tunnelSpeed: 90,
     // Mag deflector upward push
     deflectRadius: 70,
-    deflectAcceleration: 420
+    deflectAcceleration: 420,
+    // Guidance steering
+    heatSeekRadius: 130,
+    heatSeekAcceleration: 300,
+    horizontalSpeed: 140,
+    verticalDiveSpeed: 210
   },
   wind: {
     min: 0,
@@ -849,6 +858,11 @@ export const GAME_CONFIG = {
     { id: 'mag-deflector', name: 'Mag Deflector', price: 10000, bundleSize: 2, hotkey: 'G', description: 'Deflects nearby shots upward', category: 'defense', deflects: true },
     { id: 'auto-defense', name: 'Auto Defense', price: 1500, bundleSize: 1, hotkey: 'O', description: 'Shields auto-arm each round', category: 'defense', oneTime: true },
     { id: 'fuel-tank', name: 'Fuel Tank', price: 10000, bundleSize: 10, hotkey: 'U', description: '+10 movement fuel each', category: 'utility', sidebarLabel: 'FUEL TANKS' },
-    { id: 'contact-trigger', name: 'Contact Trigger', price: 1000, bundleSize: 25, hotkey: 'T', description: 'Warheads explode on contact while tunneling', category: 'utility', sidebarLabel: 'CONTACT TRIGGERS' }
+    { id: 'contact-trigger', name: 'Contact Trigger', price: 1000, bundleSize: 25, hotkey: 'T', description: 'Warheads explode on contact while tunneling', category: 'utility', sidebarLabel: 'CONTACT TRIGGERS' },
+    { id: 'heat-guidance', name: 'Heat Guidance', price: 10000, bundleSize: 6, hotkey: 'J', description: 'Shots home toward nearby tanks', category: 'utility', sidebarLabel: 'HEAT GUIDE' },
+    { id: 'ballistic-guidance', name: 'Ballistic Guidance', price: 10000, bundleSize: 2, hotkey: 'K', description: 'Auto-computes the firing solution', category: 'utility', sidebarLabel: 'BALLISTIC' },
+    { id: 'horizontal-guidance', name: 'Horizontal Guidance', price: 15000, bundleSize: 5, hotkey: 'L', description: 'Shots level off toward the target', category: 'utility', sidebarLabel: 'HORIZONTAL' },
+    { id: 'vertical-guidance', name: 'Vertical Guidance', price: 20000, bundleSize: 5, hotkey: 'I', description: 'Shots dive when above the target', category: 'utility', sidebarLabel: 'VERTICAL' },
+    { id: 'lazy-boy', name: 'Lazy Boy', price: 20000, bundleSize: 2, hotkey: 'Y', description: 'Auto-aim plus homing', category: 'utility', sidebarLabel: 'LAZY BOYS' }
   ] satisfies ItemDefinition[]
 } as const;

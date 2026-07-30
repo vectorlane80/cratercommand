@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AISystem, isAIController, isRemoteController, type AIDecision } from '../systems/AISystem';
-import { EconomySystem } from '../systems/EconomySystem';
+import { EconomySystem, GUIDANCE_IDS } from '../systems/EconomySystem';
 import { HudSystem, SHOP_LAYOUT } from '../systems/HudSystem';
 import { networkSystem, type GameSnapshot, type NetInput, type NetworkMessage } from '../systems/NetworkSystem';
 import { soundSystem } from '../systems/SoundSystem';
@@ -117,6 +117,7 @@ export class GameScene extends Phaser.Scene {
   private moveRightKey!: Phaser.Input.Keyboard.Key;
   private batteryUseKey!: Phaser.Input.Keyboard.Key;
   private shieldArmKey!: Phaser.Input.Keyboard.Key;
+  private guidanceCycleKey!: Phaser.Input.Keyboard.Key;
   private itemHotkeys: Array<{ key: Phaser.Input.Keyboard.Key; itemId: string }> = [];
   private soundToggleKey!: Phaser.Input.Keyboard.Key;
   private escapeKey!: Phaser.Input.Keyboard.Key;
@@ -245,6 +246,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponNextKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.batteryUseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     this.shieldArmKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+    this.guidanceCycleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     GAME_CONFIG.items.forEach((item) => {
       const keyCode = Phaser.Input.Keyboard.KeyCodes[item.hotkey as keyof typeof Phaser.Input.Keyboard.KeyCodes];
       this.itemHotkeys.push({ key: this.input.keyboard!.addKey(keyCode), itemId: item.id });
@@ -260,6 +262,7 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.D,
       Phaser.Input.Keyboard.KeyCodes.B,
       Phaser.Input.Keyboard.KeyCodes.X,
+      Phaser.Input.Keyboard.KeyCodes.C,
       Phaser.Input.Keyboard.KeyCodes.P,
       Phaser.Input.Keyboard.KeyCodes.S,
       Phaser.Input.Keyboard.KeyCodes.V,
@@ -659,6 +662,12 @@ export class GameScene extends Phaser.Scene {
           this.endTurn();
         }
         break;
+      case 'cycle-guidance':
+        if (this.turn.phase === 'aiming') {
+          this.cycleGuidance(activeTank);
+          this.renderTanksAndHud();
+        }
+        break;
       case 'shop-buy':
         if (this.turn.phase === 'shopping' && this.match.shoppingPlayerId === remoteId) {
           this.tryQueueShopBuy(this.match.profiles[remoteId], action.itemKey);
@@ -712,7 +721,8 @@ export class GameScene extends Phaser.Scene {
         damageScale: p.damageScale,
         rolling: p.rolling,
         tunneling: p.tunneling,
-        tunnelRemaining: p.tunnelRemaining
+        tunnelRemaining: p.tunnelRemaining,
+        guidanceId: p.guidanceId
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -757,7 +767,8 @@ export class GameScene extends Phaser.Scene {
         damageScale: p.damageScale,
         rolling: p.rolling,
         tunneling: p.tunneling,
-        tunnelRemaining: p.tunnelRemaining
+        tunnelRemaining: p.tunnelRemaining,
+        guidanceId: p.guidanceId
       };
     });
     this.statusMessage = snap.statusMessage;
@@ -851,6 +862,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (Phaser.Input.Keyboard.JustDown(this.shieldArmKey)) {
       this.sendInput({ kind: 'arm-shield' });
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.guidanceCycleKey)) {
+      this.sendInput({ kind: 'cycle-guidance' });
     }
     if (this.moveLeftKey.isDown) this.sendInput({ kind: 'move-step', direction: -1 });
     if (this.moveRightKey.isDown) this.sendInput({ kind: 'move-step', direction: 1 });
@@ -1002,6 +1016,12 @@ export class GameScene extends Phaser.Scene {
         this.renderTanksAndHud();
         this.endTurn();
       }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.guidanceCycleKey)) {
+      this.cycleGuidance(activeTank);
+      soundSystem.playUiClick();
+      changed = true;
     }
 
     return changed;
@@ -1434,7 +1454,58 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Guidance consumption and auto-aim (skip entirely for laser behavior)
+    let usedGuidanceId: string | null = null;
+    if (activeTank.selectedGuidanceId && (activeTank.guidance[activeTank.selectedGuidanceId] ?? 0) > 0) {
+      usedGuidanceId = activeTank.selectedGuidanceId;
+      activeTank.guidance[usedGuidanceId] -= 1;
+
+      // Auto-aim for ballistic-guidance and lazy-boy
+      if (usedGuidanceId === 'ballistic-guidance' || usedGuidanceId === 'lazy-boy') {
+        // Find nearest alive enemy tank
+        let nearestEnemy: TankState | null = null;
+        let nearestDistance = Infinity;
+        for (const tank of this.tanks) {
+          if (!tank.alive || tank.id === activeTank.id) continue;
+          const distance = Math.hypot(tank.x - activeTank.x, tank.y - activeTank.y);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestEnemy = tank;
+          }
+        }
+
+        // Solve for the shot if enemy found
+        if (nearestEnemy) {
+          const solution = this.aiSystem.solveShot(
+            activeTank,
+            nearestEnemy,
+            weapon,
+            this.turn.wind,
+            this.terrainSystem,
+            this.terrainData
+          );
+          if (solution) {
+            activeTank.angle = solution.angle;
+            activeTank.power = solution.power;
+          }
+        }
+      }
+
+      // Clear selectedGuidanceId only when its count reaches 0
+      if (activeTank.guidance[usedGuidanceId] === 0) {
+        activeTank.selectedGuidanceId = null;
+      }
+    }
+
     this.activeProjectiles = this.projectileSystem.launch(activeTank, weapon, this.tankSystem);
+
+    // Stamp guidanceId onto all launched projectiles
+    if (usedGuidanceId) {
+      for (const projectile of this.activeProjectiles) {
+        projectile.guidanceId = usedGuidanceId;
+      }
+    }
+
     this.turn.phase = 'projectileInFlight';
     soundSystem.playFire();
     this.renderTanksAndHud();
@@ -1520,6 +1591,20 @@ export class GameScene extends Phaser.Scene {
     }
 
     return false;
+  }
+
+  private cycleGuidance(tank: TankState): void {
+    // Build list of available guidance options: null + guidance ids with count > 0
+    const available: (string | null)[] = [null];
+    for (const guidanceId of GUIDANCE_IDS) {
+      if ((tank.guidance[guidanceId] ?? 0) > 0) {
+        available.push(guidanceId);
+      }
+    }
+    // Cycle to the next option
+    const currentIndex = available.indexOf(tank.selectedGuidanceId);
+    const nextIndex = (currentIndex + 1) % available.length;
+    tank.selectedGuidanceId = available[nextIndex];
   }
 
   // -------- PROJECTILE TICK --------

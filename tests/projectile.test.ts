@@ -652,4 +652,109 @@ describe('ProjectileSystem', () => {
     expect(projectile.tunneling).toBe(true);
     expect(projectile.tunnelRemaining).toBe(weapon.tunnelLength ?? 60);
   });
+
+  it('heat-guidance: projectile homing toward nearby target', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, x: 400, y: 300 });
+    const targetTank = makeTank({ id: 1, x: 500, y: 200, alive: true });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.guidanceId = 'heat-guidance';
+    projectile.x = 420;
+    projectile.y = 280;
+    projectile.velocityX = 50;
+    projectile.velocityY = 50;
+
+    const initialVelocityX = projectile.velocityX;
+    const initialVelocityY = projectile.velocityY;
+    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+
+    // Projectile should accelerate toward target (500, 200-6=194)
+    expect(projectile.velocityX).toBeGreaterThan(initialVelocityX);
+    expect(tick.impact).toBeNull();
+  });
+
+  it('heat-guidance: no homing when target is out of range', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, x: 100, y: 300 });
+    const targetTank = makeTank({ id: 1, x: 800, y: 200, alive: true });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.guidanceId = 'heat-guidance';
+    projectile.x = 200;
+    projectile.y = 280;
+    projectile.velocityX = 50;
+    projectile.velocityY = 50;
+
+    const initialVelocityX = projectile.velocityX;
+    projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+
+    // Distance > heatSeekRadius (130), so no guidance acceleration — velocityX stays the same
+    expect(projectile.velocityX).toBe(initialVelocityX);
+  });
+
+  it('horizontal-guidance: post-apex level-off toward target', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, x: 300, y: 300 });
+    const targetTank = makeTank({ id: 1, x: 500, y: 300, alive: true });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.guidanceId = 'horizontal-guidance';
+    projectile.x = 400;
+    projectile.y = 200;
+    projectile.velocityX = 50;
+    projectile.velocityY = 10;
+
+    projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+
+    expect(projectile.velocityY).toBe(0);
+    expect(Math.abs(projectile.velocityX - GAME_CONFIG.projectile.horizontalSpeed)).toBeLessThan(1e-6);
+  });
+
+  it('vertical-guidance: dive when above target', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, x: 300, y: 300 });
+    const targetTank = makeTank({ id: 1, x: 310, y: 300, alive: true });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.guidanceId = 'vertical-guidance';
+    projectile.x = 310;
+    projectile.y = 200;
+    projectile.velocityX = 10;
+    projectile.velocityY = 50;
+
+    projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+
+    expect(projectile.velocityX).toBe(0);
+    expect(projectile.velocityY).toBe(GAME_CONFIG.projectile.verticalDiveSpeed);
+  });
+
+  it('heat-guidance: dead target not used for homing', () => {
+    const terrain = makeFlatTerrain(340);
+    const ownerTank = makeTank({ id: 0, x: 400, y: 300 });
+    const deadTank = makeTank({ id: 1, x: 500, y: 200, alive: false });
+    const liveTank = makeTank({ id: 2, x: 550, y: 330, alive: true });
+
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(ownerTank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.guidanceId = 'heat-guidance';
+    projectile.x = 550;
+    projectile.y = 280;
+    projectile.velocityX = 50;
+    projectile.velocityY = 50;
+
+    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, deadTank, liveTank]);
+
+    // Should home toward liveTank (nearby), not deadTank (dead)
+    expect(tick.impact).toBeNull();
+  });
 });

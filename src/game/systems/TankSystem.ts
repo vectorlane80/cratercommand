@@ -83,6 +83,8 @@ export class TankSystem {
         batteries: profile.batteries,
         fuel: profile.fuel,
         contactTriggers: profile.contactTriggers,
+        guidance: { ...profile.guidance },
+        selectedGuidanceId: null,
         damageDealt: 0
       };
     });
