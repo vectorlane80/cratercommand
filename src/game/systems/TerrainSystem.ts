@@ -242,6 +242,72 @@ export class TerrainSystem {
     return y >= this.getHeightAtX(terrainData, x);
   }
 
+  /** Pour `volume` px^2 of liquid dirt at x: raise the surface toward a level
+   *  line inside a window, filling the lowest ground first (classic flood fill
+   *  on a heightmap). Window is centered on x, up to `maxWidth` px wide. */
+  applyLiquid(terrainData: TerrainData, x: number, volume: number, maxWidth = 220): void {
+    const { heights, segmentWidth } = terrainData;
+    const centerIndex = Math.round(x / segmentWidth);
+    const halfWidth = Math.floor(maxWidth / 2 / segmentWidth);
+
+    // Find window bounds
+    const startIndex = Math.max(0, centerIndex - halfWidth);
+    const endIndex = Math.min(heights.length - 1, centerIndex + halfWidth);
+
+    // Find min and max heights in window
+    let minHeight = Infinity;
+    let maxHeight = -Infinity;
+    for (let i = startIndex; i <= endIndex; i += 1) {
+      minHeight = Math.min(minHeight, heights[i]);
+      maxHeight = Math.max(maxHeight, heights[i]);
+    }
+
+    // Binary search for fill level: find L where filledVolume(L) ≈ volume
+    let low = minHeight;
+    let high = maxHeight;
+    let fillLevel = minHeight;
+
+    for (let iter = 0; iter < 20; iter += 1) {
+      const mid = (low + high) / 2;
+      let filledVolume = 0;
+      for (let i = startIndex; i <= endIndex; i += 1) {
+        if (heights[i] > mid) {
+          filledVolume += (heights[i] - mid) * segmentWidth;
+        }
+      }
+      if (filledVolume < volume) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+      fillLevel = mid;
+    }
+
+    // Apply liquid: raise terrain to fill level (decrease heights toward fillLevel)
+    for (let i = startIndex; i <= endIndex; i += 1) {
+      if (heights[i] > fillLevel) {
+        heights[i] = Math.min(heights[i], Math.max(fillLevel, GAME_CONFIG.terrain.minY));
+      }
+    }
+  }
+
+  /** Settle/level terrain: heavy smoothing passes over a radius. */
+  applySettle(terrainData: TerrainData, x: number, radius: number): void {
+    const { heights, segmentWidth } = terrainData;
+    const centerIndex = Math.round(x / segmentWidth);
+    const sampleRadius = Math.ceil(radius / segmentWidth);
+
+    const start = Math.max(1, centerIndex - sampleRadius);
+    const end = Math.min(heights.length - 2, centerIndex + sampleRadius);
+
+    // Heavy smoothing: twelve passes of neighbor averaging
+    for (let pass = 0; pass < 12; pass += 1) {
+      for (let index = start; index <= end; index += 1) {
+        heights[index] = (heights[index - 1] + heights[index] * 2 + heights[index + 1]) / 4;
+      }
+    }
+  }
+
   private relaxCraterEdges(terrainData: TerrainData, centerIndex: number, range: number): void {
     const { heights } = terrainData;
     const start = Math.max(1, centerIndex - range);

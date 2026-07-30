@@ -247,4 +247,30 @@ describe('EconomySystem', () => {
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'riot-bomb')!.craterForwardBias).toBeUndefined();
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'heavy-riot-bomb')!.craterForwardBias).toBeUndefined();
   });
+
+  it('basePriceFor looks up dirt arsenal weapons', () => {
+    expect(system.basePriceFor('dirt-clod')).toBe(5000);
+    expect(system.basePriceFor('dirt-ball')).toBe(5000);
+    expect(system.basePriceFor('ton-of-dirt')).toBe(6750);
+    expect(system.basePriceFor('liquid-dirt')).toBe(5000);
+    expect(system.basePriceFor('earth-disrupter')).toBe(5000);
+  });
+
+  it('bundleSizeFor looks up dirt arsenal weapons', () => {
+    expect(system.bundleSizeFor('dirt-clod')).toBe(10);
+    expect(system.bundleSizeFor('dirt-ball')).toBe(5);
+    expect(system.bundleSizeFor('ton-of-dirt')).toBe(2);
+    expect(system.bundleSizeFor('liquid-dirt')).toBe(10);
+    expect(system.bundleSizeFor('earth-disrupter')).toBe(10);
+  });
+
+  it('dirt arsenal weapons have zero damage and correct special properties', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'dirt-clod')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'dirt-ball')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'ton-of-dirt')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'liquid-dirt')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'liquid-dirt')!.liquidVolume).toBe(2600);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'earth-disrupter')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'earth-disrupter')!.settleRadius).toBe(80);
+  });
 });

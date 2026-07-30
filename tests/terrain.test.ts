@@ -105,4 +105,68 @@ describe('TerrainSystem', () => {
       expect(h).toBe(250);
     });
   });
+
+  it('applyLiquid fills a pit toward surface level', () => {
+    const terrain = makeFlatTerrain(250);
+    // Create a rectangular pit: indices 76-84 are 50px deeper
+    for (let i = 76; i <= 84; i += 1) {
+      terrain.heights[i] = 300;
+    }
+
+    // Fill with volume that should roughly fill the pit
+    // 9 samples * 50 deep * 6 segmentWidth = 2700
+    system.applyLiquid(terrain, 480, 2700);
+
+    // Pit columns should rise close to 250
+    for (let i = 76; i <= 84; i += 1) {
+      expect(terrain.heights[i]).toBeLessThan(300);
+      expect(terrain.heights[i]).toBeGreaterThan(249);
+      expect(terrain.heights[i]).toBeLessThan(252);
+    }
+    // Flat columns outside pit stay 250
+    expect(terrain.heights[0]).toBe(250);
+    expect(terrain.heights[160]).toBe(250);
+  });
+
+  it('applyLiquid partially fills a pit with less volume', () => {
+    const terrain = makeFlatTerrain(250);
+    // Create the same pit
+    for (let i = 76; i <= 84; i += 1) {
+      terrain.heights[i] = 300;
+    }
+
+    // Fill with partial volume
+    system.applyLiquid(terrain, 480, 600);
+
+    // Pit columns should rise but stay > 250 (partially filled)
+    for (let i = 76; i <= 84; i += 1) {
+      expect(terrain.heights[i]).toBeLessThan(300);
+      expect(terrain.heights[i]).toBeGreaterThan(250);
+    }
+    // Outside columns untouched
+    expect(terrain.heights[0]).toBe(250);
+  });
+
+  it('applySettle smooths terrain within radius', () => {
+    const terrain = makeFlatTerrain(250);
+    // Create alternating heights across window
+    for (let i = 40; i < 120; i += 2) {
+      terrain.heights[i] = 240;
+      terrain.heights[i + 1] = 260;
+    }
+
+    // Store some original values to verify they changed
+    const origAtCenter = terrain.heights[80];
+
+    system.applySettle(terrain, 480, 80);
+
+    // Settling should have changed center values toward average
+    const settledAtCenter = terrain.heights[80];
+    expect(settledAtCenter).not.toBe(origAtCenter);
+    expect(settledAtCenter).toBeCloseTo(250, 0);
+
+    // Far columns outside settle radius should be unchanged
+    expect(terrain.heights[0]).toBe(250);
+    expect(terrain.heights[160]).toBe(250);
+  });
 });

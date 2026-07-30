@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -113,6 +113,8 @@ export interface WeaponDefinition {
   tunnelLength?: number;
   tunnelRadius?: number;
   craterForwardBias?: number;
+  liquidVolume?: number;
+  settleRadius?: number;
 }
 
 export interface ItemDefinition {
@@ -674,6 +676,71 @@ export const GAME_CONFIG = {
       behavior: 'single',
       category: 'terrain',
       bundleSize: 2
+    },
+    {
+      id: 'dirt-clod',
+      name: 'Dirt Clod',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'dirt',
+      category: 'terrain',
+      bundleSize: 10,
+      moundRadius: 24
+    },
+    {
+      id: 'dirt-ball',
+      name: 'Dirt Ball',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'dirt',
+      category: 'terrain',
+      bundleSize: 5,
+      moundRadius: 42
+    },
+    {
+      id: 'ton-of-dirt',
+      name: 'Ton of Dirt',
+      startingAmmo: 0,
+      price: 6750,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'dirt',
+      category: 'terrain',
+      bundleSize: 2,
+      moundRadius: 70
+    },
+    {
+      id: 'liquid-dirt',
+      name: 'Liquid Dirt',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'liquid',
+      category: 'terrain',
+      bundleSize: 10,
+      liquidVolume: 2600
+    },
+    {
+      id: 'earth-disrupter',
+      name: 'Earth Disrupter',
+      startingAmmo: 0,
+      price: 5000,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'settle',
+      category: 'terrain',
+      bundleSize: 10,
+      settleRadius: 80
     }
   ] satisfies WeaponDefinition[],
   items: [

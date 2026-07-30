@@ -1431,6 +1431,12 @@ export class GameScene extends Phaser.Scene {
         const radius = weapon.moundRadius ?? weapon.craterRadius ?? 30;
         this.terrainSystem.applyMound(this.terrainData, impact.x, impact.y, radius);
         terrainChanged = true;
+      } else if (weapon.behavior === 'liquid') {
+        this.terrainSystem.applyLiquid(this.terrainData, impact.x, weapon.liquidVolume ?? 2000);
+        terrainChanged = true;
+      } else if (weapon.behavior === 'settle') {
+        this.terrainSystem.applySettle(this.terrainData, impact.x, weapon.settleRadius ?? 60);
+        terrainChanged = true;
       } else if (weapon.craterRadius > 0) {
         let craterX = impact.x;
         let craterY = impact.y;
