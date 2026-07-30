@@ -5,6 +5,7 @@ import {
   type ProjectileState,
   type TankState,
   type TerrainData,
+  type WallMode,
   type WeaponDefinition,
   type WindState
 } from '../types/GameTypes';
@@ -74,6 +75,7 @@ export class ProjectileSystem {
     projectile: ProjectileState,
     deltaMs: number,
     wind: WindState,
+    wallMode: Exclude<WallMode, 'random' | 'erratic'> = 'none',
     terrainSystem: TerrainSystem,
     terrainData: TerrainData,
     tankSystem: TankSystem,
@@ -91,7 +93,7 @@ export class ProjectileSystem {
 
     // Rolling physics: takes priority over ballistic
     if (projectile.rolling === true) {
-      return this.updateRolling(projectile, deltaSeconds, terrainSystem, terrainData, tankSystem, tanks);
+      return this.updateRolling(projectile, deltaSeconds, wallMode, terrainSystem, terrainData, tankSystem, tanks);
     }
 
     // Ballistic projectile physics
@@ -199,6 +201,41 @@ export class ProjectileSystem {
       }
     }
 
+    // Side wall handling (when wallMode is not 'none')
+    if (wallMode !== 'none') {
+      if (projectile.x < 0 || projectile.x > terrainData.width) {
+        const isLeftWall = projectile.x < 0;
+        const clampedX = isLeftWall ? 0 : terrainData.width;
+
+        if (wallMode === 'concrete') {
+          // Concrete: impact at the wall
+          return { impact: { kind: 'terrain', x: clampedX, y: projectile.y }, spawned };
+        } else if (wallMode === 'padded' || wallMode === 'rubber' || wallMode === 'spring') {
+          // Reflect with restitution
+          const restitution = wallMode === 'padded'
+            ? GAME_CONFIG.walls.paddedRestitution
+            : wallMode === 'rubber'
+              ? GAME_CONFIG.walls.rubberRestitution
+              : GAME_CONFIG.walls.springRestitution;
+          projectile.x = clampedX + (isLeftWall ? 1 : -1);
+          projectile.velocityX = -projectile.velocityX * restitution;
+          projectile.wallBounces = (projectile.wallBounces ?? 0) + 1;
+
+          // If max bounces exceeded, fall through to OOB
+          if ((projectile.wallBounces ?? 0) > GAME_CONFIG.walls.maxBounces) {
+            return { impact: { kind: 'outOfBounds', x: projectile.x, y: projectile.y }, spawned };
+          }
+          // Continue normally (no impact)
+          return { impact: null, spawned };
+        } else if (wallMode === 'wraparound') {
+          // Wraparound: teleport to opposite side
+          projectile.x = projectile.x < 0 ? projectile.x + terrainData.width : projectile.x - terrainData.width;
+          projectile.trail.push({ x: projectile.x, y: projectile.y });
+          return { impact: null, spawned };
+        }
+      }
+    }
+
     if (
       projectile.x < -40 ||
       projectile.x > terrainData.width + 40 ||
@@ -275,6 +312,7 @@ export class ProjectileSystem {
   private updateRolling(
     projectile: ProjectileState,
     deltaSeconds: number,
+    wallMode: Exclude<WallMode, 'random' | 'erratic'> = 'none',
     terrainSystem: TerrainSystem,
     terrainData: TerrainData,
     tankSystem: TankSystem,
@@ -315,6 +353,23 @@ export class ProjectileSystem {
         impact: { kind: 'tank', x: projectile.x, y: projectile.y, targetTankId: hitTank.id },
         spawned
       };
+    }
+
+    // Wall handling for rolling projectiles
+    if (wallMode !== 'none' && (projectile.x < 0 || projectile.x > terrainData.width)) {
+      const isLeftWall = projectile.x < 0;
+      const clampedX = isLeftWall ? 0 : terrainData.width;
+
+      if (wallMode === 'concrete') {
+        return { impact: { kind: 'terrain', x: clampedX, y: projectile.y }, spawned };
+      } else if (wallMode === 'padded' || wallMode === 'rubber' || wallMode === 'spring') {
+        projectile.velocityX = -projectile.velocityX * 0.6;
+        projectile.x = clampedX + (isLeftWall ? 1 : -1);
+        return { impact: null, spawned };
+      } else if (wallMode === 'wraparound') {
+        projectile.x = projectile.x < 0 ? projectile.x + terrainData.width : projectile.x - terrainData.width;
+        return { impact: null, spawned };
+      }
     }
 
     // Off-field check

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   CONTROLLER_LABELS,
   GAME_CONFIG,
+  WALL_LABELS,
   type MatchState,
   type PlayerId,
   type TankState,
@@ -287,6 +288,8 @@ export class HudSystem {
         colors.cyan,
         GAME_CONFIG.font.small
       );
+      const wallColor = match.activeWallMode === 'none' ? colors.dimGray : colors.cyan;
+      this.addText(GAME_CONFIG.width / 2 - 40, 136, WALL_LABELS[match.activeWallMode], wallColor, GAME_CONFIG.font.small);
       return;
     }
 
@@ -680,29 +683,29 @@ export class HudSystem {
 
   private drawStatusPanel(activeTank: TankState, match: MatchState, top: number): void {
     this.addText(728, top + 22, 'STATUS', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.medium);
-    this.addText(728, top + 46, `P${activeTank.id + 1} TURN`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
-    this.addText(728, top + 60, `HP   ${activeTank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+    this.addText(728, top + 34, `P${activeTank.id + 1} TURN`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+    this.addText(728, top + 46, `HP   ${activeTank.health}`, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
     const moveStr = activeTank.fuel > 0
       ? `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}+${Math.round(activeTank.fuel)}`
       : `MOVE ${Math.round(activeTank.moveRemaining)}/${GAME_CONFIG.movement.perTurn}`;
-    this.addText(728, top + 74, moveStr, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
-    this.addText(728, top + 88, `CHUTES  ${activeTank.parachutes}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
-    this.addText(728, top + 102, `BATT    ${activeTank.batteries}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+    this.addText(728, top + 58, moveStr, GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+    this.addText(728, top + 70, `CHUTES  ${activeTank.parachutes}`, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.small);
+    this.addText(728, top + 82, `BATT    ${activeTank.batteries}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
     const guideLabel = activeTank.selectedGuidanceId
       ? (GAME_CONFIG.items.find((i) => i.id === activeTank.selectedGuidanceId)?.sidebarLabel ?? activeTank.selectedGuidanceId.toUpperCase())
       : '--';
-    this.addText(728, top + 116, `GUIDE   ${guideLabel}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
-    this.addText(728, top + 130, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+    this.addText(728, top + 94, `GUIDE   ${guideLabel}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
+    this.addText(728, top + 106, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, GAME_CONFIG.colors.cyan, GAME_CONFIG.font.small);
     this.addText(
       728,
-      top + 144,
+      top + 118,
       `CASH $${match.profiles[activeTank.id].cash}`,
       GAME_CONFIG.colors.green,
       GAME_CONFIG.font.small
     );
     this.addText(
       728,
-      top + 158,
+      top + 130,
       `ROUND ${match.round}  W ${match.profiles[0].wins}-${match.profiles[1].wins}`,
       GAME_CONFIG.colors.cyan,
       GAME_CONFIG.font.small
@@ -787,10 +790,10 @@ export class HudSystem {
     GAME_CONFIG.items.forEach((item, idx) => {
       const itemTotal = pending.ownedFor(item.id) + pending.pendingFor(item.id) * pending.bundleSize(item.id);
       const itemColor = item.id === 'parachute' ? colors.yellow : colors.cyan;
-      const itemY = sideY + 72 + idx * 26;
+      const itemY = sideY + 72 + idx * 20;
       const label = item.sidebarLabel ?? item.name.toUpperCase() + 'S';
-      this.addText(sideX + 12, itemY, label, itemColor, GAME_CONFIG.font.small);
-      this.addText(sideX + sideW - 30, itemY, `${itemTotal}`, colors.white, GAME_CONFIG.font.small);
+      this.addText(sideX + 12, itemY, label, itemColor, GAME_CONFIG.font.tiny);
+      this.addText(sideX + sideW - 30, itemY, `${itemTotal}`, colors.white, GAME_CONFIG.font.tiny);
     });
 
     // UNDO button at the bottom of the sidebar (only when something to undo).

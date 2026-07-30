@@ -76,6 +76,7 @@ export interface GameSnapshot {
     tunneling?: boolean;
     tunnelRemaining?: number;
     guidanceId?: string;
+    wallBounces?: number;
   }>;
   statusMessage: string | null;
   topToast: { text: string; color: number; expiresAt: number } | null;

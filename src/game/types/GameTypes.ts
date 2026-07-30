@@ -9,6 +9,20 @@ export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
 export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle' | 'napalm' | 'laser';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
+export type WallMode = 'none' | 'concrete' | 'padded' | 'rubber' | 'spring' | 'wraparound' | 'random' | 'erratic';
+
+export const WALL_MODES: WallMode[] = ['none', 'concrete', 'padded', 'rubber', 'spring', 'wraparound', 'random', 'erratic'];
+
+export const WALL_LABELS: Record<WallMode, string> = {
+  none: 'NO WALLS',
+  concrete: 'CONCRETE',
+  padded: 'PADDED',
+  rubber: 'RUBBER',
+  spring: 'SPRING',
+  wraparound: 'WRAPAROUND',
+  random: 'RANDOM',
+  erratic: 'ERRATIC'
+};
 
 export interface TerrainData {
   heights: number[];
@@ -98,6 +112,8 @@ export interface MatchState {
    * enterShoppingPhase. Null when there's no sale.
    */
   currentSale: { itemKey: string; discount: number } | null;
+  wallMode: WallMode;
+  activeWallMode: Exclude<WallMode, 'random' | 'erratic'>;
 }
 
 export const MAX_PLAYERS = 4;
@@ -162,6 +178,7 @@ export interface ProjectileState {
   tunneling?: boolean;
   tunnelRemaining?: number;
   guidanceId?: string;
+  wallBounces?: number;
 }
 
 export interface WindState {
@@ -302,6 +319,12 @@ export const GAME_CONFIG = {
   wind: {
     min: 0,
     max: 18
+  },
+  walls: {
+    rubberRestitution: 0.75,
+    paddedRestitution: 0.45,
+    springRestitution: 1.25,
+    maxBounces: 6
   },
   movement: {
     perTurn: 70,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TurnSystem } from '../src/game/systems/TurnSystem';
-import { GAME_CONFIG } from '../src/game/types/GameTypes';
+import { GAME_CONFIG, WALL_MODES } from '../src/game/types/GameTypes';
 import { makeTank } from './helpers';
 
 describe('TurnSystem', () => {
@@ -165,5 +165,96 @@ describe('TurnSystem', () => {
 
     expect(match.profiles[0].batteries).toBe(5);
     expect(match.profiles[1].batteries).toBe(3);
+  });
+
+  it('createMatchState with default wallMode sets both wallMode and activeWallMode to none', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet']);
+
+    expect(match.wallMode).toBe('none');
+    expect(match.activeWallMode).toBe('none');
+  });
+
+  it('createMatchState with concrete wallMode sets wallMode and activeWallMode correctly', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'concrete');
+
+    expect(match.wallMode).toBe('concrete');
+    expect(match.activeWallMode).toBe('concrete');
+  });
+
+  it('createMatchState with rubber wallMode sets wallMode and activeWallMode correctly', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'rubber');
+
+    expect(match.wallMode).toBe('rubber');
+    expect(match.activeWallMode).toBe('rubber');
+  });
+
+  it('createMatchState with random wallMode resolves to a concrete candidate', () => {
+    for (let i = 0; i < 50; i += 1) {
+      const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'random');
+      expect(match.wallMode).toBe('random');
+      expect(['concrete', 'padded', 'rubber', 'spring', 'wraparound']).toContain(match.activeWallMode);
+      expect(match.activeWallMode).not.toBe('random');
+      expect(match.activeWallMode).not.toBe('erratic');
+    }
+  });
+
+  it('createMatchState with erratic wallMode resolves to a concrete candidate', () => {
+    for (let i = 0; i < 50; i += 1) {
+      const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'erratic');
+      expect(match.wallMode).toBe('erratic');
+      expect(['concrete', 'padded', 'rubber', 'spring', 'wraparound']).toContain(match.activeWallMode);
+      expect(match.activeWallMode).not.toBe('random');
+      expect(match.activeWallMode).not.toBe('erratic');
+    }
+  });
+
+  it('resolveWallMode with none mode does not change activeWallMode', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none');
+    const initialMode = match.activeWallMode;
+
+    system.resolveWallMode(match);
+
+    expect(match.activeWallMode).toBe(initialMode);
+    expect(match.activeWallMode).toBe('none');
+  });
+
+  it('resolveWallMode with concrete mode does not change activeWallMode', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'concrete');
+    const initialMode = match.activeWallMode;
+
+    system.resolveWallMode(match);
+
+    expect(match.activeWallMode).toBe(initialMode);
+    expect(match.activeWallMode).toBe('concrete');
+  });
+
+  it('resolveWallMode with random mode re-rolls activeWallMode', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'random');
+    const modeSet = new Set<string>();
+
+    for (let i = 0; i < 50; i += 1) {
+      system.resolveWallMode(match);
+      expect(match.wallMode).toBe('random');
+      expect(['concrete', 'padded', 'rubber', 'spring', 'wraparound']).toContain(match.activeWallMode);
+      modeSet.add(match.activeWallMode);
+    }
+
+    // Over 50 iterations, we should see at least 2 different modes (statistically very likely)
+    expect(modeSet.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('resolveWallMode with erratic mode re-rolls activeWallMode', () => {
+    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'erratic');
+    const modeSet = new Set<string>();
+
+    for (let i = 0; i < 50; i += 1) {
+      system.resolveWallMode(match);
+      expect(match.wallMode).toBe('erratic');
+      expect(['concrete', 'padded', 'rubber', 'spring', 'wraparound']).toContain(match.activeWallMode);
+      modeSet.add(match.activeWallMode);
+    }
+
+    // Over 50 iterations, we should see at least 2 different modes (statistically very likely)
+    expect(modeSet.size).toBeGreaterThanOrEqual(2);
   });
 });

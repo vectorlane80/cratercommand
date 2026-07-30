@@ -54,7 +54,7 @@ describe('ProjectileSystem', () => {
     projectile.y = 50;
 
     const initialVelocityY = projectile.velocityY;
-    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(Math.abs(projectile.velocityY - (initialVelocityY + GAME_CONFIG.projectile.gravity * 0.1))).toBeLessThan(1e-6);
     expect(tick.impact).toBeNull();
@@ -68,7 +68,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.x = -50;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('outOfBounds');
@@ -82,7 +82,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -97,7 +97,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityY = 1;
     projectile.y = 100;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.spawned.length).toBe(weapon.splitCount! - 1);
     expect(projectile.hasSplit).toBe(true);
@@ -116,7 +116,7 @@ describe('ProjectileSystem', () => {
     projectile.x = tank.x;
     projectile.y = tank.y - GAME_CONFIG.tank.height / 2;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [tank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [tank]);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('tank');
@@ -133,7 +133,7 @@ describe('ProjectileSystem', () => {
     projectile.y = 260;
     projectile.velocityY = 10;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).toBeNull();
     expect(projectile.bouncesLeft).toBe(0);
@@ -148,7 +148,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.ageMs = GAME_CONFIG.projectile.maxAgeMs + 1;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('outOfBounds');
@@ -176,7 +176,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 100;
     projectile.velocityY = 50;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -195,7 +195,7 @@ describe('ProjectileSystem', () => {
     projectile.hopsLeft = 0;
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -213,7 +213,7 @@ describe('ProjectileSystem', () => {
     projectile.x = targetTank.x;
     projectile.y = targetTank.y - GAME_CONFIG.tank.height / 2;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [targetTank]);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('tank');
@@ -240,7 +240,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityY = 1;
     projectile.y = 100;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.spawned.length).toBe(weapon.splitCount! - 1);
     tick.spawned.forEach((p) => {
@@ -257,7 +257,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityY = 1;
     projectile.y = 100;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.spawned.length).toBe(8);
     tick.spawned.forEach((p) => {
@@ -273,7 +273,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -296,7 +296,7 @@ describe('ProjectileSystem', () => {
     projectile.hasSplit = true;
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -321,7 +321,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).toBeNull();
     expect(projectile.rolling).toBe(true);
@@ -347,7 +347,7 @@ describe('ProjectileSystem', () => {
 
     let velocityAfterTicks = projectile.velocityX;
     for (let i = 0; i < 5; i += 1) {
-      projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+      projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
       velocityAfterTicks = projectile.velocityX;
     }
 
@@ -366,7 +366,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 5;
     projectile.y = 247;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -388,7 +388,7 @@ describe('ProjectileSystem', () => {
     projectile.y = terrainSystem.getHeightAtX(terrain, projectile.x) - 3;
     projectile.velocityX = 5;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).toBeNull();
   });
@@ -405,7 +405,7 @@ describe('ProjectileSystem', () => {
     projectile.y = 247;
     projectile.velocityX = 100;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [targetTank]);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('tank');
@@ -422,10 +422,10 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 0;
     const wind = { direction: 1 as const, magnitude: 18 };
 
-    projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
     const velocityAfterNoWind = projectile.velocityX;
     projectile.velocityX = 0;
-    projectileSystem.update(projectile, 16, wind, terrainSystem, terrain, tankSystem, []);
+    projectileSystem.update(projectile, 16, wind, 'none', terrainSystem, terrain, tankSystem, []);
     const velocityAfterWind = projectile.velocityX;
 
     expect(Math.abs(velocityAfterWind - velocityAfterNoWind)).toBeLessThan(0.5);
@@ -439,7 +439,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).toBeNull();
     expect(projectile.tunneling).toBe(true);
@@ -462,7 +462,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 90;
     projectile.velocityY = 0;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [targetTank]);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -482,7 +482,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 90;
     projectile.velocityY = 0;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [targetTank]);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('tank');
@@ -502,7 +502,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 90;
     projectile.velocityY = 0;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -521,7 +521,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 90;
     projectile.velocityY = 0;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.terrainChanged).toBe(true);
     expect(tick.impact).toBeNull();
@@ -535,7 +535,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -565,7 +565,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 5;
     projectile.y = 247;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -594,7 +594,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityY = 50;
 
     const initialVelocityY = projectile.velocityY;
-    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, defenderTank]);
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, defenderTank]);
 
     expect(projectile.velocityY).toBeLessThan(initialVelocityY);
     expect(tick.impact).toBeNull();
@@ -614,7 +614,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityY = 50;
 
     const initialVelocityY = projectile.velocityY;
-    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, deadDefenderTank, liveDefenderTank]);
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, deadDefenderTank, liveDefenderTank]);
 
     const gravity = GAME_CONFIG.projectile.gravity * 0.1;
     const expectedVelocityY = initialVelocityY + gravity;
@@ -630,7 +630,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [ownerTank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank]);
 
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('terrain');
@@ -646,7 +646,7 @@ describe('ProjectileSystem', () => {
     const projectile = projectiles[0];
     projectile.y = 260;
 
-    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [ownerTank]);
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank]);
 
     expect(tick.impact).toBeNull();
     expect(projectile.tunneling).toBe(true);
@@ -669,7 +669,7 @@ describe('ProjectileSystem', () => {
 
     const initialVelocityX = projectile.velocityX;
     const initialVelocityY = projectile.velocityY;
-    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
 
     // Projectile should accelerate toward target (500, 200-6=194)
     expect(projectile.velocityX).toBeGreaterThan(initialVelocityX);
@@ -691,7 +691,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityY = 50;
 
     const initialVelocityX = projectile.velocityX;
-    projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+    projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
 
     // Distance > heatSeekRadius (130), so no guidance acceleration — velocityX stays the same
     expect(projectile.velocityX).toBe(initialVelocityX);
@@ -711,7 +711,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 50;
     projectile.velocityY = 10;
 
-    projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+    projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
 
     expect(projectile.velocityY).toBe(0);
     expect(Math.abs(projectile.velocityX - GAME_CONFIG.projectile.horizontalSpeed)).toBeLessThan(1e-6);
@@ -731,7 +731,7 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 10;
     projectile.velocityY = 50;
 
-    projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
+    projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, targetTank]);
 
     expect(projectile.velocityX).toBe(0);
     expect(projectile.velocityY).toBe(GAME_CONFIG.projectile.verticalDiveSpeed);
@@ -752,9 +752,110 @@ describe('ProjectileSystem', () => {
     projectile.velocityX = 50;
     projectile.velocityY = 50;
 
-    const tick = projectileSystem.update(projectile, 100, noWind, terrainSystem, terrain, tankSystem, [ownerTank, deadTank, liveTank]);
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, [ownerTank, deadTank, liveTank]);
 
     // Should home toward liveTank (nearby), not deadTank (dead)
     expect(tick.impact).toBeNull();
+  });
+
+  it('rubber wall: ballistic projectile crossing x < 0 with wallMode rubber reflects and reduces velocity', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = -5;
+    projectile.velocityX = -100;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, 'rubber', terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).toBeNull();
+    expect(projectile.x).toBeGreaterThan(0);
+    expect(projectile.x).toBeLessThanOrEqual(2);
+    expect(Math.abs(projectile.velocityX - (-(-100) * GAME_CONFIG.walls.rubberRestitution))).toBeLessThan(1e-6);
+    expect(projectile.wallBounces).toBe(1);
+  });
+
+  it('spring wall: projectile amplifies velocity on reflection', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = -5;
+    projectile.velocityX = -100;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, 'spring', terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).toBeNull();
+    expect(Math.abs(projectile.velocityX - 100 * GAME_CONFIG.walls.springRestitution)).toBeLessThan(1e-6);
+    expect(projectile.wallBounces).toBe(1);
+  });
+
+  it('concrete wall: ballistic projectile crossing x < 0 with wallMode concrete impacts at wall', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = -5;
+    projectile.velocityX = -100;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, 'concrete', terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.impact!.x).toBe(0);
+  });
+
+  it('wraparound wall: projectile teleports to opposite side at x > width', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = 961;
+    projectile.velocityX = 10;
+    projectile.velocityY = 0;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, 'wraparound', terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).toBeNull();
+    // 961 > 960, so it wraps: x = 961 - 960 = 1, then add velocity: 1 + 10*0.016 = 1.16
+    expect(projectile.x).toBeGreaterThan(0);
+    expect(projectile.x).toBeLessThan(5);
+  });
+
+  it('maxBounces: projectile exceeding maxBounces limit causes OOB impact', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = -5;
+    projectile.velocityX = -100;
+    projectile.wallBounces = GAME_CONFIG.walls.maxBounces;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, 'rubber', terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('outOfBounds');
+  });
+
+  it('wall mode none: projectile crossing x < 0 results in OOB impact (no wall handling)', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'small-missile')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.x = -50;
+    projectile.velocityX = -100;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, 'none', terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('outOfBounds');
   });
 });

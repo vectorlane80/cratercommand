@@ -5,7 +5,10 @@ import {
   CONTROLLER_LABELS,
   GAME_CONFIG,
   MAX_PLAYERS,
-  type ControllerKind
+  WALL_LABELS,
+  WALL_MODES,
+  type ControllerKind,
+  type WallMode
 } from '../types/GameTypes';
 
 /** Slot 3 and 4 can be empty (no participant) via `undefined`. */
@@ -16,6 +19,7 @@ export interface MenuResult {
   roundsToWin: number;
   /** Parallel to controllers — null means "use default (PLAYER N)". */
   names: Array<string | null>;
+  wallMode: WallMode;
 }
 
 const MAX_NAME_LEN = 12;
@@ -36,6 +40,7 @@ export class MenuScene extends Phaser.Scene {
   // window.prompt() for input.
   private names: Array<string | null> = [null, null, null, null];
   private matchLengthIndex = 0; // index into MATCH_LENGTHS, default first
+  private wallModeIndex = 0; // index into WALL_MODES, default first
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
 
@@ -43,6 +48,7 @@ export class MenuScene extends Phaser.Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
   private bKey!: Phaser.Input.Keyboard.Key;
+  private wKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('MenuScene');
@@ -62,11 +68,13 @@ export class MenuScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.bKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
+    this.wKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     this.input.keyboard!.addCapture([
       ...keyCodes,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
       Phaser.Input.Keyboard.KeyCodes.ENTER,
-      Phaser.Input.Keyboard.KeyCodes.B
+      Phaser.Input.Keyboard.KeyCodes.B,
+      Phaser.Input.Keyboard.KeyCodes.W
     ]);
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
@@ -89,6 +97,11 @@ export class MenuScene extends Phaser.Scene {
       soundSystem.playUiClick();
       this.render();
     }
+    if (Phaser.Input.Keyboard.JustDown(this.wKey)) {
+      this.cycleWallMode();
+      soundSystem.playUiClick();
+      this.render();
+    }
     if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
@@ -97,6 +110,10 @@ export class MenuScene extends Phaser.Scene {
 
   private cycleMatchLength(): void {
     this.matchLengthIndex = (this.matchLengthIndex + 1) % MATCH_LENGTHS.length;
+  }
+
+  private cycleWallMode(): void {
+    this.wallModeIndex = (this.wallModeIndex + 1) % WALL_MODES.length;
   }
 
   /**
@@ -140,10 +157,18 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
     }
-    // Match length selector — see drawMatchLength for geometry
+    // Match length selector — see matchLengthRect for geometry
     const mlBtn = this.matchLengthRect();
     if (x >= mlBtn.x && x <= mlBtn.x + mlBtn.w && y >= mlBtn.y && y <= mlBtn.y + mlBtn.h) {
       this.cycleMatchLength();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Wall mode selector — see wallModeRect for geometry
+    const wmBtn = this.wallModeRect();
+    if (x >= wmBtn.x && x <= wmBtn.x + wmBtn.w && y >= wmBtn.y && y <= wmBtn.y + wmBtn.h) {
+      this.cycleWallMode();
       soundSystem.playUiClick();
       this.render();
       return;
@@ -186,7 +211,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private matchLengthRect() {
-    return { x: GAME_CONFIG.width / 2 - 130, y: 340, w: 260, h: 36 };
+    return { x: GAME_CONFIG.width / 2 - 270, y: 340, w: 260, h: 36 };
+  }
+
+  private wallModeRect() {
+    return { x: GAME_CONFIG.width / 2 + 10, y: 340, w: 260, h: 36 };
   }
 
   /**
@@ -234,7 +263,8 @@ export class MenuScene extends Phaser.Scene {
     const result: MenuResult = {
       controllers: this.participants(),
       names: this.participantNames(),
-      roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin
+      roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
+      wallMode: WALL_MODES[this.wallModeIndex]
     };
     this.scene.start('GameScene', result);
   }
@@ -262,9 +292,9 @@ export class MenuScene extends Phaser.Scene {
 
     // Hint
     this.addText(
-      GAME_CONFIG.width / 2 - 310,
+      GAME_CONFIG.width / 2 - 360,
       318,
-      'Tap name to rename · Tap box to cycle controller · B = match length',
+      'Tap name to rename · Tap box to cycle controller · B = match length · W = walls',
       colors.white,
       GAME_CONFIG.font.small
     );
@@ -277,6 +307,15 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.strokeRect(ml.x, ml.y, ml.w, ml.h);
     const mlLabel = MATCH_LENGTHS[this.matchLengthIndex].label;
     this.addText(ml.x + 60, ml.y + 8, mlLabel, colors.cyan, GAME_CONFIG.font.large);
+
+    // Wall mode button (W to cycle, also clickable)
+    const wm = this.wallModeRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(wm.x, wm.y, wm.w, wm.h);
+    this.graphics.lineStyle(2, colors.magenta, 1);
+    this.graphics.strokeRect(wm.x, wm.y, wm.w, wm.h);
+    const wmLabel = `WALLS: ${WALL_LABELS[WALL_MODES[this.wallModeIndex]]}`;
+    this.addText(wm.x + 40, wm.y + 8, wmLabel, colors.magenta, GAME_CONFIG.font.large);
 
     // Start button (gated on canStart())
     const enabled = this.canStart();

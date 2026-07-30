@@ -6,6 +6,7 @@ import {
   type PlayerProfile,
   type TankState,
   type TurnState,
+  type WallMode,
   type WindState
 } from '../types/GameTypes';
 
@@ -28,9 +29,11 @@ export class TurnSystem {
   createMatchState(
     controllers: ControllerKind[] = ['human', 'cpu-veteran'],
     roundsToWin: number = GAME_CONFIG.match.roundsToWin,
-    names: Array<string | null> = []
+    names: Array<string | null> = [],
+    wallMode: WallMode = 'none'
   ): MatchState {
     const active = controllers.filter((c): c is ControllerKind => !!c);
+    const activeWallMode = this.resolveActiveWallMode(wallMode);
     return {
       round: 1,
       roundsToWin,
@@ -38,7 +41,9 @@ export class TurnSystem {
       shoppingPlayerId: null,
       shopVisitsRemaining: 0,
       matchWinnerId: null,
-      currentSale: null
+      currentSale: null,
+      wallMode,
+      activeWallMode
     };
   }
 
@@ -101,5 +106,21 @@ export class TurnSystem {
   /** True when 0 or 1 tanks remain alive — the round cannot continue. */
   isRoundOver(tanks: TankState[]): boolean {
     return tanks.filter((tank) => tank.alive).length <= 1;
+  }
+
+  /** Resolve random/erratic wallMode to a concrete implementation. */
+  private resolveActiveWallMode(wallMode: WallMode): Exclude<WallMode, 'random' | 'erratic'> {
+    if (wallMode === 'random' || wallMode === 'erratic') {
+      const candidates: Exclude<WallMode, 'random' | 'erratic'>[] = ['concrete', 'padded', 'rubber', 'spring', 'wraparound'];
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+    return wallMode;
+  }
+
+  /** Re-roll activeWallMode for random/erratic modes. */
+  resolveWallMode(match: MatchState): void {
+    if (match.wallMode === 'random' || match.wallMode === 'erratic') {
+      match.activeWallMode = this.resolveActiveWallMode(match.wallMode);
+    }
   }
 }

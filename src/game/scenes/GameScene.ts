@@ -21,6 +21,7 @@ import {
   type TerrainData,
   type TurnState,
   type VisualSystem,
+  type WallMode,
   type WeaponDefinition
 } from '../types/GameTypes';
 
@@ -76,6 +77,7 @@ export class GameScene extends Phaser.Scene {
   private pendingControllers: ControllerKind[] = ['human', 'cpu-veteran'];
   private pendingNames: Array<string | null> = [];
   private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
+  private pendingWallMode: WallMode = 'none';
 
   // Tentative shop purchases for the current shopper. Committed on ENTER,
   // discarded on ESC. Keys: weapon ids + 'parachute' + 'shield'.
@@ -134,6 +136,7 @@ export class GameScene extends Phaser.Scene {
     controllers?: ControllerKind[];
     names?: Array<string | null>;
     roundsToWin?: number;
+    wallMode?: WallMode;
     online?: { isHost: boolean };
   }): void {
     if (data?.controllers && data.controllers.length >= 2) {
@@ -142,6 +145,9 @@ export class GameScene extends Phaser.Scene {
     if (data?.names) this.pendingNames = data.names;
     if (typeof data?.roundsToWin === 'number' && data.roundsToWin >= 1) {
       this.pendingRoundsToWin = data.roundsToWin;
+    }
+    if (data?.wallMode) {
+      this.pendingWallMode = data.wallMode;
     }
     if (data?.online) {
       this.isOnlineHost = data.online.isHost;
@@ -215,7 +221,7 @@ export class GameScene extends Phaser.Scene {
     this.hudSystem = new HudSystem(this);
     this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames);
+    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode);
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -495,6 +501,7 @@ export class GameScene extends Phaser.Scene {
     this.statusMessage = null;
     this.activeProjectiles = [];
     this.laserResolving = false;
+    this.turnSystem.resolveWallMode(this.match);
     this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
 
@@ -722,7 +729,8 @@ export class GameScene extends Phaser.Scene {
         rolling: p.rolling,
         tunneling: p.tunneling,
         tunnelRemaining: p.tunnelRemaining,
-        guidanceId: p.guidanceId
+        guidanceId: p.guidanceId,
+        wallBounces: p.wallBounces
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -768,7 +776,8 @@ export class GameScene extends Phaser.Scene {
         rolling: p.rolling,
         tunneling: p.tunneling,
         tunnelRemaining: p.tunnelRemaining,
-        guidanceId: p.guidanceId
+        guidanceId: p.guidanceId,
+        wallBounces: p.wallBounces
       };
     });
     this.statusMessage = snap.statusMessage;
@@ -1449,6 +1458,11 @@ export class GameScene extends Phaser.Scene {
       activeTank.ammo[weapon.id] -= 1;
     }
 
+    // For erratic wall mode, re-roll the active mode per shot
+    if (this.match.wallMode === 'erratic') {
+      this.turnSystem.resolveWallMode(this.match);
+    }
+
     if (weapon.behavior === 'laser') {
       this.fireLaser(activeTank, weapon);
       return;
@@ -1622,6 +1636,7 @@ export class GameScene extends Phaser.Scene {
         projectile,
         delta,
         this.turn.wind,
+        this.match.activeWallMode,
         this.terrainSystem,
         this.terrainData,
         this.tankSystem,
