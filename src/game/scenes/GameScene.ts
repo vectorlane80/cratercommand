@@ -76,7 +76,7 @@ export class GameScene extends Phaser.Scene {
   private aiTurnElapsedMs = 0;
   private aiHasFired = false;
   private aiShopElapsedMs = 0;
-  private pendingControllers: ControllerKind[] = ['human', 'cpu-veteran'];
+  private pendingControllers: ControllerKind[] = ['human', 'cpu-tosser'];
   private pendingNames: Array<string | null> = [];
   private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
   private pendingWallMode: WallMode = 'none';
@@ -438,7 +438,9 @@ export class GameScene extends Phaser.Scene {
       opponents,
       this.turn.wind,
       this.terrainSystem,
-      this.terrainData
+      this.terrainData,
+      this.match.physics,
+      this.match.profiles
     );
     // Force the AI to a weapon it actually has ammo for.
     if (!this.tankHasAmmo(activeTank, this.aiDecision.weaponIndex)) {
@@ -508,6 +510,7 @@ export class GameScene extends Phaser.Scene {
     this.statusMessage = null;
     this.activeProjectiles = [];
     this.laserResolving = false;
+    this.aiSystem.resetRound();
     this.turnSystem.resolveWallMode(this.match);
     this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);

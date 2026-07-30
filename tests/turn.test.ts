@@ -7,7 +7,7 @@ describe('TurnSystem', () => {
   const system = new TurnSystem();
 
   it('createMatchState initializes profiles and match state correctly', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet', 'cpu-marshal'], 3, ['ALICE', null, null]);
+    const match = system.createMatchState(['human', 'cpu-tosser', 'cpu-spoiler'], 3, ['ALICE', null, null]);
 
     expect(match.profiles.length).toBe(3);
     expect(match.roundsToWin).toBe(3);
@@ -95,7 +95,7 @@ describe('TurnSystem', () => {
   });
 
   it('saveTanksToProfiles copies ammo and makes it a separate copy', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet']);
+    const match = system.createMatchState(['human', 'cpu-tosser']);
     const tanks = [
       makeTank({ id: 0, ammo: { 'small-missile': -1, 'big-missile': 5 }, parachutes: 2, defenses: { 'shield': 1 } }),
       makeTank({ id: 1, ammo: { 'small-missile': -1, 'big-missile': 3 }, parachutes: 0, defenses: { 'shield': 2 } })
@@ -148,14 +148,14 @@ describe('TurnSystem', () => {
   });
 
   it('createMatchState profiles have batteries === startingBatteries', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet']);
+    const match = system.createMatchState(['human', 'cpu-tosser']);
     match.profiles.forEach((profile) => {
       expect(profile.batteries).toBe(GAME_CONFIG.match.startingBatteries);
     });
   });
 
   it('saveTanksToProfiles copies batteries', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet']);
+    const match = system.createMatchState(['human', 'cpu-tosser']);
     const tanks = [
       makeTank({ id: 0, batteries: 5 }),
       makeTank({ id: 1, batteries: 3 })
@@ -168,21 +168,21 @@ describe('TurnSystem', () => {
   });
 
   it('createMatchState with default wallMode sets both wallMode and activeWallMode to none', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet']);
+    const match = system.createMatchState(['human', 'cpu-tosser']);
 
     expect(match.wallMode).toBe('none');
     expect(match.activeWallMode).toBe('none');
   });
 
   it('createMatchState with concrete wallMode sets wallMode and activeWallMode correctly', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'concrete');
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'concrete');
 
     expect(match.wallMode).toBe('concrete');
     expect(match.activeWallMode).toBe('concrete');
   });
 
   it('createMatchState with rubber wallMode sets wallMode and activeWallMode correctly', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'rubber');
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'rubber');
 
     expect(match.wallMode).toBe('rubber');
     expect(match.activeWallMode).toBe('rubber');
@@ -190,7 +190,7 @@ describe('TurnSystem', () => {
 
   it('createMatchState with random wallMode resolves to a concrete candidate', () => {
     for (let i = 0; i < 50; i += 1) {
-      const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'random');
+      const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'random');
       expect(match.wallMode).toBe('random');
       expect(['concrete', 'padded', 'rubber', 'spring', 'wraparound']).toContain(match.activeWallMode);
       expect(match.activeWallMode).not.toBe('random');
@@ -200,7 +200,7 @@ describe('TurnSystem', () => {
 
   it('createMatchState with erratic wallMode resolves to a concrete candidate', () => {
     for (let i = 0; i < 50; i += 1) {
-      const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'erratic');
+      const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'erratic');
       expect(match.wallMode).toBe('erratic');
       expect(['concrete', 'padded', 'rubber', 'spring', 'wraparound']).toContain(match.activeWallMode);
       expect(match.activeWallMode).not.toBe('random');
@@ -209,7 +209,7 @@ describe('TurnSystem', () => {
   });
 
   it('resolveWallMode with none mode does not change activeWallMode', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none');
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'none');
     const initialMode = match.activeWallMode;
 
     system.resolveWallMode(match);
@@ -219,7 +219,7 @@ describe('TurnSystem', () => {
   });
 
   it('resolveWallMode with concrete mode does not change activeWallMode', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'concrete');
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'concrete');
     const initialMode = match.activeWallMode;
 
     system.resolveWallMode(match);
@@ -229,7 +229,7 @@ describe('TurnSystem', () => {
   });
 
   it('resolveWallMode with random mode re-rolls activeWallMode', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'random');
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'random');
     const modeSet = new Set<string>();
 
     for (let i = 0; i < 50; i += 1) {
@@ -244,7 +244,7 @@ describe('TurnSystem', () => {
   });
 
   it('resolveWallMode with erratic mode re-rolls activeWallMode', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'erratic');
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'erratic');
     const modeSet = new Set<string>();
 
     for (let i = 0; i < 50; i += 1) {
@@ -259,7 +259,7 @@ describe('TurnSystem', () => {
   });
 
   it('createMatchState with default physics uses PHYSICS_DEFAULTS', () => {
-    const match = system.createMatchState(['human', 'cpu-cadet']);
+    const match = system.createMatchState(['human', 'cpu-tosser']);
 
     expect(match.physics).toEqual(PHYSICS_DEFAULTS);
     expect(match.physics.gravity).toBe(138);
@@ -269,7 +269,7 @@ describe('TurnSystem', () => {
 
   it('createMatchState with custom physics stores the provided settings', () => {
     const customPhysics = { gravity: 70, viscosity: 0.35, tanksFall: false };
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none', customPhysics);
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'none', customPhysics);
 
     expect(match.physics).toEqual(customPhysics);
     expect(match.physics.gravity).toBe(70);
@@ -279,7 +279,7 @@ describe('TurnSystem', () => {
 
   it('createMatchState with custom gravity override stores correct gravity', () => {
     const customPhysics = { gravity: 240, viscosity: 0, tanksFall: true };
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none', customPhysics);
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'none', customPhysics);
 
     expect(match.physics.gravity).toBe(240);
     expect(match.physics.viscosity).toBe(0);
@@ -288,7 +288,7 @@ describe('TurnSystem', () => {
 
   it('createMatchState with custom viscosity override stores correct viscosity', () => {
     const customPhysics = { gravity: 138, viscosity: 0.6, tanksFall: true };
-    const match = system.createMatchState(['human', 'cpu-cadet'], 2, [], 'none', customPhysics);
+    const match = system.createMatchState(['human', 'cpu-tosser'], 2, [], 'none', customPhysics);
 
     expect(match.physics.gravity).toBe(138);
     expect(match.physics.viscosity).toBe(0.6);

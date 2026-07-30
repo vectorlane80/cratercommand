@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import {
   GAME_CONFIG,
+  PHYSICS_DEFAULTS,
   type ControllerKind,
+  type PhysicsSettings,
   type PlayerId,
+  type PlayerProfile,
   type TankState,
   type TerrainData,
   type WeaponDefinition,
@@ -24,6 +27,8 @@ interface SimulationResult {
 }
 
 export class AISystem {
+  private tosserMemory: Map<PlayerId, { angle: number; power: number; missBy: number } | null> = new Map();
+
   /**
    * Compute the AI's intended firing solution for the active tank.
    *
@@ -37,40 +42,90 @@ export class AISystem {
     opponents: TankState[],
     wind: WindState,
     terrainSystem: TerrainSystem,
-    terrainData: TerrainData
+    terrainData: TerrainData,
+    physics: PhysicsSettings = PHYSICS_DEFAULTS,
+    profiles: PlayerProfile[] = []
   ): AIDecision {
     const target = this.pickTarget(controller, shooter, opponents);
-    if (controller === 'cpu-cadet') {
-      return this.decideCadet(shooter, target);
+    if (controller === 'cpu-moron') {
+      return this.decideMoron(shooter, target);
     }
-    if (controller === 'cpu-veteran') {
-      return this.decideVeteran(shooter, target, wind, terrainSystem, terrainData);
+    if (controller === 'cpu-shooter') {
+      return this.decideShooter(shooter, target, wind, terrainSystem, terrainData, physics);
     }
-    return this.decideMarshal(shooter, target, wind, terrainSystem, terrainData);
+    if (controller === 'cpu-tosser') {
+      return this.decideTosser(shooter, target, wind, terrainSystem, terrainData, physics);
+    }
+    if (controller === 'cpu-spoiler') {
+      return this.decideSpoiler(shooter, target, wind, terrainSystem, terrainData, physics);
+    }
+    if (controller === 'cpu-cyborg') {
+      return this.decideCyborg(shooter, target, opponents, wind, terrainSystem, terrainData, physics, profiles);
+    }
+    return this.decideMoron(shooter, target);
   }
 
   /**
-   * Pick which opponent to aim at. Cadet rolls random; Veteran/Marshal pick
-   * the nearest alive opponent. Falls back to the shooter (a self-target) if
-   * there are no opponents available, which the caller will turn into a stalled
-   * shot rather than crash.
+   * Reset per-round AI memory (tosser memory, etc).
+   * Called from GameScene.beginRound.
    */
-  private pickTarget(controller: ControllerKind, shooter: TankState, opponents: TankState[]): TankState {
+  resetRound(): void {
+    this.tosserMemory.clear();
+  }
+
+  /**
+   * Pick which opponent to aim at.
+   * - Moron: random
+   * - Shooter, Tosser, Spoiler: nearest-by-x
+   * - Cyborg: tactical targeting by health and wins
+   * Falls back to shooter if no opponents available.
+   */
+  private pickTarget(controller: ControllerKind, shooter: TankState, opponents: TankState[], profiles: PlayerProfile[] = []): TankState {
     const alive = opponents.filter((t) => t.alive);
     if (alive.length === 0) return shooter;
-    if (controller === 'cpu-cadet') {
+
+    if (controller === 'cpu-moron') {
       return alive[Math.floor(Math.random() * alive.length)];
     }
-    // Nearest-by-x for Veteran and Marshal.
+
+    if (controller === 'cpu-cyborg') {
+      // Tactical: (maxHealth - health) * 2 + (is leader ? 60 : 0)
+      let maxHealth = 0;
+      let maxWins = 0;
+      alive.forEach(t => {
+        maxHealth = Math.max(maxHealth, GAME_CONFIG.tank.maxHealth);
+        const idx = opponents.indexOf(t);
+        if (idx !== -1 && profiles[idx]) {
+          maxWins = Math.max(maxWins, profiles[idx].wins);
+        }
+      });
+
+      let bestTarget = alive[0];
+      let bestScore = -Infinity;
+      alive.forEach(t => {
+        const idx = opponents.indexOf(t);
+        const profile = idx !== -1 ? profiles[idx] : null;
+        const isLeader = profile && profile.wins === maxWins;
+        const score = (maxHealth - t.health) * 2 + (isLeader ? 60 : 0);
+        const distFromShooter = Math.abs(t.x - shooter.x);
+        // Tie-breaking: nearest
+        if (score > bestScore || (score === bestScore && distFromShooter < Math.abs(bestTarget.x - shooter.x))) {
+          bestScore = score;
+          bestTarget = t;
+        }
+      });
+      return bestTarget;
+    }
+
+    // Shooter, Tosser, Spoiler: nearest-by-x
     return alive.reduce((closest, t) =>
       Math.abs(t.x - shooter.x) < Math.abs(closest.x - shooter.x) ? t : closest
     );
   }
 
-  // -------- DIFFICULTY: CADET --------
+  // -------- MORON --------
   // Random angle/power within sane bounds, random weapon. Mostly misses.
-  private decideCadet(shooter: TankState, target: TankState): AIDecision {
-    // Bias firing arc based on which direction the target sits.
+  private decideMoron(shooter: TankState, target: TankState): AIDecision {
     const facingLeft = target.x < shooter.x;
     const minA = facingLeft ? 95 : 25;
     const maxA = facingLeft ? 155 : 85;
@@ -80,43 +135,118 @@ export class AISystem {
     return { angle, power, weaponIndex };
   }
 
-  // -------- DIFFICULTY: VETERAN --------
-  // Coarse grid search over angle/power, picks the closest landing to the
-  // opponent and adds small random noise so the AI is good but not perfect.
-  private decideVeteran(
+  // -------- SHOOTER --------
+  // Line-of-sight specialist: checks direct low-arc paths (flat angles only).
+  // If blocked or no clear solution, falls back to Moron.
+  private decideShooter(
     shooter: TankState,
     target: TankState,
     wind: WindState,
     terrainSystem: TerrainSystem,
-    terrainData: TerrainData
+    terrainData: TerrainData,
+    physics: PhysicsSettings
   ): AIDecision {
     const weaponIndex = this.pickBestDamageWeapon(shooter);
     const weapon = GAME_CONFIG.weapons[weaponIndex];
 
-    // Bias firing arc toward the target's direction.
     const facingLeft = target.x < shooter.x;
-    const angleStart = facingLeft ? 95 : 25;
-    const angleEnd = facingLeft ? 155 : 85;
+    // Flat angles only: 25-60 (right) or 120-155 (left)
+    const angleStart = facingLeft ? 120 : 25;
+    const angleEnd = facingLeft ? 155 : 60;
     let bestAngle = (angleStart + angleEnd) / 2;
-    let bestPower = 60;
-    let bestDistSq = Infinity;
+    let bestPower = 75;
+    let bestDist = Infinity;
 
+    // High power only (60-100, step 5)
     for (let angle = angleStart; angle <= angleEnd; angle += 8) {
-      for (let power = 30; power <= 95; power += 8) {
-        const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData);
+      for (let power = 60; power <= 100; power += 5) {
+        const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData, physics);
         if (result.hitOutOfBounds) continue;
         const dx = result.landX - target.x;
         const dy = result.landY - target.y;
-        const distSq = dx * dx + dy * dy;
-        if (distSq < bestDistSq) {
-          bestDistSq = distSq;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bestDist) {
+          bestDist = dist;
           bestAngle = angle;
           bestPower = power;
         }
       }
     }
 
-    // Veteran noise: ±6° angle, ±8 power → still good but humanly imperfect.
+    // If no clear line (best landing > 80px away), fall back to Moron
+    if (bestDist > 80) {
+      return this.decideMoron(shooter, target);
+    }
+
+    const angle = Phaser.Math.Clamp(
+      bestAngle + (Math.random() * 2 - 1) * 2,
+      GAME_CONFIG.aiming.minAngle,
+      GAME_CONFIG.aiming.maxAngle
+    );
+    const power = Phaser.Math.Clamp(
+      bestPower + (Math.random() * 2 - 1) * 3,
+      GAME_CONFIG.aiming.minPower,
+      GAME_CONFIG.aiming.maxPower
+    );
+
+    return { angle, power, weaponIndex };
+  }
+
+  // -------- TOSSER --------
+  // Grid search with PROGRESSIVE memory refinement.
+  // Stores best solution per shooter; next decide searches ±12°/±12 power around it.
+  private decideTosser(
+    shooter: TankState,
+    target: TankState,
+    wind: WindState,
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData,
+    physics: PhysicsSettings
+  ): AIDecision {
+    const weaponIndex = this.pickBestDamageWeapon(shooter);
+    const weapon = GAME_CONFIG.weapons[weaponIndex];
+
+    const facingLeft = target.x < shooter.x;
+    const angleStart = facingLeft ? 95 : 25;
+    const angleEnd = facingLeft ? 155 : 85;
+
+    let searchAngleStart = angleStart;
+    let searchAngleEnd = angleEnd;
+    let searchPowerStart = 30;
+    let searchPowerEnd = 95;
+
+    const memory = this.tosserMemory.get(shooter.id);
+    if (memory) {
+      // Refine around remembered solution
+      searchAngleStart = Math.max(angleStart, memory.angle - 12);
+      searchAngleEnd = Math.min(angleEnd, memory.angle + 12);
+      searchPowerStart = Math.max(30, memory.power - 12);
+      searchPowerEnd = Math.min(95, memory.power + 12);
+    }
+
+    let bestAngle = (searchAngleStart + searchAngleEnd) / 2;
+    let bestPower = (searchPowerStart + searchPowerEnd) / 2;
+    let bestDist = Infinity;
+
+    for (let angle = searchAngleStart; angle <= searchAngleEnd; angle += 4) {
+      for (let power = searchPowerStart; power <= searchPowerEnd; power += 4) {
+        const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData, physics);
+        if (result.hitOutOfBounds) continue;
+        const dx = result.landX - target.x;
+        const dy = result.landY - target.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestAngle = angle;
+          bestPower = power;
+        }
+      }
+    }
+
+    // Store solution for next call
+    this.tosserMemory.set(shooter.id, { angle: bestAngle, power: bestPower, missBy: bestDist });
+
+    // Noise: ±6° angle, ±8 power
     const angle = Phaser.Math.Clamp(
       bestAngle + (Math.random() * 2 - 1) * 6,
       GAME_CONFIG.aiming.minAngle,
@@ -131,17 +261,17 @@ export class AISystem {
     return { angle, power, weaponIndex };
   }
 
-  // -------- DIFFICULTY: MARSHAL --------
-  // Fine grid search, evaluates every weapon the shooter actually has, picks
-  // the (weapon, angle, power) triple with the best damage-weighted score.
-  private decideMarshal(
+  // -------- SPOILER --------
+  // Fine grid search, all weapons. Cannot compensate for viscosity.
+  // When viscosity > 0, add extra noise ±8°/±10 power.
+  private decideSpoiler(
     shooter: TankState,
     target: TankState,
     wind: WindState,
     terrainSystem: TerrainSystem,
-    terrainData: TerrainData
+    terrainData: TerrainData,
+    physics: PhysicsSettings
   ): AIDecision {
-    // Bias firing arc toward the target's direction.
     const facingLeft = target.x < shooter.x;
     const angleStart = facingLeft ? 95 : 25;
     const angleEnd = facingLeft ? 155 : 85;
@@ -154,18 +284,16 @@ export class AISystem {
     GAME_CONFIG.weapons.forEach((weapon, weaponIndex) => {
       const ammo = shooter.ammo[weapon.id];
       if (ammo !== -1 && ammo <= 0) return;
-      // Skip Dirt Mover for direct attacks — it doesn't damage tanks.
       if (weapon.damage <= 0) return;
 
       for (let angle = angleStart; angle <= angleEnd; angle += 4) {
         for (let power = 25; power <= 100; power += 5) {
-          const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData);
+          const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData, physics);
           if (result.hitOutOfBounds) continue;
           const dx = result.landX - target.x;
           const dy = result.landY - target.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           const proximityScore = 200 / (dist + 10);
-          // Reward higher damage weapons but only if they actually land close.
           const score = proximityScore * (weapon.damage / 35);
           if (score > bestScore) {
             bestScore = score;
@@ -177,8 +305,77 @@ export class AISystem {
       }
     });
 
-    // Marshal noise: very small (±1.5°, ±2 power) so it feels reactive, not
-    // surgical-perfect — still beats a careless human.
+    // Base noise: ±1.5°, ±2 power
+    let angleNoise = (Math.random() * 2 - 1) * 1.5;
+    let powerNoise = (Math.random() * 2 - 1) * 2;
+
+    // Viscosity penalty: add extra noise
+    if (physics.viscosity > 0) {
+      angleNoise += (Math.random() * 2 - 1) * 8;
+      powerNoise += (Math.random() * 2 - 1) * 10;
+    }
+
+    const angle = Phaser.Math.Clamp(
+      bestAngle + angleNoise,
+      GAME_CONFIG.aiming.minAngle,
+      GAME_CONFIG.aiming.maxAngle
+    );
+    const power = Phaser.Math.Clamp(
+      bestPower + powerNoise,
+      GAME_CONFIG.aiming.minPower,
+      GAME_CONFIG.aiming.maxPower
+    );
+
+    return { angle, power, weaponIndex: bestWeaponIndex };
+  }
+
+  // -------- CYBORG --------
+  // Spoiler's search (with correct viscosity) + tactical targeting.
+  // Tactical targeting happens via pickTarget; decideCyborg uses the fine grid search.
+  private decideCyborg(
+    shooter: TankState,
+    target: TankState,
+    _opponents: TankState[],
+    wind: WindState,
+    terrainSystem: TerrainSystem,
+    terrainData: TerrainData,
+    physics: PhysicsSettings,
+    _profiles: PlayerProfile[]
+  ): AIDecision {
+    const facingLeft = target.x < shooter.x;
+    const angleStart = facingLeft ? 95 : 25;
+    const angleEnd = facingLeft ? 155 : 85;
+
+    let bestAngle = (angleStart + angleEnd) / 2;
+    let bestPower = 60;
+    let bestWeaponIndex = 0;
+    let bestScore = -Infinity;
+
+    GAME_CONFIG.weapons.forEach((weapon, weaponIndex) => {
+      const ammo = shooter.ammo[weapon.id];
+      if (ammo !== -1 && ammo <= 0) return;
+      if (weapon.damage <= 0) return;
+
+      for (let angle = angleStart; angle <= angleEnd; angle += 4) {
+        for (let power = 25; power <= 100; power += 5) {
+          const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData, physics);
+          if (result.hitOutOfBounds) continue;
+          const dx = result.landX - target.x;
+          const dy = result.landY - target.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const proximityScore = 200 / (dist + 10);
+          const score = proximityScore * (weapon.damage / 35);
+          if (score > bestScore) {
+            bestScore = score;
+            bestAngle = angle;
+            bestPower = power;
+            bestWeaponIndex = weaponIndex;
+          }
+        }
+      }
+    });
+
+    // Base noise: ±1.5°, ±2 power (same as Spoiler, NO extra viscosity penalty)
     const angle = Phaser.Math.Clamp(
       bestAngle + (Math.random() * 2 - 1) * 1.5,
       GAME_CONFIG.aiming.minAngle,
@@ -204,7 +401,8 @@ export class AISystem {
     weapon: WeaponDefinition,
     wind: WindState,
     terrainSystem: TerrainSystem,
-    terrainData: TerrainData
+    terrainData: TerrainData,
+    physics: PhysicsSettings = PHYSICS_DEFAULTS
   ): { angle: number; power: number } | null {
     // Bias firing arc toward the target's direction
     const facingLeft = target.x < shooter.x;
@@ -218,7 +416,7 @@ export class AISystem {
 
     for (let angle = angleStart; angle <= angleEnd; angle += 4) {
       for (let power = 25; power <= 100; power += 5) {
-        const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData);
+        const result = this.simulateShot(shooter, angle, power, weapon, wind, terrainSystem, terrainData, physics);
         if (result.hitOutOfBounds) continue;
         const dx = result.landX - target.x;
         const dy = result.landY - target.y;
@@ -280,7 +478,8 @@ export class AISystem {
     weapon: WeaponDefinition,
     wind: WindState,
     terrainSystem: TerrainSystem,
-    terrainData: TerrainData
+    terrainData: TerrainData,
+    physics: PhysicsSettings = PHYSICS_DEFAULTS
   ): SimulationResult {
     const dt = 0.05; // seconds per step (~20 Hz; fast enough, plenty accurate)
     const rad = Phaser.Math.DegToRad(angleDeg);
@@ -299,7 +498,15 @@ export class AISystem {
 
     while (age < maxAge) {
       vx += wind.direction * wind.magnitude * GAME_CONFIG.projectile.windAccelerationScale * dt;
-      vy += GAME_CONFIG.projectile.gravity * dt;
+      vy += physics.gravity * dt;
+
+      // Apply viscosity drag
+      if (physics.viscosity > 0) {
+        const drag = 1 - physics.viscosity * dt;
+        vx *= drag;
+        vy *= drag;
+      }
+
       x += vx * dt;
       y += vy * dt;
       age += dt;
@@ -316,7 +523,7 @@ export class AISystem {
 }
 
 export function isAIController(kind: ControllerKind): boolean {
-  return kind === 'cpu-cadet' || kind === 'cpu-veteran' || kind === 'cpu-marshal';
+  return kind === 'cpu-moron' || kind === 'cpu-shooter' || kind === 'cpu-tosser' || kind === 'cpu-spoiler' || kind === 'cpu-cyborg';
 }
 
 export function isRemoteController(kind: ControllerKind): boolean {

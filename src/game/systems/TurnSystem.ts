@@ -29,7 +29,7 @@ export class TurnSystem {
    * least one human.
    */
   createMatchState(
-    controllers: ControllerKind[] = ['human', 'cpu-veteran'],
+    controllers: ControllerKind[] = ['human', 'cpu-tosser'],
     roundsToWin: number = GAME_CONFIG.match.roundsToWin,
     names: Array<string | null> = [],
     wallMode: WallMode = 'none',

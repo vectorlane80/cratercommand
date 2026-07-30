@@ -41,7 +41,7 @@ const SLOT_CYCLE_REQUIRED: ControllerKind[] = CONTROLLER_CYCLE; // human + 3 CPU
 const SLOT_CYCLE_OPTIONAL: Array<ControllerKind | undefined> = [undefined, ...CONTROLLER_CYCLE];
 
 export class MenuScene extends Phaser.Scene {
-  private slots: Slot[] = ['human', 'cpu-veteran', undefined, undefined];
+  private slots: Slot[] = ['human', 'cpu-tosser', undefined, undefined];
   // Per-slot display names. null means "use default (PLAYER N)". Set via
   // tap on the label to the left of the controller box, which fires
   // window.prompt() for input.
@@ -300,10 +300,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Slots 0 and 1 are required: they cycle human → cpu-cadet → cpu-veteran →
-   * cpu-marshal → human. Slots 2 and 3 are optional: their cycle starts at
-   * `undefined` (empty) so the user can leave them out. Cycling slot 2 to
-   * empty also empties slot 3 (no gaps allowed — keeps PlayerId contiguous).
+   * Slots 0 and 1 are required: they cycle through human and the 5 SE personalities
+   * (moron, shooter, tosser, spoiler, cyborg). Slots 2 and 3 are optional: their
+   * cycle starts at `undefined` (empty) so the user can leave them out. Cycling slot 2
+   * to empty also empties slot 3 (no gaps allowed — keeps PlayerId contiguous).
    */
   private cycleSlot(idx: number): void {
     const cycle = idx <= 1 ? SLOT_CYCLE_REQUIRED : SLOT_CYCLE_OPTIONAL;
