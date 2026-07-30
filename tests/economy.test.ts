@@ -44,11 +44,25 @@ describe('EconomySystem', () => {
     expect(system.basePriceFor('unknown')).toBe(0);
   });
 
+  it('basePriceFor looks up scorched earth missiles', () => {
+    expect(system.basePriceFor('missile')).toBe(1875);
+    expect(system.basePriceFor('baby-nuke')).toBe(10000);
+    expect(system.basePriceFor('nuke')).toBe(12000);
+    expect(system.basePriceFor('leapfrog')).toBe(10000);
+  });
+
   it('bundleSizeFor looks up weapons and items', () => {
     expect(system.bundleSizeFor('parachute')).toBe(8);
     expect(system.bundleSizeFor('shield')).toBe(3);
     expect(system.bundleSizeFor('big-missile')).toBe(1);
     expect(system.bundleSizeFor('unknown')).toBe(1);
+  });
+
+  it('bundleSizeFor looks up scorched earth missiles', () => {
+    expect(system.bundleSizeFor('missile')).toBe(5);
+    expect(system.bundleSizeFor('baby-nuke')).toBe(3);
+    expect(system.bundleSizeFor('nuke')).toBe(1);
+    expect(system.bundleSizeFor('leapfrog')).toBe(2);
   });
 
   it('totalPendingCost sums pending costs', () => {
@@ -135,28 +149,28 @@ describe('EconomySystem', () => {
     expect(system.ownedCount(profile, 'unknown')).toBe(0);
   });
 
-  it('pageCount with pageSize 10 returns 1 for 10 entries', () => {
-    expect(system.pageCount(10)).toBe(1);
-  });
-
-  it('pageCount with pageSize 4 returns 3 for 10 entries', () => {
-    expect(system.pageCount(4)).toBe(3);
-  });
-
-  it('pageCount with pageSize 100 returns 1', () => {
+  it('pageCount calculates correct page count', () => {
+    const total = GAME_CONFIG.weapons.length + GAME_CONFIG.items.length;
+    expect(system.pageCount(10)).toBe(Math.ceil(total / 10));
+    expect(system.pageCount(4)).toBe(Math.ceil(total / 4));
     expect(system.pageCount(100)).toBe(1);
   });
 
   it('pageSlice returns correct entries per page', () => {
     const page0 = system.pageSlice(0, 4);
     expect(page0.length).toBe(4);
-    const page2 = system.pageSlice(2, 4);
-    expect(page2.length).toBe(2);
+    const total = GAME_CONFIG.weapons.length + GAME_CONFIG.items.length;
+    const lastPageNum = system.pageCount(4) - 1;
+    const lastPage = system.pageSlice(lastPageNum, 4);
+    expect(lastPage.length).toBe(total - 4 * lastPageNum);
   });
 
-  it('pageSlice clamps out-of-range page', () => {
-    const lastPage = system.pageSlice(99, 4);
-    expect(lastPage.length).toBe(2);
+  it('pageSlice clamps out-of-range page to last page', () => {
+    const total = GAME_CONFIG.weapons.length + GAME_CONFIG.items.length;
+    const lastPageNum = system.pageCount(4) - 1;
+    const lastPageFromClamp = system.pageSlice(99, 4);
+    const lastPageDirect = system.pageSlice(lastPageNum, 4);
+    expect(lastPageFromClamp).toEqual(lastPageDirect);
   });
 
   it('pageSlice clamps negative page to 0', () => {

@@ -39,6 +39,9 @@ export class ProjectileSystem {
     if (weapon.behavior === 'bounce') {
       projectile.bouncesLeft = weapon.bounceCount ?? 1;
     }
+    if (weapon.behavior === 'leapfrog') {
+      projectile.hopsLeft = (weapon.hopCount ?? 1) - 1;
+    }
     return [projectile];
   }
 
@@ -132,6 +135,20 @@ export class ProjectileSystem {
 
     const hitTank = tankSystem.findHitTank(tanks, projectile.x, projectile.y, projectile.ownerId);
     if (hitTank) {
+      // Leapfrog handling: spawn continuation before returning impact
+      if (weapon.behavior === 'leapfrog' && (projectile.hopsLeft ?? 0) > 0) {
+        spawned.push({
+          ownerId: projectile.ownerId,
+          weapon,
+          x: projectile.x,
+          y: projectile.y - 4,
+          velocityX: projectile.velocityX * 0.85,
+          velocityY: -Math.abs(projectile.velocityY) * 0.55,
+          trail: [{ x: projectile.x, y: projectile.y - 4 }],
+          ageMs: 0,
+          hopsLeft: (projectile.hopsLeft ?? 0) - 1
+        });
+      }
       return {
         impact: { kind: 'tank', x: projectile.x, y: projectile.y, targetTankId: hitTank.id },
         spawned
@@ -156,6 +173,20 @@ export class ProjectileSystem {
         // Push above terrain so we don't immediately re-collide
         projectile.y = terrainSystem.getHeightAtX(terrainData, projectile.x) - 6;
         return { impact: null, spawned };
+      }
+      // Leapfrog handling: spawn continuation before returning impact
+      if (weapon.behavior === 'leapfrog' && (projectile.hopsLeft ?? 0) > 0) {
+        spawned.push({
+          ownerId: projectile.ownerId,
+          weapon,
+          x: projectile.x,
+          y: projectile.y - 4,
+          velocityX: projectile.velocityX * 0.85,
+          velocityY: -Math.abs(projectile.velocityY) * 0.55,
+          trail: [{ x: projectile.x, y: projectile.y - 4 }],
+          ageMs: 0,
+          hopsLeft: (projectile.hopsLeft ?? 0) - 1
+        });
       }
       return { impact: { kind: 'terrain', x: projectile.x, y: projectile.y }, spawned };
     }

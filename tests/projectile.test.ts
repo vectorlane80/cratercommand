@@ -153,4 +153,71 @@ describe('ProjectileSystem', () => {
     expect(tick.impact).not.toBeNull();
     expect(tick.impact!.kind).toBe('outOfBounds');
   });
+
+  it('launch leapfrog creates 1 projectile with hopsLeft = hopCount - 1', () => {
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'leapfrog')!;
+
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+
+    expect(projectiles.length).toBe(1);
+    expect(projectiles[0].hopsLeft).toBe(weapon.hopCount! - 1);
+    expect(projectiles[0].hopsLeft).toBe(2);
+  });
+
+  it('update leapfrog below terrain with hopsLeft 2 spawns continuation', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'leapfrog')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.hopsLeft = 2;
+    projectile.y = 260;
+    projectile.velocityX = 100;
+    projectile.velocityY = 50;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.spawned.length).toBe(1);
+    expect(tick.spawned[0].hopsLeft).toBe(1);
+    expect(tick.spawned[0].velocityY).toBeLessThan(0);
+    expect(Math.abs(tick.spawned[0].velocityX - 100 * 0.85)).toBeLessThan(1e-6);
+  });
+
+  it('update leapfrog below terrain with hopsLeft 0 does not spawn', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'leapfrog')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.hopsLeft = 0;
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.spawned.length).toBe(0);
+  });
+
+  it('update leapfrog tank hit with hopsLeft 1 spawns continuation', () => {
+    const terrain = makeFlatTerrain(250);
+    const targetTank = makeTank({ id: 2, x: 480, y: 248, alive: true });
+    const attacker = makeTank({ id: 0, angle: 45, power: 50, x: 100, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'leapfrog')!;
+    const projectiles = projectileSystem.launch(attacker, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.hopsLeft = 1;
+    projectile.x = targetTank.x;
+    projectile.y = targetTank.y - GAME_CONFIG.tank.height / 2;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, [targetTank]);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('tank');
+    expect(tick.spawned.length).toBe(1);
+    expect(tick.spawned[0].hopsLeft).toBe(0);
+  });
 });

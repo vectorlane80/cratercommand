@@ -586,8 +586,8 @@ export class HudSystem {
     const hasScrollDown = weaponWindowStart + WEAPON_WINDOW_SIZE < GAME_CONFIG.weapons.length;
 
     this.addText(20, top + 20, `Weapon ${activeTank.selectedWeaponIndex + 1}/${GAME_CONFIG.weapons.length}`, GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
-    if (hasScrollUp) this.addText(260, top + 20, '▲', GAME_CONFIG.colors.green, GAME_CONFIG.font.small);
-    if (hasScrollDown) this.addText(260, top + 20 + (WEAPON_WINDOW_SIZE - 1) * 13, '▼', GAME_CONFIG.colors.green, GAME_CONFIG.font.small);
+    if (hasScrollUp) this.addText(288, top + 22, '▲', GAME_CONFIG.colors.green, GAME_CONFIG.font.small);
+    if (hasScrollDown) this.addText(288, top + 142, '▼', GAME_CONFIG.colors.green, GAME_CONFIG.font.small);
     this.addText(210, top + 20, `Move ${Math.round(activeTank.moveRemaining)}`, GAME_CONFIG.colors.magenta, GAME_CONFIG.font.small);
 
     const rowStep = 13;

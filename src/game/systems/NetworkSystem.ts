@@ -67,6 +67,7 @@ export interface GameSnapshot {
     ageMs: number;
     bouncesLeft?: number;
     hasSplit?: boolean;
+    hopsLeft?: number;
   }>;
   statusMessage: string | null;
   topToast: { text: string; color: number; expiresAt: number } | null;

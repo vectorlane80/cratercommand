@@ -672,7 +672,8 @@ export class GameScene extends Phaser.Scene {
         trail: p.trail.slice(),
         ageMs: p.ageMs,
         bouncesLeft: p.bouncesLeft,
-        hasSplit: p.hasSplit
+        hasSplit: p.hasSplit,
+        hopsLeft: p.hopsLeft
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -712,7 +713,8 @@ export class GameScene extends Phaser.Scene {
         trail: p.trail,
         ageMs: p.ageMs,
         bouncesLeft: p.bouncesLeft,
-        hasSplit: p.hasSplit
+        hasSplit: p.hasSplit,
+        hopsLeft: p.hopsLeft
       };
     });
     this.statusMessage = snap.statusMessage;

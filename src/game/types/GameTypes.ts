@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -108,6 +108,7 @@ export interface WeaponDefinition {
   salvoAngleSpread?: number;
   salvoPowerSpread?: number;
   moundRadius?: number;
+  hopCount?: number;
 }
 
 export interface ItemDefinition {
@@ -131,6 +132,7 @@ export interface ProjectileState {
   ageMs: number;
   bouncesLeft?: number;
   hasSplit?: boolean;
+  hopsLeft?: number;
 }
 
 export interface WindState {
@@ -398,6 +400,55 @@ export const GAME_CONFIG = {
       salvoCount: 5,
       salvoAngleSpread: 5,
       salvoPowerSpread: 12
+    },
+    {
+      id: 'missile',
+      name: 'Missile',
+      startingAmmo: 0,
+      price: 1875,
+      damage: 45,
+      craterRadius: 30,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 5
+    },
+    {
+      id: 'baby-nuke',
+      name: 'Baby Nuke',
+      startingAmmo: 0,
+      price: 10000,
+      damage: 70,
+      craterRadius: 46,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 3
+    },
+    {
+      id: 'nuke',
+      name: 'Nuke',
+      startingAmmo: 0,
+      price: 12000,
+      damage: 110,
+      craterRadius: 75,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 1
+    },
+    {
+      id: 'leapfrog',
+      name: 'Leapfrog',
+      startingAmmo: 0,
+      price: 10000,
+      damage: 40,
+      craterRadius: 26,
+      projectileSpeedScale: 1,
+      behavior: 'leapfrog',
+      category: 'missile',
+      bundleSize: 2,
+      hopCount: 3
     }
   ] satisfies WeaponDefinition[],
   items: [
