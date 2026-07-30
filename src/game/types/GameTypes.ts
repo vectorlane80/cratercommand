@@ -6,7 +6,7 @@ export type GamePhase =
   | 'shopping'
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
-export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle';
+export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle' | 'napalm';
 export type VisualSystem = 'classic' | 'retroPixel';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
@@ -115,6 +115,7 @@ export interface WeaponDefinition {
   craterForwardBias?: number;
   liquidVolume?: number;
   settleRadius?: number;
+  flameCount?: number;
 }
 
 export interface ItemDefinition {
@@ -741,6 +742,56 @@ export const GAME_CONFIG = {
       category: 'terrain',
       bundleSize: 10,
       settleRadius: 80
+    },
+    {
+      id: 'tracer',
+      name: 'Tracer',
+      startingAmmo: 0,
+      price: 10,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'utility',
+      bundleSize: 20
+    },
+    {
+      id: 'smoke-tracer',
+      name: 'Smoke Tracer',
+      startingAmmo: 0,
+      price: 500,
+      damage: 0,
+      craterRadius: 0,
+      projectileSpeedScale: 1,
+      behavior: 'single',
+      category: 'utility',
+      bundleSize: 10
+    },
+    {
+      id: 'napalm',
+      name: 'Napalm',
+      startingAmmo: 0,
+      price: 10000,
+      damage: 45,
+      craterRadius: 20,
+      projectileSpeedScale: 1,
+      behavior: 'napalm',
+      category: 'fire',
+      bundleSize: 10,
+      flameCount: 7
+    },
+    {
+      id: 'hot-napalm',
+      name: 'Hot Napalm',
+      startingAmmo: 0,
+      price: 20000,
+      damage: 70,
+      craterRadius: 26,
+      projectileSpeedScale: 1,
+      behavior: 'napalm',
+      category: 'fire',
+      bundleSize: 5,
+      flameCount: 10
     }
   ] satisfies WeaponDefinition[],
   items: [

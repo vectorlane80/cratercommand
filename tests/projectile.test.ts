@@ -526,4 +526,58 @@ describe('ProjectileSystem', () => {
     expect(tick.terrainChanged).toBe(true);
     expect(tick.impact).toBeNull();
   });
+
+  it('update napalm below terrain with hasSplit falsy spawns flame children', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'napalm')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.y = 260;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.spawned.length).toBe(weapon.flameCount ?? 7);
+    tick.spawned.forEach((child) => {
+      expect(child.rolling).toBe(true);
+      expect(child.hasSplit).toBe(true);
+      expect(child.damageScale).toBe(0.3);
+      expect(child.velocityY).toBe(0);
+    });
+    // Verify velocityX values span negative to positive
+    const velocityXValues = tick.spawned.map((c) => c.velocityX);
+    const minVelocityX = Math.min(...velocityXValues);
+    const maxVelocityX = Math.max(...velocityXValues);
+    expect(minVelocityX).toBeLessThan(-50);
+    expect(maxVelocityX).toBeGreaterThan(50);
+  });
+
+  it('update flame child (hasSplit true, rolling true) on flat terrain with low velocity detonates at rest', () => {
+    const terrain = makeFlatTerrain(250);
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'napalm')!;
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+    const projectile = projectiles[0];
+    projectile.hasSplit = true;
+    projectile.rolling = true;
+    projectile.velocityX = 5;
+    projectile.y = 247;
+
+    const tick = projectileSystem.update(projectile, 16, noWind, terrainSystem, terrain, tankSystem, []);
+
+    expect(tick.impact).not.toBeNull();
+    expect(tick.impact!.kind).toBe('terrain');
+    expect(tick.spawned.length).toBe(0);
+  });
+
+  it('tracer and smoke-tracer have zero damage and zero crater radius', () => {
+    const tracer = GAME_CONFIG.weapons.find((w) => w.id === 'tracer')!;
+    const smokeTracer = GAME_CONFIG.weapons.find((w) => w.id === 'smoke-tracer')!;
+    expect(tracer.damage).toBe(0);
+    expect(tracer.craterRadius).toBe(0);
+    expect(smokeTracer.damage).toBe(0);
+    expect(smokeTracer.craterRadius).toBe(0);
+  });
 });

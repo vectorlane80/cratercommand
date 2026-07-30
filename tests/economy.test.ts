@@ -273,4 +273,36 @@ describe('EconomySystem', () => {
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'earth-disrupter')!.damage).toBe(0);
     expect(GAME_CONFIG.weapons.find((w) => w.id === 'earth-disrupter')!.settleRadius).toBe(80);
   });
+
+  it('basePriceFor looks up tracer weapons', () => {
+    expect(system.basePriceFor('tracer')).toBe(10);
+    expect(system.basePriceFor('smoke-tracer')).toBe(500);
+  });
+
+  it('bundleSizeFor looks up tracer weapons', () => {
+    expect(system.bundleSizeFor('tracer')).toBe(20);
+    expect(system.bundleSizeFor('smoke-tracer')).toBe(10);
+  });
+
+  it('basePriceFor looks up napalm weapons', () => {
+    expect(system.basePriceFor('napalm')).toBe(10000);
+    expect(system.basePriceFor('hot-napalm')).toBe(20000);
+  });
+
+  it('bundleSizeFor looks up napalm weapons', () => {
+    expect(system.bundleSizeFor('napalm')).toBe(10);
+    expect(system.bundleSizeFor('hot-napalm')).toBe(5);
+  });
+
+  it('tracers have zero damage and zero crater radius', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'tracer')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'tracer')!.craterRadius).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'smoke-tracer')!.damage).toBe(0);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'smoke-tracer')!.craterRadius).toBe(0);
+  });
+
+  it('napalm weapons have correct flame counts', () => {
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'napalm')!.flameCount).toBe(7);
+    expect(GAME_CONFIG.weapons.find((w) => w.id === 'hot-napalm')!.flameCount).toBe(10);
+  });
 });

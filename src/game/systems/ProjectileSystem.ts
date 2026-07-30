@@ -380,6 +380,26 @@ export class ProjectileSystem {
         });
       }
     }
+
+    // Napalm: spawn downhill-flowing flame children
+    if (weapon.behavior === 'napalm' && !projectile.hasSplit) {
+      const n = weapon.flameCount ?? 7;
+      for (let i = 0; i < n; i += 1) {
+        spawned.push({
+          ownerId: projectile.ownerId,
+          weapon,
+          x: projectile.x,
+          y: projectile.y - 3,
+          velocityX: ((i - (n - 1) / 2) / Math.max(1, (n - 1) / 2)) * 120 + (Math.random() * 2 - 1) * 15,
+          velocityY: 0,
+          trail: [{ x: projectile.x, y: projectile.y - 3 }],
+          ageMs: 0,
+          hasSplit: true,
+          damageScale: 0.3,
+          rolling: true
+        });
+      }
+    }
   }
 
   drawAll(graphics: Phaser.GameObjects.Graphics, projectiles: ProjectileState[]): void {
