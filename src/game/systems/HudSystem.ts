@@ -60,6 +60,8 @@ export interface ShopPending {
   saleItem: () => string | null;
   /** Sale discount fraction (0..1) for `saleItem`, or 0. */
   saleDiscount: () => number;
+  /** Bundle size for an item — units added per single purchase. */
+  bundleSize: (key: string) => number;
 }
 
 export const EMPTY_SHOP_PENDING: ShopPending = {
@@ -68,7 +70,8 @@ export const EMPTY_SHOP_PENDING: ShopPending = {
   hasPending: () => false,
   effectivePrice: (basePrice) => basePrice,
   saleItem: () => null,
-  saleDiscount: () => 0
+  saleDiscount: () => 0,
+  bundleSize: () => 1
 };
 
 export class HudSystem {
@@ -725,10 +728,10 @@ export class HudSystem {
     const totalWeapons = GAME_CONFIG.weapons.reduce((sum, w) => {
       const owned = profile.ammo[w.id] ?? 0;
       if (owned === -1) return sum; // skip unlimited (Small Missile)
-      return sum + owned + pending.pendingFor(w.id);
+      return sum + owned + pending.pendingFor(w.id) * pending.bundleSize(w.id);
     }, 0);
-    const totalChutes = profile.parachutes + pending.pendingFor('parachute');
-    const totalShields = profile.shields + pending.pendingFor('shield');
+    const totalChutes = profile.parachutes + pending.pendingFor('parachute') * pending.bundleSize('parachute');
+    const totalShields = profile.shields + pending.pendingFor('shield') * pending.bundleSize('shield');
 
     this.addText(sideX + 12, sideY + 46, 'WEAPONS', colors.magenta, GAME_CONFIG.font.small);
     this.addText(sideX + sideW - 40, sideY + 46, `${totalWeapons}`, colors.white, GAME_CONFIG.font.small);
@@ -784,8 +787,11 @@ export class HudSystem {
           ? tint
           : colors.dimGray;
 
+      const bundleSize = pending.bundleSize(itemKey);
+      const displayName = bundleSize > 1 ? `${itemName} x${bundleSize}` : itemName;
+
       this.addText(colKey, rowY, keyLabel, rowColor, GAME_CONFIG.font.medium);
-      this.addText(colName, rowY, itemName, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colName, rowY, displayName, rowColor, GAME_CONFIG.font.medium);
       this.addText(colPrice, rowY, buyable ? `$${price}` : 'FREE', rowColor, GAME_CONFIG.font.medium);
       if (onSale) {
         this.addText(colPrice + 76, rowY + 2, `-${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
@@ -827,8 +833,11 @@ export class HudSystem {
       this.graphics.strokePath();
     }
 
-    drawRow('P', 'parachute', 'Parachute', GAME_CONFIG.match.parachutePrice, profile.parachutes, colors.yellow);
-    drawRow('S', 'shield', 'Shield', GAME_CONFIG.match.shieldPrice, profile.shields, colors.cyan);
+    GAME_CONFIG.items.forEach((item) => {
+      const owned = item.id === 'parachute' ? profile.parachutes : profile.shields;
+      const color = item.id === 'parachute' ? colors.yellow : colors.cyan;
+      drawRow(item.hotkey, item.id, item.name, item.price, owned, color);
+    });
 
     // ----- FOOTER -----
     const footerY = panelY + panelH - 38;

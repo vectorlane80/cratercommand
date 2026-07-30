@@ -8,6 +8,7 @@ export type GamePhase =
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
 export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo';
 export type VisualSystem = 'classic' | 'retroPixel';
+export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 
 export interface TerrainData {
   heights: number[];
@@ -98,6 +99,8 @@ export interface WeaponDefinition {
   craterRadius: number;
   projectileSpeedScale: number;
   behavior: WeaponBehavior;
+  category: ItemCategory;
+  bundleSize: number;
   splitCount?: number;
   splitAngleSpread?: number;
   bounceCount?: number;
@@ -105,6 +108,15 @@ export interface WeaponDefinition {
   salvoAngleSpread?: number;
   salvoPowerSpread?: number;
   moundRadius?: number;
+}
+
+export interface ItemDefinition {
+  id: string;
+  name: string;
+  price: number;
+  bundleSize: number;
+  hotkey: string;
+  description: string;
 }
 
 export interface ProjectileState {
@@ -264,15 +276,13 @@ export const GAME_CONFIG = {
   },
   match: {
     roundsToWin: 2,
-    startingCash: 1500,
+    startingCash: 15000,
     startingParachutes: 1,
     startingShields: 0,
-    parachutePrice: 250,
-    shieldPrice: 300,
     shieldAbsorbAmount: 40,
-    damageCashMultiplier: 3,
-    roundWinBonus: 500,
-    survivalBonus: 150,
+    damageCashMultiplier: 30,
+    roundWinBonus: 5000,
+    survivalBonus: 1500,
     // Each round past round 1, every base price is multiplied by
     // (1 + (round - 1) * roundPriceInflation). At 0.15, round 2 prices are
     // 1.15x, round 5 are 1.60x, round 7 are 1.90x.
@@ -293,27 +303,33 @@ export const GAME_CONFIG = {
       damage: 35,
       craterRadius: 25,
       projectileSpeedScale: 1,
-      behavior: 'single'
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 1
     },
     {
       id: 'big-missile',
       name: 'Big Missile',
       startingAmmo: 8,
-      price: 350,
+      price: 3500,
       damage: 55,
       craterRadius: 38,
       projectileSpeedScale: 1,
-      behavior: 'single'
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 1
     },
     {
       id: 'triple-missile',
       name: 'Triple Missile',
       startingAmmo: 6,
-      price: 1000,
+      price: 10000,
       damage: 30,
       craterRadius: 22,
       projectileSpeedScale: 1,
       behavior: 'split',
+      category: 'missile',
+      bundleSize: 1,
       splitCount: 3,
       splitAngleSpread: 18
     },
@@ -321,56 +337,70 @@ export const GAME_CONFIG = {
       id: 'huge-missile',
       name: 'Huge Missile',
       startingAmmo: 3,
-      price: 1800,
+      price: 18000,
       damage: 90,
       craterRadius: 60,
       projectileSpeedScale: 1,
-      behavior: 'single'
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 1
     },
     {
       id: 'dirt-mover',
       name: 'Dirt Mover',
       startingAmmo: 4,
-      price: 500,
+      price: 5000,
       damage: 0,
       craterRadius: 0,
       projectileSpeedScale: 1,
       behavior: 'dirt',
+      category: 'terrain',
+      bundleSize: 1,
       moundRadius: 42
     },
     {
       id: 'bouncing-bomb',
       name: 'Bouncing Bomb',
       startingAmmo: 5,
-      price: 800,
+      price: 8000,
       damage: 50,
       craterRadius: 32,
       projectileSpeedScale: 1,
       behavior: 'bounce',
+      category: 'missile',
+      bundleSize: 1,
       bounceCount: 1
     },
     {
       id: 'bullet',
       name: 'Bullet',
       startingAmmo: 12,
-      price: 150,
+      price: 1500,
       damage: 22,
       craterRadius: 12,
       projectileSpeedScale: 1.7,
-      behavior: 'single'
+      behavior: 'single',
+      category: 'missile',
+      bundleSize: 1
     },
     {
       id: 'stream',
       name: 'Stream',
       startingAmmo: 4,
-      price: 1300,
+      price: 13000,
       damage: 18,
       craterRadius: 14,
       projectileSpeedScale: 0.95,
       behavior: 'salvo',
+      category: 'missile',
+      bundleSize: 1,
       salvoCount: 5,
       salvoAngleSpread: 5,
       salvoPowerSpread: 12
     }
-  ] satisfies WeaponDefinition[]
+  ] satisfies WeaponDefinition[],
+  items: [
+    { id: 'parachute', name: 'Parachute', price: 10000, bundleSize: 8, hotkey: 'P', description: 'Auto-deploys on falls' },
+    { id: 'shield', name: 'Shield', price: 20000, bundleSize: 3, hotkey: 'S', description: 'Absorbs up to 40 damage' }
+  ] satisfies ItemDefinition[]
 } as const;

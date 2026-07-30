@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AISystem, isAIController, isRemoteController, type AIDecision } from '../systems/AISystem';
+import { EconomySystem } from '../systems/EconomySystem';
 import { HudSystem, SHOP_LAYOUT } from '../systems/HudSystem';
 import { networkSystem, type GameSnapshot, type NetInput, type NetworkMessage } from '../systems/NetworkSystem';
 import { soundSystem } from '../systems/SoundSystem';
@@ -52,6 +53,7 @@ export class GameScene extends Phaser.Scene {
   private turnSystem!: TurnSystem;
   private hudSystem!: HudSystem;
   private aiSystem!: AISystem;
+  private economySystem = new EconomySystem();
 
   private terrainData!: TerrainData;
   private tanks: TankState[] = [];
@@ -529,17 +531,7 @@ export class GameScene extends Phaser.Scene {
    * in this round's shop session.
    */
   private rollShopSale(): void {
-    if (Math.random() >= GAME_CONFIG.match.saleChance) {
-      this.match.currentSale = null;
-      return;
-    }
-    const candidates: string[] = [];
-    GAME_CONFIG.weapons.forEach((w) => { if (w.price > 0) candidates.push(w.id); });
-    candidates.push('parachute', 'shield');
-    const itemKey = candidates[Math.floor(Math.random() * candidates.length)];
-    const range = GAME_CONFIG.match.maxSaleDiscount - GAME_CONFIG.match.minSaleDiscount;
-    const discount = GAME_CONFIG.match.minSaleDiscount + Math.random() * range;
-    this.match.currentSale = { itemKey, discount };
+    this.match.currentSale = this.economySystem.rollSale();
   }
 
   /**
@@ -549,11 +541,7 @@ export class GameScene extends Phaser.Scene {
    * price. Minimum 1 to keep it a real transaction.
    */
   private effectivePrice(basePrice: number, itemKey: string): number {
-    if (basePrice <= 0) return 0;
-    const inflated = basePrice * (1 + (this.match.round - 1) * GAME_CONFIG.match.roundPriceInflation);
-    const sale = this.match.currentSale;
-    const final = sale && sale.itemKey === itemKey ? inflated * (1 - sale.discount) : inflated;
-    return Math.max(1, Math.round(final));
+    return this.economySystem.effectivePrice(basePrice, itemKey, this.match.round, this.match.currentSale);
   }
 
   private returnToMenu(): void {
@@ -795,23 +783,8 @@ export class GameScene extends Phaser.Scene {
 
   // -------- PENDING SHOP HELPERS --------
 
-  private pendingPriceFor(key: string): number {
-    return this.effectivePrice(this.basePriceFor(key), key);
-  }
-
   private basePriceFor(key: string): number {
-    if (key === 'parachute') return GAME_CONFIG.match.parachutePrice;
-    if (key === 'shield') return GAME_CONFIG.match.shieldPrice;
-    const weapon = GAME_CONFIG.weapons.find((w) => w.id === key);
-    return weapon?.price ?? 0;
-  }
-
-  private totalPendingCost(): number {
-    let total = 0;
-    for (const [k, qty] of Object.entries(this.pendingShopBuys)) {
-      total += qty * this.pendingPriceFor(k);
-    }
-    return total;
+    return this.economySystem.basePriceFor(key);
   }
 
   /**
@@ -820,7 +793,7 @@ export class GameScene extends Phaser.Scene {
    * affordability checks both stay consistent.
    */
   effectiveCash(profile: PlayerProfile): number {
-    return profile.cash - this.totalPendingCost();
+    return this.economySystem.effectiveCash(profile, this.pendingShopBuys, this.match.round, this.match.currentSale);
   }
 
   /** Pending count of an item — what's in the cart but not yet committed. */
@@ -859,16 +832,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private commitPendingShop(profile: PlayerProfile): void {
-    for (const [key, qty] of Object.entries(this.pendingShopBuys)) {
-      const cost = qty * this.pendingPriceFor(key);
-      profile.cash -= cost;
-      if (key === 'parachute') profile.parachutes += qty;
-      else if (key === 'shield') profile.shields += qty;
-      else {
-        if (profile.ammo[key] === -1) profile.ammo[key] = 0;
-        profile.ammo[key] = (profile.ammo[key] ?? 0) + qty;
-      }
-    }
+    this.economySystem.applyPurchases(profile, this.pendingShopBuys, this.match.round, this.match.currentSale);
     this.clearPendingShop();
   }
 
@@ -1480,7 +1444,8 @@ export class GameScene extends Phaser.Scene {
         hasPending: () => Object.keys(this.pendingShopBuys).length > 0,
         effectivePrice: (basePrice, key) => this.effectivePrice(basePrice, key),
         saleItem: () => this.match.currentSale?.itemKey ?? null,
-        saleDiscount: () => this.match.currentSale?.discount ?? 0
+        saleDiscount: () => this.match.currentSale?.discount ?? 0,
+        bundleSize: (key) => this.economySystem.bundleSizeFor(key)
       },
       this.topToast,
       this.quitConfirmActive

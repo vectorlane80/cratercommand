@@ -83,7 +83,6 @@ describe('TankSystem', () => {
   });
 
   it('settleTanksAfterTerrainChange applies fall damage', () => {
-    const oldTerrain = makeFlatTerrain(250);
     const newTerrain = makeFlatTerrain(300);
     const tank = makeTank({ id: 0, y: 250 - GAME_CONFIG.tank.placementOffsetY, health: 125, parachutes: 0 });
     const initialTankY = tank.y;
@@ -106,7 +105,6 @@ describe('TankSystem', () => {
   });
 
   it('settleTanksAfterTerrainChange uses parachute', () => {
-    const oldTerrain = makeFlatTerrain(250);
     const newTerrain = makeFlatTerrain(300);
     const tank = makeTank({ id: 0, y: 250 - GAME_CONFIG.tank.placementOffsetY, health: 125, parachutes: 1 });
 

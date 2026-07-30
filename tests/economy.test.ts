@@ -1,0 +1,100 @@
+import { describe, it, expect } from 'vitest';
+import { EconomySystem } from '../src/game/systems/EconomySystem';
+import { GAME_CONFIG } from '../src/game/types/GameTypes';
+import { makeProfile } from './helpers';
+
+describe('EconomySystem', () => {
+  const system = new EconomySystem();
+
+  it('effectivePrice: round 1 no sale returns base price', () => {
+    const price = system.effectivePrice(3500, 'big-missile', 1, null);
+    expect(price).toBe(3500);
+  });
+
+  it('effectivePrice: round 5 no sale applies inflation', () => {
+    const basePrice = 3500;
+    const round = 5;
+    const inflated = basePrice * (1 + (round - 1) * GAME_CONFIG.match.roundPriceInflation);
+    const price = system.effectivePrice(basePrice, 'big-missile', round, null);
+    expect(price).toBe(Math.max(1, Math.round(inflated)));
+  });
+
+  it('effectivePrice: sale on different key returns inflated price', () => {
+    const price = system.effectivePrice(3500, 'big-missile', 1, { itemKey: 'shield', discount: 0.5 });
+    expect(price).toBe(3500);
+  });
+
+  it('effectivePrice: sale on same key applies discount', () => {
+    const basePrice = 3500;
+    const inflated = basePrice * (1 + (1 - 1) * GAME_CONFIG.match.roundPriceInflation);
+    const discounted = inflated * (1 - 0.5);
+    const price = system.effectivePrice(basePrice, 'big-missile', 1, { itemKey: 'big-missile', discount: 0.5 });
+    expect(price).toBe(Math.max(1, Math.round(discounted)));
+  });
+
+  it('effectivePrice: basePrice 0 returns 0', () => {
+    const price = system.effectivePrice(0, 'small-missile', 1, null);
+    expect(price).toBe(0);
+  });
+
+  it('basePriceFor looks up weapons and items', () => {
+    expect(system.basePriceFor('big-missile')).toBe(3500);
+    expect(system.basePriceFor('parachute')).toBe(10000);
+    expect(system.basePriceFor('shield')).toBe(20000);
+    expect(system.basePriceFor('unknown')).toBe(0);
+  });
+
+  it('bundleSizeFor looks up weapons and items', () => {
+    expect(system.bundleSizeFor('parachute')).toBe(8);
+    expect(system.bundleSizeFor('shield')).toBe(3);
+    expect(system.bundleSizeFor('big-missile')).toBe(1);
+    expect(system.bundleSizeFor('unknown')).toBe(1);
+  });
+
+  it('totalPendingCost sums pending costs', () => {
+    const pending = { parachute: 2, 'big-missile': 1 };
+    const cost = system.totalPendingCost(pending, 1, null);
+    expect(cost).toBe(2 * 10000 + 3500);
+  });
+
+  it('effectiveCash subtracts pending cost from profile cash', () => {
+    const profile = makeProfile({ cash: 30000 });
+    const pending = { parachute: 1, 'big-missile': 1 };
+    const effective = system.effectiveCash(profile, pending, 1, null);
+    expect(effective).toBe(30000 - 10000 - 3500);
+  });
+
+  it('applyPurchases applies purchases to profile', () => {
+    const profile = makeProfile({ cash: 30000 });
+    const pending = { parachute: 1, 'big-missile': 2 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.cash).toBe(30000 - 10000 - 7000);
+    expect(profile.parachutes).toBe(1 + 8);
+    expect(profile.ammo['big-missile']).toBe(8 + 2);
+  });
+
+  it('applyPurchases converts unlimited ammo to 0 before adding', () => {
+    const profile = makeProfile({ ammo: { 'big-missile': -1 } });
+    const pending = { 'big-missile': 1 };
+    system.applyPurchases(profile, pending, 1, null);
+    expect(profile.ammo['big-missile']).toBe(0 + 1);
+  });
+
+  it('rollSale generates valid sales', () => {
+    for (let i = 0; i < 200; i += 1) {
+      const sale = system.rollSale();
+      if (sale === null) {
+        expect(sale).toBeNull();
+      } else {
+        expect(typeof sale.itemKey).toBe('string');
+        expect(typeof sale.discount).toBe('number');
+        expect(sale.discount).toBeGreaterThanOrEqual(GAME_CONFIG.match.minSaleDiscount);
+        expect(sale.discount).toBeLessThanOrEqual(GAME_CONFIG.match.maxSaleDiscount);
+
+        const isWeapon = GAME_CONFIG.weapons.some((w) => w.id === sale.itemKey && w.price > 0);
+        const isItem = GAME_CONFIG.items.some((i) => i.id === sale.itemKey);
+        expect(isWeapon || isItem).toBe(true);
+      }
+    }
+  });
+});

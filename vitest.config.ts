@@ -3,9 +3,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      phaser: fileURLToPath(new URL('./tests/stubs/phaser.ts', import.meta.url))
-    }
+    alias: [
+      { find: /^phaser$/, replacement: fileURLToPath(new URL('./tests/stubs/phaser.ts', import.meta.url)) }
+    ]
   },
   test: {
     environment: 'node',
