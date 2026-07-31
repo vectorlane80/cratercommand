@@ -146,6 +146,8 @@ export class HudSystem {
     if (!inShop && !matchOver) {
       if (visualSystem === 'retroPixel') {
         this.drawRetroPixelHud(turn, tanks, weapon, match, weaponWindowStart);
+      } else if (visualSystem === 'hiRes') {
+        this.drawHiResHud(turn, tanks, weapon, match, weaponWindowStart);
       } else {
         this.drawTopHud(turn, tanks, match);
         this.drawConsole(turn, tanks[turn.activePlayerId], weapon, match, weaponWindowStart);
@@ -996,16 +998,175 @@ export class HudSystem {
     this.addText(x + 10, y, label, accent, GAME_CONFIG.font.medium);
   }
 
-  private addText(x: number, y: number, value: string, color: number, fontSize: string): void {
+  private addText(
+    x: number,
+    y: number,
+    value: string,
+    color: number,
+    fontSize: string,
+    fontFamily?: string,
+    letterSpacing?: number
+  ): void {
     const text = this.scene.add.text(x, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
-      fontFamily: GAME_CONFIG.font.family,
+      fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
       fontStyle: 'bold'
     });
     // Higher resolution makes text crisp under Phaser scale.zoom + CSS scale.
     text.setResolution(2);
+    if (letterSpacing !== undefined) {
+      text.setLetterSpacing(letterSpacing);
+    }
     this.texts.push(text);
+  }
+
+  private drawHiResPanelFrame(x: number, y: number, w: number, h: number, title: string): void {
+    // Dark glass gradient background
+    this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.93);
+    this.graphics.fillRoundedRect(x, y, w, h, 3);
+    // Outer border — warm highlight
+    this.graphics.lineStyle(1, 0xffbe78, 0.16);
+    this.graphics.strokeRoundedRect(x, y, w, h, 3);
+    // Inset top highlight
+    this.graphics.lineStyle(1, 0xffffff, 0.06);
+    this.graphics.beginPath();
+    this.graphics.moveTo(x + 2, y + 1);
+    this.graphics.lineTo(x + w - 2, y + 1);
+    this.graphics.strokePath();
+    // Title
+    if (title) {
+      this.addText(x + (w - title.length * 6) / 2, y + 8, title, 0xffbe78, '10px', 'JetBrains Mono', 2);
+    }
+  }
+
+  private drawHiResHud(
+    turn: TurnState,
+    tanks: TankState[],
+    weapon: WeaponDefinition,
+    match: MatchState,
+    weaponWindowStart = 0
+  ): void {
+    const colors = GAME_CONFIG.colors;
+    const activeTank = tanks[turn.activePlayerId];
+    const top = GAME_CONFIG.layout.consoleTop;
+    const activePalette = getPlayerPalette(turn.activePlayerId, 'hiRes');
+
+    // Top bar background
+    this.graphics.fillStyle(colors.black, 1);
+    this.graphics.fillRect(0, 0, GAME_CONFIG.width, 82);
+    this.graphics.lineStyle(2, colors.steelLight, 1);
+    this.graphics.strokeRect(2, 2, GAME_CONFIG.width - 4, GAME_CONFIG.height - 4);
+    this.graphics.lineStyle(1, colors.steelDark, 1);
+    this.graphics.strokeRect(6, 6, GAME_CONFIG.width - 12, GAME_CONFIG.height - 12);
+
+    this.drawRetroPlayerPanel(22, 14, tanks[0], match, getPlayerPalette(0, 'hiRes').primary);
+    this.drawRetroPlayerPanel(774, 14, tanks[1], match, getPlayerPalette(1, 'hiRes').primary);
+
+    const windArrow = turn.wind.direction < 0 ? '<' : '>';
+    this.addText(434, 12, `ROUND ${match.round}`, colors.white, GAME_CONFIG.font.medium, 'JetBrains Mono', 1);
+    this.addText(
+      434,
+      36,
+      `PLAYER ${turn.activePlayerId + 1}`,
+      activePalette.primary,
+      GAME_CONFIG.font.large,
+      'Barlow Condensed',
+      0
+    );
+    this.addText(432, 66, `Wind ${windArrow} ${turn.wind.magnitude}`, colors.green, GAME_CONFIG.font.medium, 'JetBrains Mono', 1);
+
+    // Console band background
+    this.graphics.fillStyle(colors.steelMid, 1);
+    this.graphics.fillRect(0, top, GAME_CONFIG.width, 134);
+    this.graphics.lineStyle(3, colors.steelLight, 1);
+    this.graphics.strokeRect(0, top, GAME_CONFIG.width, 134);
+    // Console band top hairline
+    this.graphics.lineStyle(1, 0xffb347, 0.8);
+    this.graphics.beginPath();
+    this.graphics.moveTo(0, top);
+    this.graphics.lineTo(GAME_CONFIG.width, top);
+    this.graphics.strokePath();
+
+    this.drawHiResPanelFrame(8, top + 8, 208, 122, 'WEAPONS');
+    this.drawRetroWeaponRows(18, top + 32, activeTank, activePalette.primary, weaponWindowStart);
+    this.drawHiResPanelFrame(220, top + 8, 176, 122, 'ANGLE');
+    this.drawRetroAnglePanel(236, top + 42, activeTank, activePalette.primary);
+    this.drawHiResPanelFrame(400, top + 8, 204, 122, 'POWER');
+    this.drawRetroPowerPanel(416, top + 42, activeTank, activePalette.primary);
+    this.drawHiResPanelFrame(610, top + 8, 140, 122, '');
+    this.drawHiResFireButton(632, top + 36, turn.phase === 'aiming');
+    this.drawHiResPanelFrame(756, top + 8, 196, 122, 'STATUS');
+    this.drawHiResStatusPanel(770, top + 36, activeTank, match);
+
+    // Bottom hint strip
+    this.graphics.fillStyle(colors.black, 1);
+    this.graphics.fillRect(0, top + 136, GAME_CONFIG.width, 46);
+    this.graphics.lineStyle(2, colors.steelLight, 1);
+    this.graphics.strokeRect(0, top + 136, GAME_CONFIG.width, 46);
+
+    this.addText(
+      16,
+      top + 144,
+      '←→ Aim  ↑↓ Power  A/D·TAP MOVE  1-8 Weapon',
+      colors.cyan,
+      GAME_CONFIG.font.small,
+      'JetBrains Mono',
+      1
+    );
+    this.addText(
+      16,
+      top + 162,
+      'SPACE Fire  V Visual  ENTER Advance',
+      colors.cyan,
+      GAME_CONFIG.font.small,
+      'JetBrains Mono',
+      1
+    );
+    this.addText(
+      720,
+      top + 144,
+      turn.phase === 'aiming' ? 'SPACE to fire' : 'SHOT IN FLIGHT',
+      turn.phase === 'aiming' ? colors.green : colors.yellow,
+      GAME_CONFIG.font.small,
+      'JetBrains Mono',
+      1
+    );
+    this.addText(720, top + 162, `Weapon: ${weapon.name}`, colors.white, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+  }
+
+  private drawHiResStatusPanel(x: number, y: number, activeTank: TankState, match: MatchState): void {
+    const colors = GAME_CONFIG.colors;
+    this.addText(x, y, `HP     ${activeTank.health} / ${GAME_CONFIG.tank.maxHealth}`, colors.white, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+    const moveStr = activeTank.fuel > 0
+      ? `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}+${Math.round(activeTank.fuel)}`
+      : `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}`;
+    this.addText(
+      x,
+      y + 12,
+      moveStr,
+      colors.white,
+      GAME_CONFIG.font.small,
+      'JetBrains Mono',
+      1
+    );
+    this.addText(x, y + 24, `CHUTES ${activeTank.parachutes}`, colors.yellow, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+    this.addText(x, y + 36, `BATT   ${activeTank.batteries}`, colors.cyan, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+    const guideLabel = activeTank.selectedGuidanceId
+      ? (GAME_CONFIG.items.find((i) => i.id === activeTank.selectedGuidanceId)?.sidebarLabel ?? activeTank.selectedGuidanceId.toUpperCase())
+      : '--';
+    this.addText(x, y + 48, `GUIDE  ${guideLabel}`, colors.cyan, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+    this.addText(x, y + 60, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, colors.cyan, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+    this.addText(x, y + 72, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+    // Note: WINS row dropped for hiRes
+  }
+
+  private drawHiResFireButton(x: number, y: number, canFire: boolean): void {
+    const gradient = canFire ? 1 : 0.35;
+    this.graphics.fillGradientStyle(0xffb347, 0xffb347, 0xff7a3c, 0xff7a3c, gradient);
+    this.graphics.fillRoundedRect(x, y, 94, 58, 4);
+    const labelColor = canFire ? 0x1a0d05 : 0x777777;
+    this.addText(x + 20, y + 14, 'FIRE', labelColor, GAME_CONFIG.font.title, 'Barlow Condensed', 0);
   }
 
   private clearTexts(): void {

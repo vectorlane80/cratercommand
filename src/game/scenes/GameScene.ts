@@ -1342,7 +1342,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleAimingPointer(x: number, y: number): void {
-    if (this.visualSystem === 'retroPixel') {
+    if (this.visualSystem !== 'classic') {
       this.handleRetroAimingPointer(x, y);
       return;
     }

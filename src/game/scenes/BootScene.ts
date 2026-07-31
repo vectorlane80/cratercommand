@@ -27,6 +27,11 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.scene.start('MenuScene');
+    const fontLoads = [
+      document.fonts.load('600 16px "Barlow Condensed"'),
+      document.fonts.load('700 16px "Barlow Condensed"'),
+      document.fonts.load('400 12px "JetBrains Mono"')
+    ];
+    Promise.all(fontLoads).catch(() => undefined).finally(() => this.scene.start('MenuScene'));
   }
 }
