@@ -130,6 +130,7 @@ export class GameScene extends Phaser.Scene {
   private weaponKeys: Phaser.Input.Keyboard.Key[] = [];
   private weaponPrevKey!: Phaser.Input.Keyboard.Key;
   private weaponNextKey!: Phaser.Input.Keyboard.Key;
+  private vKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('GameScene');
@@ -257,6 +258,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponKeys = numberKeyCodes.map((code) => this.input.keyboard!.addKey(code));
     this.weaponPrevKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.weaponNextKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.vKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.V);
     this.batteryUseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     this.shieldArmKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
     this.guidanceCycleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C);
@@ -317,6 +319,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    if (Phaser.Input.Keyboard.JustDown(this.vKey)) {
+      this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
+      this.renderAll();
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.soundToggleKey)) {
       soundSystem.toggle();
       this.renderTanksAndHud();
