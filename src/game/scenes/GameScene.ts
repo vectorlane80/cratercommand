@@ -50,6 +50,11 @@ export class GameScene extends Phaser.Scene {
   private retroCacti: Phaser.GameObjects.Image[] = [];
   private retroTankBodies: Phaser.GameObjects.Image[] = [];
 
+  // HiRes-mode sprite layers (created once, shown only when visualSystem === 'hiRes').
+  private hiresBarrels: Phaser.GameObjects.Image[] = [];
+  private hiresChutes: Phaser.GameObjects.Image[] = [];
+  private hiresShells: Phaser.GameObjects.Image[] = [];
+
   private terrainSystem!: TerrainSystem;
   private tankSystem!: TankSystem;
   private projectileSystem!: ProjectileSystem;
@@ -220,6 +225,23 @@ export class GameScene extends Phaser.Scene {
       this.add.image(0, 0, 'retro-tank-red').setOrigin(0.5, 1).setScale(0.55)
     ];
 
+    // HiRes-mode barrel sprites (one per tank).
+    this.hiresBarrels = [
+      this.add.image(0, 0, 'hires-barrel-blue').setOrigin(0.0625, 0.5).setScale(0.25),
+      this.add.image(0, 0, 'hires-barrel-red').setOrigin(0.0625, 0.5).setScale(0.25)
+    ];
+
+    // HiRes-mode chute indicators (one per tank).
+    this.hiresChutes = [
+      this.add.image(0, 0, 'hires-chute').setOrigin(0.5, 1).setScale(0.25),
+      this.add.image(0, 0, 'hires-chute').setOrigin(0.5, 1).setScale(0.25)
+    ];
+
+    // HiRes-mode shell sprites (pool of 24 for projectiles).
+    this.hiresShells = Array.from({ length: 24 }, () =>
+      this.add.image(0, 0, 'hires-shell').setOrigin(0.5, 0.5).setScale(0.25).setVisible(false)
+    );
+
     this.applyVisualLayerTextures();
 
     this.projectileGraphics = this.add.graphics();
@@ -295,6 +317,16 @@ export class GameScene extends Phaser.Scene {
 
     // Mouse/touch routing.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
+
+    // HiRes blast animation.
+    if (!this.anims.exists('hires-blast-anim')) {
+      this.anims.create({
+        key: 'hires-blast-anim',
+        frames: this.anims.generateFrameNumbers('hires-blast', { frames: [0, 1, 2, 3] }),
+        frameRate: 16,
+        repeat: 0
+      });
+    }
 
     // Online networking.
     if (this.isOnlineHost || this.isOnlineJoiner) {
@@ -1930,6 +1962,14 @@ export class GameScene extends Phaser.Scene {
       soundSystem.playMiss();
     }
 
+    // HiRes blast animation
+    if (this.visualSystem === 'hiRes' && (impact.kind === 'tank' || impact.kind === 'terrain')) {
+      const r = Math.max(20, weapon.craterRadius || 20);
+      const s = this.add.sprite(impact.x, impact.y, 'hires-blast').setScale(r / 44);
+      s.play('hires-blast-anim');
+      s.once('animationcomplete', () => s.destroy());
+    }
+
     if (terrainChanged) {
       this.settleTerrainAndTanks(shooter);
     }
@@ -1988,7 +2028,7 @@ export class GameScene extends Phaser.Scene {
     this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
     this.updateRetroLayerVisibility();
     this.renderTanksAndHud();
-    this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
+    this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles, this.visualSystem, this.hiresShells);
   }
 
   private applyVisualLayerTextures(): void {
@@ -2010,6 +2050,9 @@ export class GameScene extends Phaser.Scene {
     this.retroBackdrop.visible = retro;
     this.retroCacti.forEach((cactus) => (cactus.visible = retro));
     this.retroTankBodies.forEach((tankImg) => (tankImg.visible = retro));
+    this.hiresBarrels.forEach((barrel) => (barrel.visible = false));
+    this.hiresChutes.forEach((chute) => (chute.visible = false));
+    this.hiresShells.forEach((shell) => (shell.visible = false));
 
     if (retro && this.terrainData) {
       RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
@@ -2046,6 +2089,34 @@ export class GameScene extends Phaser.Scene {
     // Host broadcasts a snapshot every time the state would re-render.
     if (this.isOnlineHost) this.broadcastSnapshot();
     this.tankSystem.draw(this.tankGraphics, this.tanks, this.turn.activePlayerId, this.visualSystem);
+
+    // Position hiRes barrel and chute sprites.
+    if (this.visualSystem === 'hiRes') {
+      this.tanks.forEach((tank, idx) => {
+        // Barrels
+        const barrel = this.hiresBarrels[idx];
+        if (barrel) {
+          if (tank.alive) {
+            barrel.setPosition(Math.round(tank.x), Math.round(tank.y) - GAME_CONFIG.tank.barrelInsetY);
+            barrel.setRotation(Phaser.Math.DegToRad(-tank.angle));
+            barrel.visible = true;
+          } else {
+            barrel.visible = false;
+          }
+        }
+        // Chutes
+        const chute = this.hiresChutes[idx];
+        if (chute) {
+          if (tank.alive && tank.parachutes > 0) {
+            chute.setPosition(Math.round(tank.x) - 24, Math.round(tank.y - 32) + 14);
+            chute.visible = true;
+          } else {
+            chute.visible = false;
+          }
+        }
+      });
+    }
+
     this.hudSystem.render(
       this.turn,
       this.tanks,

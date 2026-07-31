@@ -221,7 +221,7 @@ export class TankSystem {
       const palette = getPlayerPalette(tank.id, visualSystem);
 
       if (visualSystem !== 'classic') {
-        this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId, palette);
+        this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId, palette, visualSystem);
         return;
       }
 
@@ -277,7 +277,8 @@ export class TankSystem {
     graphics: Phaser.GameObjects.Graphics,
     tank: TankState,
     isActive: boolean,
-    palette: PlayerPalette
+    palette: PlayerPalette,
+    visualSystem: VisualSystem = 'retroPixel'
   ): void {
     // The tank BODY is now rendered by a sprite Image game object (placed by
     // GameScene), so this routine only draws the active-player marker, the
@@ -303,18 +304,22 @@ export class TankSystem {
       graphics.strokeTriangle(markerX, markerY, markerX - 8, markerY - 16, markerX + 8, markerY - 16);
     }
 
-    graphics.lineStyle(4, baseColor, 1);
-    graphics.beginPath();
-    graphics.moveTo(turretStart.x, turretStart.y);
-    graphics.lineTo(turretTip.x, turretTip.y);
-    graphics.strokePath();
-    graphics.lineStyle(2, lightColor, 1);
-    graphics.beginPath();
-    graphics.moveTo(turretStart.x, turretStart.y - 1);
-    graphics.lineTo(turretTip.x, turretTip.y - 1);
-    graphics.strokePath();
+    // In hiRes, barrels are sprite Images; in retroPixel, stroked lines.
+    if (visualSystem === 'retroPixel') {
+      graphics.lineStyle(4, baseColor, 1);
+      graphics.beginPath();
+      graphics.moveTo(turretStart.x, turretStart.y);
+      graphics.lineTo(turretTip.x, turretTip.y);
+      graphics.strokePath();
+      graphics.lineStyle(2, lightColor, 1);
+      graphics.beginPath();
+      graphics.moveTo(turretStart.x, turretStart.y - 1);
+      graphics.lineTo(turretTip.x, turretTip.y - 1);
+      graphics.strokePath();
+    }
 
-    if (tank.parachutes > 0) {
+    // In retroPixel, parachutes are a 5x5 pip; in hiRes, sprite indicator.
+    if (visualSystem === 'retroPixel' && tank.parachutes > 0) {
       graphics.fillStyle(colors.yellow, 1);
       graphics.fillRect(Math.round(tank.x) - 26, bodyY + 8, 5, 5);
     }

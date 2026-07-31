@@ -7,6 +7,7 @@ import {
   type ProjectileState,
   type TankState,
   type TerrainData,
+  type VisualSystem,
   type WallMode,
   type WeaponDefinition,
   type WindState
@@ -538,19 +539,44 @@ export class ProjectileSystem {
     }
   }
 
-  drawAll(graphics: Phaser.GameObjects.Graphics, projectiles: ProjectileState[]): void {
+  drawAll(
+    graphics: Phaser.GameObjects.Graphics,
+    projectiles: ProjectileState[],
+    visualSystem: VisualSystem = 'classic',
+    shellPool: Phaser.GameObjects.Image[] = []
+  ): void {
     graphics.clear();
-    projectiles.forEach((projectile) => {
+
+    // Hide all pool entries initially (will show those in use)
+    if (visualSystem === 'hiRes') {
+      shellPool.forEach((shell) => shell.setVisible(false));
+    }
+
+    projectiles.forEach((projectile, index) => {
       graphics.fillStyle(GAME_CONFIG.colors.white, 1);
-      projectile.trail.forEach((point, index) => {
-        if (index % 2 === 0) {
+      projectile.trail.forEach((point, pointIndex) => {
+        if (pointIndex % 2 === 0) {
           graphics.fillRect(Math.round(point.x), Math.round(point.y), 3, 3);
         }
       });
 
-      const color = projectile.weapon.behavior === 'dirt' ? GAME_CONFIG.colors.darkGreen : GAME_CONFIG.colors.yellow;
-      graphics.fillStyle(color, 1);
-      graphics.fillRect(Math.round(projectile.x) - 3, Math.round(projectile.y) - 3, 6, 6);
+      if (visualSystem === 'hiRes' && index < shellPool.length) {
+        // Use pool image for this projectile
+        const shell = shellPool[index];
+        shell.setPosition(Math.round(projectile.x), Math.round(projectile.y));
+        shell.setRotation(Math.atan2(projectile.velocityY, projectile.velocityX));
+        shell.setVisible(true);
+      } else if (visualSystem === 'hiRes') {
+        // Overflow beyond pool — draw classic square
+        const color = projectile.weapon.behavior === 'dirt' ? GAME_CONFIG.colors.darkGreen : GAME_CONFIG.colors.yellow;
+        graphics.fillStyle(color, 1);
+        graphics.fillRect(Math.round(projectile.x) - 3, Math.round(projectile.y) - 3, 6, 6);
+      } else {
+        // Classic/retroPixel — draw square
+        const color = projectile.weapon.behavior === 'dirt' ? GAME_CONFIG.colors.darkGreen : GAME_CONFIG.colors.yellow;
+        graphics.fillStyle(color, 1);
+        graphics.fillRect(Math.round(projectile.x) - 3, Math.round(projectile.y) - 3, 6, 6);
+      }
     });
   }
 }
