@@ -94,8 +94,7 @@ mutable state and orchestrates stateless-ish systems: Terrain, Projectile,
 Tank, Turn, Hud, AI, Economy, Sound, Network, Visual. All tunables — every
 weapon, item, price, and physics constant — live in `GAME_CONFIG`
 (`src/game/types/GameTypes.ts`); most features are data-driven from those
-tables. See [DECISIONS.md](DECISIONS.md) for the full rationale and
-[docs/DEVLOG.md](docs/DEVLOG.md) for the build history.
+tables.
 
 ## Tests
 

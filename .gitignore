@@ -3,3 +3,12 @@ dist
 .DS_Store
 .claude
 .agent-index
+
+# Internal working docs — not part of the public repo
+CLAUDE.md
+CHARTER.md
+ROADMAP.md
+REQUESTS.md
+DECISIONS.md
+TASKS.md
+docs/
