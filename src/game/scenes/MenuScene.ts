@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { soundSystem } from '../systems/SoundSystem';
+import { getPlayerPalette } from '../systems/TankSystem';
 import {
   CONTROLLER_CYCLE,
   CONTROLLER_LABELS,
@@ -52,6 +53,7 @@ export class MenuScene extends Phaser.Scene {
   private visualSystem: VisualSystem = 'classic';
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
+  private retroBackdrop!: Phaser.GameObjects.Image;
   private view: 'main' | 'settings' = 'main';
 
   private slotKeys: Phaser.Input.Keyboard.Key[] = [];
@@ -70,6 +72,11 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
+
+    // Retro backdrop — created first so it layers under graphics/text
+    this.retroBackdrop = this.add.image(GAME_CONFIG.width / 2, 0, 'retro-backdrop').setOrigin(0.5, 0);
+    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, 260);
+
     this.graphics = this.add.graphics();
 
     const keyCodes = [
@@ -364,6 +371,38 @@ export class MenuScene extends Phaser.Scene {
     return { x: GAME_CONFIG.width / 2 - 120, y: 400, w: 240, h: 36 };
   }
 
+  private menuPalette() {
+    const c = GAME_CONFIG.colors;
+    if (this.visualSystem === 'retroPixel') {
+      return {
+        title: c.desertGold,
+        subtitle: c.white,
+        hint: c.steelLight,
+        startButton: c.desertGold,
+        settingsButton: c.steelLight,
+        backButton: c.steelLight,
+        visualsButton: c.steelLight,
+        hostButton: c.retroBlue,
+        joinButton: c.retroOrange,
+        settingsLabel: c.steelLight,
+        settingsValue: c.desertGold
+      };
+    }
+    return {
+      title: c.magenta,
+      subtitle: c.cyan,
+      hint: c.white,
+      startButton: c.yellow,
+      settingsButton: c.white,
+      backButton: c.white,
+      visualsButton: c.white,
+      hostButton: c.cyan,
+      joinButton: c.magenta,
+      settingsLabel: c.white,
+      settingsValue: c.cyan
+    };
+  }
+
   /**
    * All slots cycle through human and the CPU personalities
    * (moron, shooter, tosser, spoiler, cyborg).
@@ -414,6 +453,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private render(): void {
+    this.retroBackdrop.visible = this.visualSystem === 'retroPixel';
+    this.graphics.clear();
+    if (this.visualSystem === 'retroPixel') {
+      this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.45);
+      this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+    }
     if (this.view === 'main') {
       this.renderMain();
     } else {
@@ -423,17 +468,17 @@ export class MenuScene extends Phaser.Scene {
 
   private renderMain(): void {
     this.clearTexts();
-    this.graphics.clear();
     const colors = GAME_CONFIG.colors;
+    const palette = this.menuPalette();
 
     // Title
-    this.addText(GAME_CONFIG.width / 2 - 174, 20, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
-    this.addText(GAME_CONFIG.width / 2 - 80, 60, 'MATCH SETUP', colors.cyan, GAME_CONFIG.font.large);
+    this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
+    this.addCenteredText(60, 'MATCH SETUP', palette.subtitle, GAME_CONFIG.font.large);
 
     // Player rows (2-player only)
     const labels = ['PLAYER 1', 'PLAYER 2'];
     const rowYs = [140, 200];
-    const palettes = [colors.cyan, colors.magenta];
+    const palettes = [getPlayerPalette(0, this.visualSystem).primary, getPlayerPalette(1, this.visualSystem).primary];
     for (let i = 0; i < 2; i += 1) {
       this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i]);
     }
@@ -443,7 +488,7 @@ export class MenuScene extends Phaser.Scene {
       GAME_CONFIG.width / 2 - 170,
       262,
       'Tap name to rename · Tap box to cycle',
-      colors.white,
+      palette.hint,
       GAME_CONFIG.font.small
     );
 
@@ -455,9 +500,9 @@ export class MenuScene extends Phaser.Scene {
     const btnH = 46;
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(btnX, btnY, btnW, btnH);
-    this.graphics.lineStyle(3, enabled ? colors.yellow : colors.dimGray, 1);
+    this.graphics.lineStyle(3, enabled ? palette.startButton : colors.dimGray, 1);
     this.graphics.strokeRect(btnX, btnY, btnW, btnH);
-    this.addText(btnX + 65, btnY + 10, 'START MATCH', enabled ? colors.yellow : colors.dimGray, GAME_CONFIG.font.title);
+    this.addText(btnX + 65, btnY + 10, 'START MATCH', enabled ? palette.startButton : colors.dimGray, GAME_CONFIG.font.title);
 
     if (!enabled) {
       this.addText(
@@ -473,56 +518,56 @@ export class MenuScene extends Phaser.Scene {
     const settingsBtn = this.settingsButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
-    this.graphics.lineStyle(2, colors.white, 1);
+    this.graphics.lineStyle(2, palette.settingsButton, 1);
     this.graphics.strokeRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
-    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', colors.white, GAME_CONFIG.font.large);
+    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', palette.settingsButton, GAME_CONFIG.font.large);
 
     // Visuals button
     const visualsBtn = this.visualsButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(visualsBtn.x, visualsBtn.y, visualsBtn.w, visualsBtn.h);
-    this.graphics.lineStyle(2, colors.white, 1);
+    this.graphics.lineStyle(2, palette.visualsButton, 1);
     this.graphics.strokeRect(visualsBtn.x, visualsBtn.y, visualsBtn.w, visualsBtn.h);
     const visualsLabel = this.visualSystem === 'classic' ? 'VISUALS: CLASSIC' : 'VISUALS: RETRO PIXEL';
-    this.addText(visualsBtn.x + 90, visualsBtn.y + 6, visualsLabel, colors.white, GAME_CONFIG.font.medium);
+    this.addText(visualsBtn.x + 90, visualsBtn.y + 6, visualsLabel, palette.visualsButton, GAME_CONFIG.font.medium);
 
     // Online buttons
     const host = this.hostButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(host.x, host.y, host.w, host.h);
-    this.graphics.lineStyle(2, colors.cyan, 1);
+    this.graphics.lineStyle(2, palette.hostButton, 1);
     this.graphics.strokeRect(host.x, host.y, host.w, host.h);
-    this.addText(host.x + 50, host.y + 6, 'HOST ONLINE', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(host.x + 50, host.y + 6, 'HOST ONLINE', palette.hostButton, GAME_CONFIG.font.medium);
 
     const join = this.joinButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(join.x, join.y, join.w, join.h);
-    this.graphics.lineStyle(2, colors.magenta, 1);
+    this.graphics.lineStyle(2, palette.joinButton, 1);
     this.graphics.strokeRect(join.x, join.y, join.w, join.h);
-    this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', colors.magenta, GAME_CONFIG.font.medium);
+    this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', palette.joinButton, GAME_CONFIG.font.medium);
   }
 
   private renderSettings(): void {
     this.clearTexts();
-    this.graphics.clear();
     const colors = GAME_CONFIG.colors;
+    const palette = this.menuPalette();
 
     // Title
-    this.addText(GAME_CONFIG.width / 2 - 174, 20, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
-    this.addText(GAME_CONFIG.width / 2 - 40, 60, 'SETTINGS', colors.cyan, GAME_CONFIG.font.large);
+    this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
+    this.addCenteredText(60, 'SETTINGS', palette.subtitle, GAME_CONFIG.font.large);
 
     // Settings rows with labels and value buttons
     const settingRows = [
-      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: colors.cyan },
-      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: colors.magenta },
-      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: colors.green },
-      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: colors.cyan },
-      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: colors.yellow }
+      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: palette.settingsValue },
+      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: palette.settingsValue },
+      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
+      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
+      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
     ];
 
     for (const row of settingRows) {
       // Label on the left
-      this.addText(220, row.y + 8, row.label, colors.white, GAME_CONFIG.font.medium);
+      this.addText(220, row.y + 8, row.label, palette.settingsLabel, GAME_CONFIG.font.medium);
 
       // Value button on the right
       const btn = this.settingsButtonForRow(row.y);
@@ -537,16 +582,16 @@ export class MenuScene extends Phaser.Scene {
     const backBtn = this.backButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
-    this.graphics.lineStyle(2, colors.white, 1);
+    this.graphics.lineStyle(2, palette.backButton, 1);
     this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
-    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK (ESC)', colors.white, GAME_CONFIG.font.large);
+    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK (ESC)', palette.backButton, GAME_CONFIG.font.large);
 
     // Hint
     this.addText(
       GAME_CONFIG.width / 2 - 290,
       452,
       'Settings apply to local and hosted online matches',
-      colors.white,
+      palette.hint,
       GAME_CONFIG.font.small
     );
   }
@@ -583,6 +628,18 @@ export class MenuScene extends Phaser.Scene {
       fontSize,
       fontStyle: 'bold'
     });
+    text.setResolution(2);
+    this.texts.push(text);
+  }
+
+  private addCenteredText(y: number, value: string, color: number, fontSize: string): void {
+    const text = this.add.text(GAME_CONFIG.width / 2, y, value, {
+      color: Phaser.Display.Color.IntegerToColor(color).rgba,
+      fontFamily: GAME_CONFIG.font.family,
+      fontSize,
+      fontStyle: 'bold'
+    });
+    text.setOrigin(0.5, 0);
     text.setResolution(2);
     this.texts.push(text);
   }
