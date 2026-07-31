@@ -108,6 +108,13 @@ export class HudSystem {
     this.graphics = scene.add.graphics();
   }
 
+  private uiPalette(visualSystem: VisualSystem) {
+    const c = GAME_CONFIG.colors;
+    return visualSystem === 'retroPixel'
+      ? { frame: c.steelLight, title: c.desertGold, accent: c.desertGold, header: c.desertGold, label: c.white }
+      : { frame: c.yellow, title: c.magenta, accent: c.cyan, header: c.cyan, label: c.cyan };
+  }
+
   render(
     turn: TurnState,
     tanks: TankState[],
@@ -132,7 +139,7 @@ export class HudSystem {
     // otherwise show through the modal's dim rectangle (Text is above
     // Graphics in the display list).
     if (quitConfirm) {
-      this.drawQuitConfirmModal();
+      this.drawQuitConfirmModal(visualSystem);
       return;
     }
 
@@ -146,9 +153,9 @@ export class HudSystem {
     }
 
     if (inShop) {
-      this.drawShopOverlay(match);
+      this.drawShopOverlay(match, visualSystem);
     } else if (turn.phase === 'roundOver' && statusMessage) {
-      this.drawCenterBanner(statusMessage, 'PRESS SPACE OR ENTER FOR SHOP');
+      this.drawCenterBanner(statusMessage, 'PRESS SPACE OR ENTER FOR SHOP', visualSystem);
     } else if (turn.phase === 'aiming' && statusMessage) {
       // AI is thinking — small banner that doesn't block visibility.
       this.addText(
@@ -164,7 +171,8 @@ export class HudSystem {
       const winName = match.profiles[winId].displayName ?? `PLAYER ${winId + 1}`;
       this.drawCenterBanner(
         `${winName} WINS THE MATCH`,
-        'PRESS R TO RESTART'
+        'PRESS R TO RESTART',
+        visualSystem
       );
     }
 
@@ -191,8 +199,9 @@ export class HudSystem {
    * carrying the warning and YES/NO buttons. Geometry matches
    * GameScene.handleQuitConfirmPointer.
    */
-  private drawQuitConfirmModal(): void {
+  private drawQuitConfirmModal(visualSystem: VisualSystem = 'classic'): void {
     const colors = GAME_CONFIG.colors;
+    const palette = this.uiPalette(visualSystem);
     const W = GAME_CONFIG.width;
     const H = GAME_CONFIG.height;
     const cx = W / 2;
@@ -208,7 +217,7 @@ export class HudSystem {
     const cardY = (H - cardH) / 2;
     this.graphics.fillStyle(colors.panelGray, 1);
     this.graphics.fillRect(cardX, cardY, cardW, cardH);
-    this.graphics.lineStyle(4, colors.red, 1);
+    this.graphics.lineStyle(4, palette.frame, 1);
     this.graphics.strokeRect(cardX, cardY, cardW, cardH);
 
     // Heading
@@ -240,13 +249,13 @@ export class HudSystem {
 
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(yesX, btnY, btnW, btnH);
-    this.graphics.lineStyle(3, colors.red, 1);
+    this.graphics.lineStyle(3, palette.frame, 1);
     this.graphics.strokeRect(yesX, btnY, btnW, btnH);
     this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, GAME_CONFIG.font.large);
 
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(noX, btnY, btnW, btnH);
-    this.graphics.lineStyle(3, colors.green, 1);
+    this.graphics.lineStyle(3, palette.frame, 1);
     this.graphics.strokeRect(noX, btnY, btnW, btnH);
     this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, GAME_CONFIG.font.large);
   }
@@ -561,6 +570,13 @@ export class HudSystem {
     this.graphics.moveTo(x + 18, y + 72);
     this.graphics.lineTo(x + 18 + Math.cos(rad) * dial, y + 72 - Math.sin(rad) * dial);
     this.graphics.strokePath();
+
+    // Quarter-zone markers (frame x: 220..396, this x offset by 220 so actual x = x-16)
+    // x+14=234 (-5), x+70=290 (-1), x+114=334 (+1), x+158=378 (+5)
+    this.addText(x - 6, y - 4, '<<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(x + 50, y - 4, '<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(x + 98, y - 4, '>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(x + 142, y - 4, '>>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
   }
 
   private drawRetroPowerPanel(x: number, y: number, activeTank: TankState, accentColor: number): void {
@@ -576,6 +592,13 @@ export class HudSystem {
     }
     this.addText(x + 4, y + 84, 'Min', GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
     this.addText(x + 136, y + 84, 'Max', GAME_CONFIG.colors.white, GAME_CONFIG.font.small);
+
+    // Quarter-zone markers (frame x: 400..604, this x offset by 400 so actual x = x-16)
+    // x+11=427 (-5), x+76=492 (-1), x+137=553 (+1), x+178=594 (+5)
+    this.addText(x - 5, y - 4, '<<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(x + 60, y - 4, '<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(x + 121, y - 4, '>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(x + 162, y - 4, '>>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
   }
 
   private drawRetroFireButton(x: number, y: number, canFire: boolean): void {
@@ -594,27 +617,26 @@ export class HudSystem {
       : `MOVE   ${Math.round(activeTank.moveRemaining)} / ${GAME_CONFIG.movement.perTurn}`;
     this.addText(
       x,
-      y + 14,
+      y + 12,
       moveStr,
       colors.white,
       GAME_CONFIG.font.small
     );
-    this.addText(x, y + 28, `CHUTES ${activeTank.parachutes}`, colors.yellow, GAME_CONFIG.font.small);
-    this.addText(x, y + 42, `BATT   ${activeTank.batteries}`, colors.cyan, GAME_CONFIG.font.small);
+    this.addText(x, y + 24, `CHUTES ${activeTank.parachutes}`, colors.yellow, GAME_CONFIG.font.small);
+    this.addText(x, y + 36, `BATT   ${activeTank.batteries}`, colors.cyan, GAME_CONFIG.font.small);
     const guideLabel = activeTank.selectedGuidanceId
       ? (GAME_CONFIG.items.find((i) => i.id === activeTank.selectedGuidanceId)?.sidebarLabel ?? activeTank.selectedGuidanceId.toUpperCase())
       : '--';
-    this.addText(x, y + 56, `GUIDE  ${guideLabel}`, colors.cyan, GAME_CONFIG.font.small);
-    this.addText(x, y + 70, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, colors.cyan, GAME_CONFIG.font.small);
-    this.addText(x, y + 84, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
+    this.addText(x, y + 48, `GUIDE  ${guideLabel}`, colors.cyan, GAME_CONFIG.font.small);
+    this.addText(x, y + 60, `SHIELD ${activeTank.armedShieldHp > 0 ? activeTank.armedShieldHp + ' HP' : '--'}`, colors.cyan, GAME_CONFIG.font.small);
+    this.addText(x, y + 72, `CASH   $${match.profiles[activeTank.id].cash}`, colors.green, GAME_CONFIG.font.small);
     this.addText(
       x,
-      y + 98,
+      y + 84,
       `WINS   ${match.profiles[0].wins}-${match.profiles[1].wins}  (to ${match.roundsToWin})`,
       colors.cyan,
       GAME_CONFIG.font.small
     );
-    this.addText(x, y + 112, `WEAPON ${GAME_CONFIG.weapons[activeTank.selectedWeaponIndex].name}`, colors.white, GAME_CONFIG.font.small);
   }
 
   private drawFireButton(top: number): void {
@@ -757,23 +779,25 @@ export class HudSystem {
     );
   }
 
-  private drawCenterBanner(line1: string, line2: string): void {
+  private drawCenterBanner(line1: string, line2: string, visualSystem: VisualSystem = 'classic'): void {
+    const palette = this.uiPalette(visualSystem);
     const w = 560;
     const h = 110;
     const x = (GAME_CONFIG.width - w) / 2;
     const y = 130;
     this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.82);
     this.graphics.fillRect(x, y, w, h);
-    this.graphics.lineStyle(3, GAME_CONFIG.colors.yellow, 1);
+    this.graphics.lineStyle(3, palette.frame, 1);
     this.graphics.strokeRect(x, y, w, h);
-    this.addText(x + 24, y + 22, line1, GAME_CONFIG.colors.yellow, GAME_CONFIG.font.title);
+    this.addText(x + 24, y + 22, line1, palette.title, GAME_CONFIG.font.title);
     this.addText(x + 24, y + 68, line2, GAME_CONFIG.colors.white, GAME_CONFIG.font.medium);
   }
 
-  private drawShopOverlay(match: MatchState): void {
+  private drawShopOverlay(match: MatchState, visualSystem: VisualSystem = 'classic'): void {
     const shopperId = match.shoppingPlayerId as PlayerId;
     const profile = match.profiles[shopperId];
     const colors = GAME_CONFIG.colors;
+    const palette = this.uiPalette(visualSystem);
     const pending = this.currentPendingShop;
     const effectiveCash = pending.effectiveCash(profile);
     const totalCost = profile.cash - effectiveCash;
@@ -791,7 +815,7 @@ export class HudSystem {
     this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
     this.graphics.fillStyle(colors.panelGray, 1);
     this.graphics.fillRect(panelX, panelY, panelW, panelH);
-    this.graphics.lineStyle(3, colors.yellow, 1);
+    this.graphics.lineStyle(3, palette.frame, 1);
     this.graphics.strokeRect(panelX, panelY, panelW, panelH);
 
     // ----- HEADER -----
@@ -799,17 +823,17 @@ export class HudSystem {
     // FINISH button on the right.
     const playerName = profile.displayName ?? `PLAYER ${shopperId + 1}`;
     const playerColor = getPlayerPalette(shopperId, 'classic').primary;
-    this.addText(panelX + 20, panelY + 10, `ROUND ${match.round} SHOP`, colors.magenta, GAME_CONFIG.font.large);
+    this.addText(panelX + 20, panelY + 10, `ROUND ${match.round} SHOP`, palette.title, GAME_CONFIG.font.large);
     this.addText(panelX + 20, panelY + 48, playerName, playerColor, GAME_CONFIG.font.large);
 
-    this.addText(panelX + 380, panelY + 18, 'CASH', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(panelX + 380, panelY + 18, 'CASH', palette.header, GAME_CONFIG.font.medium);
     this.addText(panelX + 380, panelY + 48, `$${effectiveCash}`, colors.green, GAME_CONFIG.font.large);
 
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH);
-    this.graphics.lineStyle(2, colors.yellow, 1);
+    this.graphics.lineStyle(2, palette.frame, 1);
     this.graphics.strokeRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH);
-    this.addText(SHOP_LAYOUT.finishX + 16, SHOP_LAYOUT.finishY + 12, 'FINISH ⏎', colors.yellow, GAME_CONFIG.font.medium);
+    this.addText(SHOP_LAYOUT.finishX + 16, SHOP_LAYOUT.finishY + 12, 'FINISH ⏎', palette.title, GAME_CONFIG.font.medium);
 
     // ----- LEFT SIDEBAR (INVENTORY summary + UNDO) -----
     const sideX = panelX + 14;
@@ -821,7 +845,7 @@ export class HudSystem {
     this.graphics.lineStyle(1, colors.panelLight, 1);
     this.graphics.strokeRect(sideX, sideY, sideW, sideH);
 
-    this.addText(sideX + 12, sideY + 10, 'INVENTORY', colors.white, GAME_CONFIG.font.medium);
+    this.addText(sideX + 12, sideY + 10, 'INVENTORY', palette.title, GAME_CONFIG.font.medium);
 
     const totalWeapons = GAME_CONFIG.weapons.reduce((sum, w) => {
       const owned = profile.ammo[w.id] ?? 0;
@@ -829,12 +853,12 @@ export class HudSystem {
       return sum + owned + pending.pendingFor(w.id) * pending.bundleSize(w.id);
     }, 0);
 
-    this.addText(sideX + 12, sideY + 46, 'WEAPONS', colors.magenta, GAME_CONFIG.font.small);
+    this.addText(sideX + 12, sideY + 46, 'WEAPONS', palette.label, GAME_CONFIG.font.small);
     this.addText(sideX + sideW - 40, sideY + 46, `${totalWeapons}`, colors.white, GAME_CONFIG.font.small);
 
     GAME_CONFIG.items.forEach((item, idx) => {
       const itemTotal = pending.ownedFor(item.id) + pending.pendingFor(item.id) * pending.bundleSize(item.id);
-      const itemColor = item.id === 'parachute' ? colors.yellow : colors.cyan;
+      const itemColor = item.id === 'parachute' ? colors.yellow : palette.label;
       const itemY = sideY + 72 + idx * 20;
       const label = item.sidebarLabel ?? item.name.toUpperCase() + 'S';
       this.addText(sideX + 12, itemY, label, itemColor, GAME_CONFIG.font.tiny);
@@ -862,11 +886,11 @@ export class HudSystem {
     const colCost = tableX + 590;
 
     // Column header
-    this.addText(colName, tableY + 8, 'ITEM', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(colPrice, tableY + 8, 'PRICE', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(colOwn, tableY + 8, 'YOU OWN', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(SHOP_LAYOUT.colMinus + 24, tableY + 8, 'BUY', colors.cyan, GAME_CONFIG.font.medium);
-    this.addText(colCost, tableY + 8, 'COST', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colName, tableY + 8, 'ITEM', palette.header, GAME_CONFIG.font.medium);
+    this.addText(colPrice, tableY + 8, 'PRICE', palette.header, GAME_CONFIG.font.medium);
+    this.addText(colOwn, tableY + 8, 'OWNED', palette.header, GAME_CONFIG.font.medium);
+    this.addText(668, tableY + 8, 'BUY', palette.header, GAME_CONFIG.font.medium);
+    this.addText(colCost, tableY + 8, 'COST', palette.header, GAME_CONFIG.font.medium);
 
     let rowY = SHOP_LAYOUT.listYStart;
     const drawRow = (
@@ -938,12 +962,12 @@ export class HudSystem {
     // ----- PAGE STRIP -----
     const pageButtonColor = pending.shopPageCount() > 1 ? colors.white : colors.dimGray;
     this.drawRockerButton(SHOP_LAYOUT.pagePrevX, SHOP_LAYOUT.pageY, '<', pageButtonColor);
-    this.addText(SHOP_LAYOUT.pagePrevX + 52, SHOP_LAYOUT.pageY + 2, pending.pageLabel(), colors.white, GAME_CONFIG.font.medium);
+    this.addText(SHOP_LAYOUT.pagePrevX + 52, SHOP_LAYOUT.pageY + 2, pending.pageLabel(), palette.label, GAME_CONFIG.font.medium);
     this.drawRockerButton(SHOP_LAYOUT.pageNextX, SHOP_LAYOUT.pageY, '>', pageButtonColor);
 
     // ----- FOOTER -----
     const footerY = panelY + panelH - 38;
-    this.addText(colOwn, footerY, 'TOTAL COST', colors.cyan, GAME_CONFIG.font.medium);
+    this.addText(colOwn, footerY, 'TOTAL COST', palette.header, GAME_CONFIG.font.medium);
     this.addText(colCost, footerY, `$${totalCost}`, totalCost > 0 ? colors.green : colors.dimGray, GAME_CONFIG.font.large);
 
     // Hint sits below the table, centered.

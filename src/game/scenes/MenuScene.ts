@@ -13,6 +13,7 @@ import {
   WALL_MODES,
   type ControllerKind,
   type PhysicsSettings,
+  type VisualSystem,
   type WallMode
 } from '../types/GameTypes';
 
@@ -48,6 +49,7 @@ export class MenuScene extends Phaser.Scene {
   private gravityIndex = GRAVITY_STEPS.indexOf(PHYSICS_DEFAULTS.gravity);
   private viscosityIndex = VISCOSITY_STEPS.indexOf(PHYSICS_DEFAULTS.viscosity);
   private tanksFall = PHYSICS_DEFAULTS.tanksFall;
+  private visualSystem: VisualSystem = 'classic';
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
   private view: 'main' | 'settings' = 'main';
@@ -100,6 +102,7 @@ export class MenuScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
 
     this.loadPhysicsFromStorage();
+    this.loadVisualSystemFromStorage();
     this.render();
   }
 
@@ -231,6 +234,15 @@ export class MenuScene extends Phaser.Scene {
       this.render();
       return;
     }
+    // Visuals button
+    const visualsBtn = this.visualsButtonRect();
+    if (x >= visualsBtn.x && x <= visualsBtn.x + visualsBtn.w && y >= visualsBtn.y && y <= visualsBtn.y + visualsBtn.h) {
+      this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
+      this.saveVisualSystemToStorage();
+      soundSystem.playUiSelect();
+      this.render();
+      return;
+    }
     // Online buttons sit at the bottom.
     const hostBtn = this.hostButtonRect();
     if (x >= hostBtn.x && x <= hostBtn.x + hostBtn.w && y >= hostBtn.y && y <= hostBtn.y + hostBtn.h) {
@@ -321,6 +333,10 @@ export class MenuScene extends Phaser.Scene {
 
   private settingsButtonRect() {
     return { x: GAME_CONFIG.width / 2 - 170, y: 366, w: 340, h: 36 };
+  }
+
+  private visualsButtonRect() {
+    return { x: GAME_CONFIG.width / 2 - 170, y: 410, w: 340, h: 28 };
   }
 
   // Settings view button rects
@@ -461,6 +477,15 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.strokeRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
     this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', colors.white, GAME_CONFIG.font.large);
 
+    // Visuals button
+    const visualsBtn = this.visualsButtonRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(visualsBtn.x, visualsBtn.y, visualsBtn.w, visualsBtn.h);
+    this.graphics.lineStyle(2, colors.white, 1);
+    this.graphics.strokeRect(visualsBtn.x, visualsBtn.y, visualsBtn.w, visualsBtn.h);
+    const visualsLabel = this.visualSystem === 'classic' ? 'VISUALS: CLASSIC' : 'VISUALS: RETRO PIXEL';
+    this.addText(visualsBtn.x + 90, visualsBtn.y + 6, visualsLabel, colors.white, GAME_CONFIG.font.medium);
+
     // Online buttons
     const host = this.hostButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
@@ -591,6 +616,25 @@ export class MenuScene extends Phaser.Scene {
   private savePhysicsToStorage(physics: PhysicsSettings): void {
     try {
       localStorage.setItem('cratercmd.physics', JSON.stringify(physics));
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
+  }
+
+  private loadVisualSystemFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('cratercmd.visual');
+      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel')) {
+        this.visualSystem = stored as VisualSystem;
+      }
+    } catch (e) {
+      // If parsing fails, just use default (already initialized)
+    }
+  }
+
+  private saveVisualSystemToStorage(): void {
+    try {
+      localStorage.setItem('cratercmd.visual', this.visualSystem);
     } catch (e) {
       // Silently fail if localStorage is not available
     }

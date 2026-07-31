@@ -307,6 +307,7 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
+    this.loadVisualSystemFromStorage();
     this.renderAll();
 
     // The joiner's network handler may not be registered yet when the host's
@@ -321,6 +322,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.vKey)) {
       this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
+      this.saveVisualSystemToStorage();
       this.renderAll();
     }
 
@@ -1292,6 +1294,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleAimingPointer(x: number, y: number): void {
+    if (this.visualSystem === 'retroPixel') {
+      this.handleRetroAimingPointer(x, y);
+      return;
+    }
+
     const top = GAME_CONFIG.layout.consoleTop;
     const activeTank = this.tanks[this.turn.activePlayerId];
 
@@ -1362,6 +1369,82 @@ export class GameScene extends Phaser.Scene {
       // A single tap takes a meaningful step (~10 px); holding still moves
       // continuously via tickPointerMovement. Four capped calls keep each
       // sub-step inside the per-frame movement bound and the move budget.
+      let moved = false;
+      for (let i = 0; i < 4; i += 1) {
+        if (this.tryPointerMove(x, 64)) moved = true;
+      }
+      if (moved) this.renderTanksAndHud();
+    }
+  }
+
+  private handleRetroAimingPointer(x: number, y: number): void {
+    const top = GAME_CONFIG.layout.consoleTop;
+    const activeTank = this.tanks[this.turn.activePlayerId];
+
+    // FIRE button: (632, top+36, 94, 58)
+    if (x >= 632 && x <= 726 && y >= top + 36 && y <= top + 94) {
+      this.fireActiveWeapon();
+      return;
+    }
+
+    // Weapon rows: x 18..206, rows starting at top+32 with 11px spacing
+    if (x >= 18 && x <= 206 && y >= top + 32 && y < top + 32 + 8 * 11) {
+      const rowIdx = Math.floor((y - (top + 32)) / 11);
+      const weaponIndex = this.weaponWindowStart + rowIdx;
+      if (weaponIndex >= 0 && weaponIndex < GAME_CONFIG.weapons.length) {
+        if (this.tankHasAmmo(activeTank, weaponIndex)) {
+          activeTank.selectedWeaponIndex = weaponIndex;
+          this.ensureWeaponVisible();
+          this.renderTanksAndHud();
+        }
+      }
+      return;
+    }
+
+    // ANGLE panel: frame (220, top+8, 176, 122) — y range top+8..top+130
+    if (x >= 220 && x <= 396 && y >= top + 8 && y <= top + 130) {
+      let horizontalDelta = 0;
+      if (x < 264) {
+        horizontalDelta = -5;
+      } else if (x < 308) {
+        horizontalDelta = -1;
+      } else if (x < 352) {
+        horizontalDelta = 1;
+      } else {
+        horizontalDelta = 5;
+      }
+      activeTank.angle = Phaser.Math.Clamp(
+        activeTank.angle + horizontalDelta,
+        GAME_CONFIG.aiming.minAngle,
+        GAME_CONFIG.aiming.maxAngle
+      );
+      this.renderTanksAndHud();
+      return;
+    }
+
+    // POWER panel: frame (400, top+8, 204, 122) — y range top+8..top+130
+    if (x >= 400 && x <= 604 && y >= top + 8 && y <= top + 130) {
+      let horizontalDelta = 0;
+      if (x < 451) {
+        horizontalDelta = -5;
+      } else if (x < 502) {
+        horizontalDelta = -1;
+      } else if (x < 553) {
+        horizontalDelta = 1;
+      } else {
+        horizontalDelta = 5;
+      }
+      activeTank.power = Phaser.Math.Clamp(
+        activeTank.power + horizontalDelta,
+        GAME_CONFIG.aiming.minPower,
+        GAME_CONFIG.aiming.maxPower
+      );
+      this.renderTanksAndHud();
+      return;
+    }
+
+    // Battlefield tap-move (above the console)
+    if (y < GAME_CONFIG.layout.consoleTop) {
       let moved = false;
       for (let i = 0; i < 4; i += 1) {
         if (this.tryPointerMove(x, 64)) moved = true;
@@ -1996,6 +2079,25 @@ export class GameScene extends Phaser.Scene {
     }
     // Retro mode: backdrop is supplied by retroSky / retroFarMountains /
     // retroMidMountains image game objects; no procedural drawing needed.
+  }
+
+  private loadVisualSystemFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('cratercmd.visual');
+      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel')) {
+        this.visualSystem = stored as VisualSystem;
+      }
+    } catch (e) {
+      // If parsing fails, just use default (already initialized)
+    }
+  }
+
+  private saveVisualSystemToStorage(): void {
+    try {
+      localStorage.setItem('cratercmd.visual', this.visualSystem);
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
   }
 
 }
