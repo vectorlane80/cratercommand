@@ -6,7 +6,6 @@ import {
   GAME_CONFIG,
   GRAVITY_LABELS,
   GRAVITY_STEPS,
-  MAX_PLAYERS,
   PHYSICS_DEFAULTS,
   VISCOSITY_LABELS,
   VISCOSITY_STEPS,
@@ -17,8 +16,7 @@ import {
   type WallMode
 } from '../types/GameTypes';
 
-/** Slot 3 and 4 can be empty (no participant) via `undefined`. */
-type Slot = ControllerKind | undefined;
+type Slot = ControllerKind;
 
 export interface MenuResult {
   controllers: ControllerKind[];
@@ -37,15 +35,14 @@ const MATCH_LENGTHS: Array<{ label: string; roundsToWin: number }> = [
   { label: 'BEST OF 7', roundsToWin: 4 }
 ];
 
-const SLOT_CYCLE_REQUIRED: ControllerKind[] = CONTROLLER_CYCLE; // human + 3 CPU tiers
-const SLOT_CYCLE_OPTIONAL: Array<ControllerKind | undefined> = [undefined, ...CONTROLLER_CYCLE];
+const SLOT_CYCLE_REQUIRED: ControllerKind[] = CONTROLLER_CYCLE; // human + CPU personalities
 
 export class MenuScene extends Phaser.Scene {
-  private slots: Slot[] = ['human', 'cpu-tosser', undefined, undefined];
+  private slots: Slot[] = ['human', 'cpu-tosser'];
   // Per-slot display names. null means "use default (PLAYER N)". Set via
   // tap on the label to the left of the controller box, which fires
   // window.prompt() for input.
-  private names: Array<string | null> = [null, null, null, null];
+  private names: Array<string | null> = [null, null];
   private matchLengthIndex = 0; // index into MATCH_LENGTHS, default first
   private wallModeIndex = 0; // index into WALL_MODES, default first
   private gravityIndex = GRAVITY_STEPS.indexOf(PHYSICS_DEFAULTS.gravity);
@@ -53,10 +50,12 @@ export class MenuScene extends Phaser.Scene {
   private tanksFall = PHYSICS_DEFAULTS.tanksFall;
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
+  private view: 'main' | 'settings' = 'main';
 
   private slotKeys: Phaser.Input.Keyboard.Key[] = [];
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
+  private escapeKey!: Phaser.Input.Keyboard.Key;
   private bKey!: Phaser.Input.Keyboard.Key;
   private wKey!: Phaser.Input.Keyboard.Key;
   private gKey!: Phaser.Input.Keyboard.Key;
@@ -73,13 +72,12 @@ export class MenuScene extends Phaser.Scene {
 
     const keyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
-      Phaser.Input.Keyboard.KeyCodes.TWO,
-      Phaser.Input.Keyboard.KeyCodes.THREE,
-      Phaser.Input.Keyboard.KeyCodes.FOUR
+      Phaser.Input.Keyboard.KeyCodes.TWO
     ];
     this.slotKeys = keyCodes.map((c) => this.input.keyboard!.addKey(c));
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.bKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     this.wKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     this.gKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G);
@@ -89,6 +87,7 @@ export class MenuScene extends Phaser.Scene {
       ...keyCodes,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
       Phaser.Input.Keyboard.KeyCodes.ENTER,
+      Phaser.Input.Keyboard.KeyCodes.ESC,
       Phaser.Input.Keyboard.KeyCodes.B,
       Phaser.Input.Keyboard.KeyCodes.W,
       Phaser.Input.Keyboard.KeyCodes.G,
@@ -105,6 +104,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   update(): void {
+    // ESC key returns from settings to main
+    if (Phaser.Input.Keyboard.JustDown(this.escapeKey) && this.view === 'settings') {
+      this.view = 'main';
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+
     for (let i = 0; i < this.slotKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.slotKeys[i])) {
         this.cycleSlot(i);
@@ -137,7 +144,7 @@ export class MenuScene extends Phaser.Scene {
       soundSystem.playUiClick();
       this.render();
     }
-    if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.canStart()) {
+    if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.view === 'main' && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
     }
@@ -179,6 +186,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handlePointerDown(x: number, y: number): void {
+    if (this.view === 'main') {
+      this.handlePointerDownMain(x, y);
+    } else {
+      this.handlePointerDownSettings(x, y);
+    }
+  }
+
+  private handlePointerDownMain(x: number, y: number): void {
     // Player NAME label area sits to the LEFT of each controller box. Tapping
     // there opens a prompt to set a display name. We check this BEFORE the
     // controller-cycle box test below so the regions don't conflict.
@@ -187,10 +202,6 @@ export class MenuScene extends Phaser.Scene {
       const r = rows[i];
       const labelHit = x >= 100 && x < r.x && y >= r.y && y <= r.y + r.h;
       if (labelHit) {
-        if (i >= 2 && this.slots[i] === undefined) {
-          // Empty slot — name input doesn't make sense yet.
-          return;
-        }
         this.promptForName(i);
         return;
       }
@@ -204,52 +215,23 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
     }
-    // Match length selector — see matchLengthRect for geometry
-    const mlBtn = this.matchLengthRect();
-    if (x >= mlBtn.x && x <= mlBtn.x + mlBtn.w && y >= mlBtn.y && y <= mlBtn.y + mlBtn.h) {
-      this.cycleMatchLength();
-      soundSystem.playUiClick();
-      this.render();
-      return;
-    }
-    // Wall mode selector — see wallModeRect for geometry
-    const wmBtn = this.wallModeRect();
-    if (x >= wmBtn.x && x <= wmBtn.x + wmBtn.w && y >= wmBtn.y && y <= wmBtn.y + wmBtn.h) {
-      this.cycleWallMode();
-      soundSystem.playUiClick();
-      this.render();
-      return;
-    }
-    // Physics buttons
-    const gravBtn = this.gravityRect();
-    if (x >= gravBtn.x && x <= gravBtn.x + gravBtn.w && y >= gravBtn.y && y <= gravBtn.y + gravBtn.h) {
-      this.cycleGravity();
-      soundSystem.playUiClick();
-      this.render();
-      return;
-    }
-    const viscBtn = this.viscosityRect();
-    if (x >= viscBtn.x && x <= viscBtn.x + viscBtn.w && y >= viscBtn.y && y <= viscBtn.y + viscBtn.h) {
-      this.cycleViscosity();
-      soundSystem.playUiClick();
-      this.render();
-      return;
-    }
-    const fallsBtn = this.tanksFallRect();
-    if (x >= fallsBtn.x && x <= fallsBtn.x + fallsBtn.w && y >= fallsBtn.y && y <= fallsBtn.y + fallsBtn.h) {
-      this.cycleTanksFall();
-      soundSystem.playUiClick();
-      this.render();
-      return;
-    }
     // Start button hitbox — see render() for matching geometry.
-    const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 430;
-    if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 46 && this.canStart()) {
+    const btnX = GAME_CONFIG.width / 2 - 170;
+    const btnY = 300;
+    if (x >= btnX && x <= btnX + 340 && y >= btnY && y <= btnY + 46 && this.canStart()) {
       soundSystem.playUiSelect();
       this.startMatch();
+      return;
     }
-    // Online buttons sit beneath the START MATCH button.
+    // Settings button
+    const settingsBtn = this.settingsButtonRect();
+    if (x >= settingsBtn.x && x <= settingsBtn.x + settingsBtn.w && y >= settingsBtn.y && y <= settingsBtn.y + settingsBtn.h) {
+      this.view = 'settings';
+      soundSystem.playUiSelect();
+      this.render();
+      return;
+    }
+    // Online buttons sit at the bottom.
     const hostBtn = this.hostButtonRect();
     if (x >= hostBtn.x && x <= hostBtn.x + hostBtn.w && y >= hostBtn.y && y <= hostBtn.y + hostBtn.h) {
       soundSystem.playUiSelect();
@@ -278,66 +260,112 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private hostButtonRect() {
-    return { x: GAME_CONFIG.width / 2 - 260, y: 488, w: 240, h: 32 };
-  }
-
-  private joinButtonRect() {
-    return { x: GAME_CONFIG.width / 2 + 20, y: 488, w: 240, h: 32 };
-  }
-
-  private matchLengthRect() {
-    return { x: GAME_CONFIG.width / 2 - 270, y: 340, w: 260, h: 36 };
-  }
-
-  private wallModeRect() {
-    return { x: GAME_CONFIG.width / 2 + 10, y: 340, w: 260, h: 36 };
-  }
-
-  private gravityRect() {
-    return { x: GAME_CONFIG.width / 2 - 270, y: 384, w: 85, h: 32 };
-  }
-
-  private viscosityRect() {
-    return { x: GAME_CONFIG.width / 2 - 175, y: 384, w: 85, h: 32 };
-  }
-
-  private tanksFallRect() {
-    return { x: GAME_CONFIG.width / 2 - 80, y: 384, w: 85, h: 32 };
-  }
-
-  /**
-   * Slots 0 and 1 are required: they cycle through human and the 5 SE personalities
-   * (moron, shooter, tosser, spoiler, cyborg). Slots 2 and 3 are optional: their
-   * cycle starts at `undefined` (empty) so the user can leave them out. Cycling slot 2
-   * to empty also empties slot 3 (no gaps allowed — keeps PlayerId contiguous).
-   */
-  private cycleSlot(idx: number): void {
-    const cycle = idx <= 1 ? SLOT_CYCLE_REQUIRED : SLOT_CYCLE_OPTIONAL;
-    const current = this.slots[idx];
-    const ci = cycle.indexOf(current as ControllerKind);
-    const next = cycle[(ci + 1) % cycle.length] as Slot;
-    this.slots[idx] = next;
-    // Cascade: if slot 2 went empty, slot 3 must also be empty.
-    if (idx === 2 && next === undefined) this.slots[3] = undefined;
-    // Cascade: if slot 3 was just made non-empty but slot 2 is empty, fill slot 2 first instead.
-    if (idx === 3 && next !== undefined && this.slots[2] === undefined) {
-      this.slots[2] = next;
-      this.slots[3] = undefined;
+  private handlePointerDownSettings(x: number, y: number): void {
+    // Match length button
+    const mlBtn = this.settingsMatchLengthRect();
+    if (x >= mlBtn.x && x <= mlBtn.x + mlBtn.w && y >= mlBtn.y && y <= mlBtn.y + mlBtn.h) {
+      this.cycleMatchLength();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Wall mode button
+    const wmBtn = this.settingsWallModeRect();
+    if (x >= wmBtn.x && x <= wmBtn.x + wmBtn.w && y >= wmBtn.y && y <= wmBtn.y + wmBtn.h) {
+      this.cycleWallMode();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Gravity button
+    const gravBtn = this.settingsGravityRect();
+    if (x >= gravBtn.x && x <= gravBtn.x + gravBtn.w && y >= gravBtn.y && y <= gravBtn.y + gravBtn.h) {
+      this.cycleGravity();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Viscosity button
+    const viscBtn = this.settingsViscosityRect();
+    if (x >= viscBtn.x && x <= viscBtn.x + viscBtn.w && y >= viscBtn.y && y <= viscBtn.y + viscBtn.h) {
+      this.cycleViscosity();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Tanks fall button
+    const fallsBtn = this.settingsTanksFallRect();
+    if (x >= fallsBtn.x && x <= fallsBtn.x + fallsBtn.w && y >= fallsBtn.y && y <= fallsBtn.y + fallsBtn.h) {
+      this.cycleTanksFall();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Back button
+    const backBtn = this.backButtonRect();
+    if (x >= backBtn.x && x <= backBtn.x + backBtn.w && y >= backBtn.y && y <= backBtn.y + backBtn.h) {
+      this.view = 'main';
+      soundSystem.playUiSelect();
+      this.render();
+      return;
     }
   }
 
+  private hostButtonRect() {
+    return { x: GAME_CONFIG.width / 2 - 260, y: 452, w: 240, h: 32 };
+  }
+
+  private joinButtonRect() {
+    return { x: GAME_CONFIG.width / 2 + 20, y: 452, w: 240, h: 32 };
+  }
+
+  private settingsButtonRect() {
+    return { x: GAME_CONFIG.width / 2 - 170, y: 366, w: 340, h: 36 };
+  }
+
+  // Settings view button rects
+  private settingsMatchLengthRect() {
+    return { x: 480, y: 130, w: 260, h: 36 };
+  }
+
+  private settingsWallModeRect() {
+    return { x: 480, y: 180, w: 260, h: 36 };
+  }
+
+  private settingsGravityRect() {
+    return { x: 480, y: 230, w: 260, h: 36 };
+  }
+
+  private settingsViscosityRect() {
+    return { x: 480, y: 280, w: 260, h: 36 };
+  }
+
+  private settingsTanksFallRect() {
+    return { x: 480, y: 330, w: 260, h: 36 };
+  }
+
+  private backButtonRect() {
+    return { x: GAME_CONFIG.width / 2 - 120, y: 400, w: 240, h: 36 };
+  }
+
+  /**
+   * All slots cycle through human and the CPU personalities
+   * (moron, shooter, tosser, spoiler, cyborg).
+   */
+  private cycleSlot(idx: number): void {
+    const current = this.slots[idx];
+    const ci = SLOT_CYCLE_REQUIRED.indexOf(current as ControllerKind);
+    const next = SLOT_CYCLE_REQUIRED[(ci + 1) % SLOT_CYCLE_REQUIRED.length];
+    this.slots[idx] = next;
+  }
+
   private participants(): ControllerKind[] {
-    return this.slots.filter((c): c is ControllerKind => c !== undefined);
+    return this.slots;
   }
 
   /** Names parallel to participants() — same length, same order. */
   private participantNames(): Array<string | null> {
-    const out: Array<string | null> = [];
-    this.slots.forEach((slot, i) => {
-      if (slot !== undefined) out.push(this.names[i] ?? null);
-    });
-    return out;
+    return this.slots.map((_, i) => this.names[i] ?? null);
   }
 
   private canStart(): boolean {
@@ -365,102 +393,75 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private slotRowRects(): Array<{ x: number; y: number; w: number; h: number }> {
-    const ys = [120, 170, 220, 270];
+    const ys = [140, 200];
     return ys.map((y) => ({ x: 240, y: y - 6, w: 480, h: 46 }));
   }
 
   private render(): void {
+    if (this.view === 'main') {
+      this.renderMain();
+    } else {
+      this.renderSettings();
+    }
+  }
+
+  private renderMain(): void {
     this.clearTexts();
     this.graphics.clear();
     const colors = GAME_CONFIG.colors;
 
-    // Title — shifted up to leave room for everything below within 540 px.
+    // Title
     this.addText(GAME_CONFIG.width / 2 - 174, 20, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
     this.addText(GAME_CONFIG.width / 2 - 80, 60, 'MATCH SETUP', colors.cyan, GAME_CONFIG.font.large);
 
-    const labels = ['PLAYER 1', 'PLAYER 2', 'PLAYER 3', 'PLAYER 4'];
-    const rowYs = [120, 170, 220, 270];
-    const palettes = [colors.cyan, colors.magenta, colors.green, colors.yellow];
-    for (let i = 0; i < MAX_PLAYERS; i += 1) {
-      this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i], i >= 2);
+    // Player rows (2-player only)
+    const labels = ['PLAYER 1', 'PLAYER 2'];
+    const rowYs = [140, 200];
+    const palettes = [colors.cyan, colors.magenta];
+    for (let i = 0; i < 2; i += 1) {
+      this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i]);
     }
 
     // Hint
     this.addText(
-      GAME_CONFIG.width / 2 - 360,
-      318,
-      'Tap name to rename · Tap box to cycle · B = length · W = walls · G = gravity · A = air · F = falls',
+      GAME_CONFIG.width / 2 - 170,
+      262,
+      'Tap name to rename · Tap box to cycle',
       colors.white,
       GAME_CONFIG.font.small
     );
 
-    // Match length button (B to cycle, also clickable)
-    const ml = this.matchLengthRect();
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(ml.x, ml.y, ml.w, ml.h);
-    this.graphics.lineStyle(2, colors.cyan, 1);
-    this.graphics.strokeRect(ml.x, ml.y, ml.w, ml.h);
-    const mlLabel = MATCH_LENGTHS[this.matchLengthIndex].label;
-    this.addText(ml.x + 60, ml.y + 8, mlLabel, colors.cyan, GAME_CONFIG.font.large);
-
-    // Wall mode button (W to cycle, also clickable)
-    const wm = this.wallModeRect();
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(wm.x, wm.y, wm.w, wm.h);
-    this.graphics.lineStyle(2, colors.magenta, 1);
-    this.graphics.strokeRect(wm.x, wm.y, wm.w, wm.h);
-    const wmLabel = `WALLS: ${WALL_LABELS[WALL_MODES[this.wallModeIndex]]}`;
-    this.addText(wm.x + 40, wm.y + 8, wmLabel, colors.magenta, GAME_CONFIG.font.large);
-
-    // Physics selector buttons
-    const grav = this.gravityRect();
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(grav.x, grav.y, grav.w, grav.h);
-    this.graphics.lineStyle(2, colors.green, 1);
-    this.graphics.strokeRect(grav.x, grav.y, grav.w, grav.h);
-    const gravLabel = GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]];
-    this.addText(grav.x + 8, grav.y + 6, gravLabel, colors.green, GAME_CONFIG.font.medium);
-
-    const visc = this.viscosityRect();
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(visc.x, visc.y, visc.w, visc.h);
-    this.graphics.lineStyle(2, colors.cyan, 1);
-    this.graphics.strokeRect(visc.x, visc.y, visc.w, visc.h);
-    const viscLabel = VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]];
-    this.addText(visc.x + 8, visc.y + 6, viscLabel, colors.cyan, GAME_CONFIG.font.medium);
-
-    const falls = this.tanksFallRect();
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(falls.x, falls.y, falls.w, falls.h);
-    this.graphics.lineStyle(2, colors.yellow, 1);
-    this.graphics.strokeRect(falls.x, falls.y, falls.w, falls.h);
-    const fallsLabel = this.tanksFall ? 'FALLS ON' : 'FALLS OFF';
-    this.addText(falls.x + 4, falls.y + 6, fallsLabel, colors.yellow, GAME_CONFIG.font.medium);
-
     // Start button (gated on canStart())
     const enabled = this.canStart();
-    const btnX = GAME_CONFIG.width / 2 - 130;
-    const btnY = 430;
-    const btnW = 260;
+    const btnX = GAME_CONFIG.width / 2 - 170;
+    const btnY = 300;
+    const btnW = 340;
     const btnH = 46;
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(btnX, btnY, btnW, btnH);
     this.graphics.lineStyle(3, enabled ? colors.yellow : colors.dimGray, 1);
     this.graphics.strokeRect(btnX, btnY, btnW, btnH);
-    this.addText(btnX + 26, btnY + 10, 'START MATCH', enabled ? colors.yellow : colors.dimGray, GAME_CONFIG.font.title);
+    this.addText(btnX + 65, btnY + 10, 'START MATCH', enabled ? colors.yellow : colors.dimGray, GAME_CONFIG.font.title);
 
     if (!enabled) {
       this.addText(
-        GAME_CONFIG.width / 2 - 222,
-        464,
-        'Need at least 2 participants and 1 human.',
+        GAME_CONFIG.width / 2 - 150,
+        352,
+        'Need at least 1 human player.',
         colors.red,
         GAME_CONFIG.font.small
       );
     }
 
-    // Online buttons (always available — they open the lobby scene, which
-    // ignores the local slot config).
+    // Settings button
+    const settingsBtn = this.settingsButtonRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
+    this.graphics.lineStyle(2, colors.white, 1);
+    this.graphics.strokeRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
+    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', colors.white, GAME_CONFIG.font.large);
+
+    // Online buttons
     const host = this.hostButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(host.x, host.y, host.w, host.h);
@@ -476,7 +477,60 @@ export class MenuScene extends Phaser.Scene {
     this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', colors.magenta, GAME_CONFIG.font.medium);
   }
 
-  private drawSlotRow(idx: number, y: number, label: string, slot: Slot, accent: number, optional: boolean): void {
+  private renderSettings(): void {
+    this.clearTexts();
+    this.graphics.clear();
+    const colors = GAME_CONFIG.colors;
+
+    // Title
+    this.addText(GAME_CONFIG.width / 2 - 174, 20, 'CRATER COMMAND', colors.magenta, GAME_CONFIG.font.title);
+    this.addText(GAME_CONFIG.width / 2 - 40, 60, 'SETTINGS', colors.cyan, GAME_CONFIG.font.large);
+
+    // Settings rows with labels and value buttons
+    const settingRows = [
+      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: colors.cyan },
+      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: colors.magenta },
+      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: colors.green },
+      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: colors.cyan },
+      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: colors.yellow }
+    ];
+
+    for (const row of settingRows) {
+      // Label on the left
+      this.addText(220, row.y + 8, row.label, colors.white, GAME_CONFIG.font.medium);
+
+      // Value button on the right
+      const btn = this.settingsButtonForRow(row.y);
+      this.graphics.fillStyle(colors.panelDark, 1);
+      this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
+      this.graphics.lineStyle(2, row.color, 1);
+      this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
+      this.addText(btn.x + 16, btn.y + 8, row.value, row.color, GAME_CONFIG.font.medium);
+    }
+
+    // Back button
+    const backBtn = this.backButtonRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.graphics.lineStyle(2, colors.white, 1);
+    this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK (ESC)', colors.white, GAME_CONFIG.font.large);
+
+    // Hint
+    this.addText(
+      GAME_CONFIG.width / 2 - 290,
+      452,
+      'Settings apply to local and hosted online matches',
+      colors.white,
+      GAME_CONFIG.font.small
+    );
+  }
+
+  private settingsButtonForRow(y: number): { x: number; y: number; w: number; h: number } {
+    return { x: 480, y, w: 260, h: 36 };
+  }
+
+  private drawSlotRow(idx: number, y: number, label: string, slot: Slot, accent: number): void {
     const colors = GAME_CONFIG.colors;
     const boxX = 280;
     const boxY = y - 6;
@@ -494,11 +548,7 @@ export class MenuScene extends Phaser.Scene {
     const displayName = customName ?? label;
     this.addText(120, y, displayName, accent, GAME_CONFIG.font.large);
 
-    if (slot === undefined) {
-      this.addText(boxX + 16, y + 4, optional ? '— EMPTY —' : '???', colors.dimGray, GAME_CONFIG.font.medium);
-    } else {
-      this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
-    }
+    this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
   }
 
   private addText(x: number, y: number, value: string, color: number, fontSize: string): void {
