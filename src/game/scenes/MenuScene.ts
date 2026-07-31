@@ -244,7 +244,13 @@ export class MenuScene extends Phaser.Scene {
     // Visuals button
     const visualsBtn = this.visualsButtonRect();
     if (x >= visualsBtn.x && x <= visualsBtn.x + visualsBtn.w && y >= visualsBtn.y && y <= visualsBtn.y + visualsBtn.h) {
-      this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
+      if (this.visualSystem === 'classic') {
+        this.visualSystem = 'retroPixel';
+      } else if (this.visualSystem === 'retroPixel') {
+        this.visualSystem = 'hiRes';
+      } else {
+        this.visualSystem = 'classic';
+      }
       this.saveVisualSystemToStorage();
       soundSystem.playUiSelect();
       this.render();
@@ -388,6 +394,7 @@ export class MenuScene extends Phaser.Scene {
         settingsValue: c.desertGold
       };
     }
+    // hiRes uses classic palette for now
     return {
       title: c.magenta,
       subtitle: c.cyan,
@@ -528,7 +535,10 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.fillRect(visualsBtn.x, visualsBtn.y, visualsBtn.w, visualsBtn.h);
     this.graphics.lineStyle(2, palette.visualsButton, 1);
     this.graphics.strokeRect(visualsBtn.x, visualsBtn.y, visualsBtn.w, visualsBtn.h);
-    const visualsLabel = this.visualSystem === 'classic' ? 'VISUALS: CLASSIC' : 'VISUALS: RETRO PIXEL';
+    const visualsLabel =
+      this.visualSystem === 'classic' ? 'VISUALS: CLASSIC' :
+      this.visualSystem === 'retroPixel' ? 'VISUALS: RETRO PIXEL' :
+      'VISUALS: HI-RES';
     this.addText(visualsBtn.x + 90, visualsBtn.y + 6, visualsLabel, palette.visualsButton, GAME_CONFIG.font.medium);
 
     // Online buttons
@@ -681,7 +691,7 @@ export class MenuScene extends Phaser.Scene {
   private loadVisualSystemFromStorage(): void {
     try {
       const stored = localStorage.getItem('cratercmd.visual');
-      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel')) {
+      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel' || stored === 'hiRes')) {
         this.visualSystem = stored as VisualSystem;
       }
     } catch (e) {

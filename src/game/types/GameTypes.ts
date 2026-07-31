@@ -7,7 +7,7 @@ export type GamePhase =
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
 export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle' | 'napalm' | 'laser';
-export type VisualSystem = 'classic' | 'retroPixel';
+export type VisualSystem = 'classic' | 'retroPixel' | 'hiRes';
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 export type WallMode = 'none' | 'concrete' | 'padded' | 'rubber' | 'spring' | 'wraparound' | 'random' | 'erratic';
 export type Sale = { itemKey: string; discount: number } | null;

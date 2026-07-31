@@ -220,6 +220,8 @@ export class GameScene extends Phaser.Scene {
       this.add.image(0, 0, 'retro-tank-red').setOrigin(0.5, 1).setScale(0.55)
     ];
 
+    this.applyVisualLayerTextures();
+
     this.projectileGraphics = this.add.graphics();
 
     this.terrainSystem = new TerrainSystem();
@@ -321,7 +323,14 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.vKey)) {
-      this.visualSystem = this.visualSystem === 'classic' ? 'retroPixel' : 'classic';
+      if (this.visualSystem === 'classic') {
+        this.visualSystem = 'retroPixel';
+      } else if (this.visualSystem === 'retroPixel') {
+        this.visualSystem = 'hiRes';
+      } else {
+        this.visualSystem = 'classic';
+      }
+      this.applyVisualLayerTextures();
       this.saveVisualSystemToStorage();
       this.renderAll();
     }
@@ -1982,8 +1991,22 @@ export class GameScene extends Phaser.Scene {
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
   }
 
+  private applyVisualLayerTextures(): void {
+    if (this.visualSystem === 'retroPixel') {
+      this.retroBackdrop.setTexture('retro-backdrop').setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      this.retroCacti.forEach((cactus) => cactus.setTexture('retro-cactus').setScale(RETRO_CACTUS_SCALE));
+      this.retroTankBodies[0].setTexture('retro-tank-blue').setScale(0.55);
+      this.retroTankBodies[1].setTexture('retro-tank-red').setScale(0.55);
+    } else if (this.visualSystem === 'hiRes') {
+      this.retroBackdrop.setTexture('hires-backdrop').setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      this.retroCacti.forEach((cactus) => cactus.setTexture('hires-cactus').setScale(0.15));
+      this.retroTankBodies[0].setTexture('hires-tank-blue').setScale(0.1375);
+      this.retroTankBodies[1].setTexture('hires-tank-red').setScale(0.1375);
+    }
+  }
+
   private updateRetroLayerVisibility(): void {
-    const retro = this.visualSystem === 'retroPixel';
+    const retro = this.visualSystem !== 'classic';
     this.retroBackdrop.visible = retro;
     this.retroCacti.forEach((cactus) => (cactus.visible = retro));
     this.retroTankBodies.forEach((tankImg) => (tankImg.visible = retro));
@@ -2084,7 +2107,7 @@ export class GameScene extends Phaser.Scene {
   private loadVisualSystemFromStorage(): void {
     try {
       const stored = localStorage.getItem('cratercmd.visual');
-      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel')) {
+      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel' || stored === 'hiRes')) {
         this.visualSystem = stored as VisualSystem;
       }
     } catch (e) {

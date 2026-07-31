@@ -24,6 +24,12 @@ export interface PlayerPalette {
  */
 export function getPlayerPalette(id: PlayerId, visualSystem: VisualSystem): PlayerPalette {
   const c = GAME_CONFIG.colors;
+  if (visualSystem === 'hiRes') {
+    // Hi-res mode has two illustrated tanks; rotate them for ids 2/3.
+    return id % 2 === 0
+      ? { primary: 0x3f9dff, accent: 0x8ed0ff, dark: 0x0a2b5c }
+      : { primary: 0xff7a3c, accent: 0xffc08a, dark: 0x5c1503 };
+  }
   if (visualSystem === 'retroPixel') {
     // Retro mode only has two hand-pixeled tanks; rotate them for ids 2/3.
     return id % 2 === 0
@@ -214,7 +220,7 @@ export class TankSystem {
       if (!tank.alive) return;
       const palette = getPlayerPalette(tank.id, visualSystem);
 
-      if (visualSystem === 'retroPixel') {
+      if (visualSystem !== 'classic') {
         this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId, palette);
         return;
       }
