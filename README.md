@@ -1,5 +1,7 @@
 # Crater Command
 
+**Play it now: https://vectorlane80.github.io/cratercommand/**
+
 A browser artillery game in the spirit of **Scorched Earth** — destructible
 terrain, a 39-weapon arsenal, shields and guidance systems, five CPU
 personalities, a between-round economy with a drifting free market, and
