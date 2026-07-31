@@ -1317,10 +1317,18 @@ export class GameScene extends Phaser.Scene {
 
     // The console's middle inner panel (x=328..533) holds BOTH the Angle
     // value (top half, y < top+84) and the Power value + bar (bottom half).
-    // Split the hitbox top/bottom; within each half, clicking the left side
-    // decreases by 5, right side increases by 5.
+    // Split the hitbox top/bottom; within each half, use quarter zones for fine adjustments.
     if (x >= 328 && x <= 533 && y >= top + 42 && y <= top + 146) {
-      const horizontalDelta = x < (328 + 533) / 2 ? -5 : 5;
+      let horizontalDelta = 0;
+      if (x < 376) {
+        horizontalDelta = -5;
+      } else if (x < 430.5) {
+        horizontalDelta = -1;
+      } else if (x < 456) {
+        horizontalDelta = 1;
+      } else {
+        horizontalDelta = 5;
+      }
       const isAngleHalf = y < top + 84;
       if (isAngleHalf) {
         activeTank.angle = Phaser.Math.Clamp(
@@ -1344,7 +1352,14 @@ export class GameScene extends Phaser.Scene {
     // the click to keep moving — the held-pointer path lives in update()
     // via tickPointerMovement.
     if (y < GAME_CONFIG.layout.consoleTop) {
-      this.tryPointerMove(x, 16); // immediate small step on tap
+      // A single tap takes a meaningful step (~10 px); holding still moves
+      // continuously via tickPointerMovement. Four capped calls keep each
+      // sub-step inside the per-frame movement bound and the move budget.
+      let moved = false;
+      for (let i = 0; i < 4; i += 1) {
+        if (this.tryPointerMove(x, 64)) moved = true;
+      }
+      if (moved) this.renderTanksAndHud();
     }
   }
 

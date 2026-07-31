@@ -295,8 +295,9 @@ export class HudSystem {
         colors.cyan,
         GAME_CONFIG.font.small
       );
-      const wallColor = match.activeWallMode === 'none' ? colors.dimGray : colors.cyan;
-      this.addText(GAME_CONFIG.width / 2 - 40, 136, WALL_LABELS[match.activeWallMode], wallColor, GAME_CONFIG.font.small);
+      if (match.activeWallMode !== 'none') {
+        this.addText(430, 88, `WALLS: ${WALL_LABELS[match.activeWallMode]}`, colors.cyan, GAME_CONFIG.font.small);
+      }
 
       // Physics indicator (only show if non-default)
       this.drawPhysicsIndicator(GAME_CONFIG.width / 2 - 40, 154, match);
@@ -382,9 +383,9 @@ export class HudSystem {
     const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, stripY, GAME_CONFIG.width, 26);
-    this.addText(20, stripY + 4, '←→/↑↓ Aim·Power   A/D Move   Q/E Weapon   SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
+    this.addText(20, stripY + 4, '←→/↑↓ Aim·Power  A/D·TAP MOVE  Q/E Weapon  SPACE/CLICK FIRE', 0x2e66ff, GAME_CONFIG.font.medium);
     const soundLabel = `F10 SOUND: ${soundSystem.enabled ? 'ON' : 'OFF'}`;
-    this.addText(650, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(700, stripY + 4, soundLabel, soundSystem.enabled ? colors.green : colors.dimGray, GAME_CONFIG.font.small);
     // ESC quit button — fixed position so pointer routing in GameScene can hit-test it.
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(820, stripY + 2, 130, 22);
@@ -450,14 +451,14 @@ export class HudSystem {
     this.addText(
       16,
       top + 144,
-      '←→ Aim   ↑↓ Power   A/D Move   1-8 Weapon',
+      '←→ Aim  ↑↓ Power  A/D·TAP MOVE  1-8 Weapon',
       colors.cyan,
       GAME_CONFIG.font.small
     );
     this.addText(
       16,
       top + 162,
-      'SPACE Fire    V Visual    ENTER Advance',
+      'SPACE Fire  V Visual  ENTER Advance',
       colors.cyan,
       GAME_CONFIG.font.small
     );
@@ -662,16 +663,29 @@ export class HudSystem {
   private drawAimPowerPanel(activeTank: TankState, phase: string, top: number): void {
     const canFire = phase === 'aiming';
     const stateColor = canFire ? GAME_CONFIG.colors.green : GAME_CONFIG.colors.red;
+    const colors = GAME_CONFIG.colors;
 
-    this.addText(344, top + 56, 'Angle', GAME_CONFIG.colors.green, GAME_CONFIG.font.medium);
-    this.addText(480, top + 54, `${Math.round(activeTank.angle)}`, GAME_CONFIG.colors.green, GAME_CONFIG.font.large);
-    this.addText(344, top + 88, 'Power', GAME_CONFIG.colors.magenta, GAME_CONFIG.font.medium);
-    this.addText(480, top + 86, `${Math.round(activeTank.power)}`, GAME_CONFIG.colors.magenta, GAME_CONFIG.font.large);
+    this.addText(344, top + 56, 'Angle', colors.green, GAME_CONFIG.font.medium);
+    this.addText(480, top + 54, `${Math.round(activeTank.angle)}`, colors.green, GAME_CONFIG.font.large);
+    // Quarter-zone markers for angle
+    this.addText(326, top + 56, '<<', colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(410, top + 56, '<', colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(440, top + 56, '>', colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(458, top + 56, '>>', colors.dimGray, GAME_CONFIG.font.small);
+
+    this.addText(344, top + 88, 'Power', colors.magenta, GAME_CONFIG.font.medium);
+    this.addText(480, top + 86, `${Math.round(activeTank.power)}`, colors.magenta, GAME_CONFIG.font.large);
+    // Quarter-zone markers for power
+    this.addText(326, top + 88, '<<', colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(410, top + 88, '<', colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(440, top + 88, '>', colors.dimGray, GAME_CONFIG.font.small);
+    this.addText(458, top + 88, '>>', colors.dimGray, GAME_CONFIG.font.small);
+
     this.addText(344, top + 132, canFire ? 'SPACE TO FIRE' : 'SHOT IN FLIGHT', stateColor, GAME_CONFIG.font.tiny);
 
-    this.graphics.lineStyle(3, GAME_CONFIG.colors.magenta, 1);
+    this.graphics.lineStyle(3, colors.magenta, 1);
     this.graphics.strokeRect(344, top + 116, 174, 12);
-    this.graphics.fillStyle(GAME_CONFIG.colors.magenta, 0.85);
+    this.graphics.fillStyle(colors.magenta, 0.85);
     this.graphics.fillRect(346, top + 118, activeTank.power * 1.7, 8);
   }
 
