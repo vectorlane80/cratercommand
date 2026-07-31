@@ -51,6 +51,10 @@ export class TerrainSystem {
       this.drawRetroPixel(graphics, terrainData);
       return;
     }
+    if (visualSystem === 'hiRes') {
+      this.drawHiRes(graphics, terrainData);
+      return;
+    }
 
     graphics.fillStyle(GAME_CONFIG.colors.darkGreen, 1);
     graphics.beginPath();
@@ -153,6 +157,91 @@ export class TerrainSystem {
     }
 
     // Cacti are now drawn as image sprites by GameScene's retro layer pass.
+  }
+
+  private drawHiRes(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
+    const { heights, width, height, segmentWidth } = terrainData;
+
+    // Pass A: Full terrain with gradient from top-mid brown to lower-mid dark
+    graphics.fillGradientStyle(0x9a5f26, 0x9a5f26, 0x2c180a, 0x2c180a, 1);
+    graphics.beginPath();
+    graphics.moveTo(0, height);
+    heights.forEach((sampleHeight, index) => {
+      graphics.lineTo(index * segmentWidth, sampleHeight);
+    });
+    graphics.lineTo(width, height);
+    graphics.closePath();
+    graphics.fillPath();
+
+    // Pass B: Lower half only with gradient from lower-mid to near-black
+    graphics.fillGradientStyle(0x2c180a, 0x2c180a, 0x0d0702, 0x0d0702, 0.9);
+    graphics.beginPath();
+    graphics.moveTo(0, height);
+    heights.forEach((sampleHeight, index) => {
+      const lowerY = sampleHeight + (height - sampleHeight) * 0.45;
+      graphics.lineTo(index * segmentWidth, lowerY);
+    });
+    graphics.lineTo(width, height);
+    graphics.closePath();
+    graphics.fillPath();
+
+    // Rubble: soft dots using deterministic pseudo-noise (no Math.random)
+    // ~40 dots scattered through the terrain
+    graphics.fillStyle(0x2c180a, 0.35);
+    for (let i = 0; i < 40; i += 1) {
+      // Pseudo-random hash based on i to get deterministic placement
+      const xHash = (i * 73) % Math.floor(width);
+      const radiusHash = (i * 53) % 3 + 2; // radius 2-4
+
+      const x = xHash;
+      const groundY = this.getHeightAtX(terrainData, x);
+      const offset = 6 + ((i * 131) % 75); // 6..80 below surface
+      const y = groundY + offset;
+
+      if (y < height) {
+        graphics.fillCircle(x, y, radiusHash);
+      }
+    }
+
+    // Ridge: layered strokes along surface polyline
+    // Layer 1: 7px warm glow
+    graphics.lineStyle(7, 0xffb347, 0.22);
+    graphics.beginPath();
+    heights.forEach((sampleHeight, index) => {
+      const x = index * segmentWidth;
+      if (index === 0) {
+        graphics.moveTo(x, sampleHeight);
+      } else {
+        graphics.lineTo(x, sampleHeight);
+      }
+    });
+    graphics.strokePath();
+
+    // Layer 2: 4px mid-tone
+    graphics.lineStyle(4, 0xffb347, 0.3);
+    graphics.beginPath();
+    heights.forEach((sampleHeight, index) => {
+      const x = index * segmentWidth;
+      if (index === 0) {
+        graphics.moveTo(x, sampleHeight);
+      } else {
+        graphics.lineTo(x, sampleHeight);
+      }
+    });
+    graphics.strokePath();
+
+    // Layer 3: 2px specular highlight
+    graphics.lineStyle(2, 0xffd68c, 0.55);
+    graphics.beginPath();
+    heights.forEach((sampleHeight, index) => {
+      const x = index * segmentWidth;
+      if (index === 0) {
+        graphics.moveTo(x, sampleHeight);
+      } else {
+        graphics.lineTo(x, sampleHeight);
+      }
+    });
+    graphics.strokePath();
   }
 
   applyMound(terrainData: TerrainData, x: number, y: number, radius: number): void {

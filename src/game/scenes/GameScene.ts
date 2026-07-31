@@ -54,6 +54,7 @@ export class GameScene extends Phaser.Scene {
   private hiresBarrels: Phaser.GameObjects.Image[] = [];
   private hiresChutes: Phaser.GameObjects.Image[] = [];
   private hiresShells: Phaser.GameObjects.Image[] = [];
+  private hiresRocks: Phaser.GameObjects.Image[] = [];
 
   private terrainSystem!: TerrainSystem;
   private tankSystem!: TankSystem;
@@ -240,6 +241,12 @@ export class GameScene extends Phaser.Scene {
     // HiRes-mode shell sprites (pool of 24 for projectiles).
     this.hiresShells = Array.from({ length: 24 }, () =>
       this.add.image(0, 0, 'hires-shell').setOrigin(0.5, 0.5).setScale(0.25).setVisible(false)
+    );
+
+    // HiRes-mode rock props (sit on terrain, positioned with cacti).
+    const HIRES_ROCK_POSITIONS = [0.22, 0.55, 0.81] as const;
+    this.hiresRocks = HIRES_ROCK_POSITIONS.map(() =>
+      this.add.image(0, 0, 'hires-rock').setOrigin(0.5, 1).setScale(0.3)
     );
 
     this.applyVisualLayerTextures();
@@ -2047,12 +2054,14 @@ export class GameScene extends Phaser.Scene {
 
   private updateRetroLayerVisibility(): void {
     const retro = this.visualSystem !== 'classic';
+    const hiRes = this.visualSystem === 'hiRes';
     this.retroBackdrop.visible = retro;
     this.retroCacti.forEach((cactus) => (cactus.visible = retro));
     this.retroTankBodies.forEach((tankImg) => (tankImg.visible = retro));
     this.hiresBarrels.forEach((barrel) => (barrel.visible = false));
     this.hiresChutes.forEach((chute) => (chute.visible = false));
     this.hiresShells.forEach((shell) => (shell.visible = false));
+    this.hiresRocks.forEach((rock) => (rock.visible = false));
 
     if (retro && this.terrainData) {
       RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
@@ -2078,6 +2087,19 @@ export class GameScene extends Phaser.Scene {
         }
         tankImg.setPosition(Math.round(tank.x), Math.round(tank.y) + 2);
       });
+
+      // HiRes rocks: position them along terrain
+      if (hiRes) {
+        const HIRES_ROCK_POSITIONS = [0.22, 0.55, 0.81] as const;
+        HIRES_ROCK_POSITIONS.forEach((t, idx) => {
+          const rock = this.hiresRocks[idx];
+          if (!rock) return;
+          const x = t * GAME_CONFIG.width;
+          const y = this.terrainSystem.getHeightAtX(this.terrainData, x);
+          rock.setPosition(Math.round(x), Math.round(y) + 2);
+          rock.visible = true;
+        });
+      }
     }
   }
 
