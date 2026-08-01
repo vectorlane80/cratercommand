@@ -21,6 +21,10 @@ export interface ProjectileTick {
   terrainChanged?: boolean;
 }
 
+export function bananaSpinStep(ageMs: number): number {
+  return Math.floor(ageMs / 90) % 4;
+}
+
 export class ProjectileSystem {
   private trailTimerMs = 0;
 
@@ -559,6 +563,69 @@ export class ProjectileSystem {
     shellPool: Phaser.GameObjects.Image[] = []
   ): void {
     graphics.clear();
+
+    if (visualSystem === 'bananas') {
+      const sunX = 480;
+      const sunY = 62;
+      const sunRadius = 22;
+      const yellow = 0xffff55;
+      const blue = 0x0000aa;
+      const shocked = projectiles.some((projectile) => Math.hypot(projectile.x - sunX, projectile.y - sunY) < 40);
+
+      graphics.lineStyle(2, yellow, 1);
+      for (let i = 0; i < 12; i += 1) {
+        const angle = (i * Math.PI) / 6;
+        graphics.beginPath();
+        graphics.moveTo(
+          sunX + Math.cos(angle) * (sunRadius + 4),
+          sunY + Math.sin(angle) * (sunRadius + 4)
+        );
+        graphics.lineTo(
+          sunX + Math.cos(angle) * (sunRadius + 12),
+          sunY + Math.sin(angle) * (sunRadius + 12)
+        );
+        graphics.strokePath();
+      }
+      graphics.fillStyle(yellow, 1);
+      graphics.beginPath();
+      graphics.arc(sunX, sunY, sunRadius, 0, 7);
+      graphics.fillPath();
+      graphics.fillStyle(blue, 1);
+      graphics.fillRect(sunX - 8, sunY - 6, 4, 5);
+      graphics.fillRect(sunX + 4, sunY - 6, 4, 5);
+      if (shocked) {
+        graphics.beginPath();
+        graphics.arc(sunX, sunY + 6, 6, 0, 7);
+        graphics.fillPath();
+      } else {
+        graphics.lineStyle(3, blue, 1);
+        graphics.beginPath();
+        graphics.arc(sunX, sunY + 2, 8, 0.25, Math.PI - 0.25);
+        graphics.strokePath();
+      }
+
+      graphics.fillStyle(yellow, 1);
+      projectiles.forEach((projectile) => {
+        if (projectile.launchDelayMs !== undefined && projectile.launchDelayMs > 0) return;
+        const x = Math.round(projectile.x);
+        const y = Math.round(projectile.y);
+        const step = bananaSpinStep(projectile.ageMs);
+        if (step === 0) {
+          graphics.fillRect(x - 6, y - 2, 12, 4);
+          graphics.fillRect(x - 4, y + 2, 8, 2);
+        } else if (step === 1) {
+          graphics.fillRect(x - 3, y - 6, 4, 12);
+          graphics.fillRect(x + 1, y - 4, 2, 8);
+        } else if (step === 2) {
+          graphics.fillRect(x - 6, y - 2, 12, 4);
+          graphics.fillRect(x - 4, y - 4, 8, 2);
+        } else {
+          graphics.fillRect(x - 1, y - 6, 4, 12);
+          graphics.fillRect(x - 3, y - 4, 2, 8);
+        }
+      });
+      return;
+    }
 
     // Hide all pool entries initially (will show those in use)
     if (visualSystem === 'hiRes') {

@@ -2279,12 +2279,14 @@ export class GameScene extends Phaser.Scene {
     this.backgroundGraphics.fillStyle(colors.black, 1);
     this.backgroundGraphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
 
-    // Console divider line is shared by both visual systems.
-    this.backgroundGraphics.lineStyle(2, this.visualSystem === 'retroPixel' ? colors.steelLight : colors.white, 1);
-    this.backgroundGraphics.beginPath();
-    this.backgroundGraphics.moveTo(0, GAME_CONFIG.layout.consoleTop - 2);
-    this.backgroundGraphics.lineTo(GAME_CONFIG.width, GAME_CONFIG.layout.consoleTop - 2);
-    this.backgroundGraphics.strokePath();
+    // Bananas draws its own console rule at the exact mock position.
+    if (this.visualSystem !== 'bananas') {
+      this.backgroundGraphics.lineStyle(2, this.visualSystem === 'retroPixel' ? colors.steelLight : colors.white, 1);
+      this.backgroundGraphics.beginPath();
+      this.backgroundGraphics.moveTo(0, GAME_CONFIG.layout.consoleTop - 2);
+      this.backgroundGraphics.lineTo(GAME_CONFIG.width, GAME_CONFIG.layout.consoleTop - 2);
+      this.backgroundGraphics.strokePath();
+    }
 
     if (this.visualSystem === 'classic') {
       // Classic sky: faint deterministic starfield.

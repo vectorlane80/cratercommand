@@ -18,6 +18,81 @@ import { getPlayerPalette } from './TankSystem';
 import { WEAPON_WINDOW_SIZE } from './WeaponWindow';
 import type { ShopCatalogEntry } from './EconomySystem';
 
+interface BananasGlyphMask {
+  pts: Array<[number, number]>;
+  w: number;
+  h: number;
+}
+
+const bananasGlyphCache: Record<string, BananasGlyphMask> = {};
+
+export function bananasTextMask(str: string): BananasGlyphMask {
+  if (bananasGlyphCache[str]) return bananasGlyphCache[str];
+  const w = Math.max(1, str.length * 6);
+  const h = 9;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const context = canvas.getContext('2d')!;
+  context.font = '9px monospace';
+  context.textBaseline = 'top';
+  context.fillStyle = '#fff';
+  context.fillText(str, 0, 0);
+  const data = context.getImageData(0, 0, w, h).data;
+  const pts: Array<[number, number]> = [];
+  for (let py = 0; py < h; py += 1) {
+    for (let px = 0; px < w; px += 1) {
+      if (data[(py * w + px) * 4 + 3] > 100) pts.push([px, py]);
+    }
+  }
+  bananasGlyphCache[str] = { pts, w, h };
+  return bananasGlyphCache[str];
+}
+
+export function bananasPixText(
+  graphics: Phaser.GameObjects.Graphics,
+  str: string,
+  x: number,
+  y: number,
+  cell: number,
+  color: number
+): number {
+  const mask = bananasTextMask(str.toUpperCase());
+  graphics.fillStyle(color, 1);
+  mask.pts.forEach(([px, py]) => graphics.fillRect(x + px * cell, y + py * cell, cell, cell));
+  return mask.w * cell;
+}
+
+export function bananasPixTextCentered(
+  graphics: Phaser.GameObjects.Graphics,
+  str: string,
+  cx: number,
+  y: number,
+  cell: number,
+  color: number
+): number {
+  const mask = bananasTextMask(str.toUpperCase());
+  return bananasPixText(graphics, str, Math.round(cx - (mask.w * cell) / 2), y, cell, color);
+}
+
+export function bananasBox(
+  graphics: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: number,
+  frame: number
+): void {
+  graphics.fillStyle(fill, 1);
+  graphics.fillRect(x, y, w, h);
+  graphics.fillStyle(frame, 1);
+  graphics.fillRect(x, y, w, 2);
+  graphics.fillRect(x, y + h - 2, w, 2);
+  graphics.fillRect(x, y, 2, h);
+  graphics.fillRect(x + w - 2, y, 2, h);
+}
+
 /**
  * Shop overlay layout constants. Click hit-tests in GameScene must match
  * these so the rocker (+/-) buttons line up with their drawn graphics.
@@ -148,10 +223,9 @@ export class HudSystem {
     }
 
     if (!inShop && !matchOver) {
-      // Bananas interim: draw the retro console so drawing matches the retro
-      // pointer map it routes through. The real Bananas console replaces this
-      // branch in slice C.
-      if (visualSystem === 'retroPixel' || visualSystem === 'bananas') {
+      if (visualSystem === 'bananas') {
+        this.drawBananasHud(turn, tanks, match, weapon);
+      } else if (visualSystem === 'retroPixel') {
         this.drawRetroPixelHud(turn, tanks, weapon, match, weaponWindowStart);
       } else if (visualSystem === 'hiRes') {
         this.drawHiResHud(turn, tanks, weapon, match, weaponWindowStart);
@@ -164,7 +238,13 @@ export class HudSystem {
     if (inShop) {
       this.drawShopOverlay(match, visualSystem);
     } else if (turn.phase === 'roundOver' && statusMessage) {
-      this.drawCenterBanner(statusMessage, 'PRESS SPACE OR ENTER FOR SHOP', visualSystem);
+      this.drawCenterBanner(
+        statusMessage,
+        visualSystem === 'bananas'
+          ? 'PRESS SPACE OR ENTER FOR NEXT ROUND'
+          : 'PRESS SPACE OR ENTER FOR SHOP',
+        visualSystem
+      );
     } else if (turn.phase === 'aiming' && statusMessage) {
       // AI is thinking — small banner that doesn't block visibility.
       this.addText(
@@ -545,6 +625,145 @@ export class HudSystem {
     this.graphics.lineStyle(1, colors.red, 1);
     this.graphics.strokeRect(820, stripY + 2, 130, 22);
     this.addText(830, stripY + 6, 'ESC: MENU', colors.red, GAME_CONFIG.font.small);
+  }
+
+  private drawBananasHud(
+    turn: TurnState,
+    tanks: TankState[],
+    match: MatchState,
+    _weapon: WeaponDefinition
+  ): void {
+    const tank = tanks[turn.activePlayerId];
+    const top = GAME_CONFIG.layout.consoleTop;
+    const p1Name = match.profiles[0].displayName ?? 'PLAYER 1';
+    const p2Name = match.profiles[1].displayName ?? 'PLAYER 2';
+    const activeName = match.profiles[turn.activePlayerId].displayName ?? `PLAYER ${turn.activePlayerId + 1}`;
+
+    bananasPixText(this.graphics, p1Name, 24, 10, 2, 0x55ffff);
+    bananasPixTextCentered(
+      this.graphics,
+      `${match.profiles[0].wins} > SCORE < ${match.profiles[1].wins}`,
+      480,
+      10,
+      2,
+      0xffffff
+    );
+    bananasPixText(
+      this.graphics,
+      p2Name,
+      936 - bananasTextMask(p2Name.toUpperCase()).w * 2,
+      10,
+      2,
+      0xff55ff
+    );
+
+    this.graphics.fillStyle(0x0000aa, 1);
+    this.graphics.fillRect(0, top, 960, 134);
+    this.graphics.fillStyle(0xffffff, 1);
+    this.graphics.fillRect(0, top, 960, 2);
+
+    bananasBox(this.graphics, 8, 366, 208, 122, 0x000000, 0xffffff);
+    bananasPixText(this.graphics, 'SCORE', 88, 374, 2, 0xffffff);
+    bananasPixText(this.graphics, p1Name, 20, 398, 2, 0x55ffff);
+    bananasPixText(this.graphics, `${match.profiles[0].wins}`, 180, 398, 2, 0xffff55);
+    bananasPixText(this.graphics, p2Name, 20, 420, 2, 0xff55ff);
+    bananasPixText(this.graphics, `${match.profiles[1].wins}`, 180, 420, 2, 0xffff55);
+    bananasPixText(this.graphics, `BEST OF ${match.roundsToWin * 2 - 1}`, 20, 448, 2, 0xaaaaaa);
+    bananasPixText(this.graphics, 'BANANA', 20, 466, 2, 0xffff55);
+
+    bananasBox(this.graphics, 220, 366, 176, 122, 0x000000, 0xffffff);
+    bananasPixText(this.graphics, 'ANGLE', 274, 374, 2, 0xffffff);
+    bananasPixTextCentered(this.graphics, `${Math.round(tank.angle)}`, 308, 402, 5, 0xffff55);
+    this.graphics.fillStyle(0xffffff, 1);
+    this.graphics.fillRect(238, 466, 140, 2);
+    const angleRadians = (tank.angle * Math.PI) / 180;
+    this.graphics.lineStyle(3, 0x55ff55, 1);
+    this.graphics.beginPath();
+    this.graphics.moveTo(250, 466);
+    this.graphics.lineTo(250 + Math.cos(angleRadians) * 60, 466 - Math.sin(angleRadians) * 60);
+    this.graphics.strokePath();
+    bananasPixText(this.graphics, '<<', 230, 448, 2, 0x555555);
+    bananasPixText(this.graphics, '>>', 356, 448, 2, 0x555555);
+
+    bananasBox(this.graphics, 400, 366, 204, 122, 0x000000, 0xffffff);
+    bananasPixText(this.graphics, 'VELOCITY', 462, 374, 2, 0xffffff);
+    bananasPixTextCentered(this.graphics, `${Math.round(tank.power)}`, 502, 402, 5, 0xffff55);
+    bananasBox(this.graphics, 418, 452, 168, 22, 0x000000, 0xffffff);
+    const filledSegments = Math.floor(tank.power / 10);
+    for (let i = 0; i < 10; i += 1) {
+      this.graphics.fillStyle(i < filledSegments ? 0x55ff55 : 0x555555, 1);
+      this.graphics.fillRect(423 + i * 16, 457, 12, 12);
+    }
+    bananasPixText(this.graphics, '<<', 410, 448, 2, 0x555555);
+    bananasPixText(this.graphics, '>>', 578, 448, 2, 0x555555);
+
+    bananasBox(this.graphics, 610, 366, 140, 122, 0x000000, 0xffffff);
+    bananasBox(
+      this.graphics,
+      632,
+      394,
+      94,
+      58,
+      turn.phase === 'aiming' ? 0xaa0000 : 0x555555,
+      0xffffff
+    );
+    bananasPixTextCentered(this.graphics, 'FIRE', 679, 412, 4, 0xffff55);
+    bananasPixTextCentered(this.graphics, 'SPACE', 679, 462, 2, 0xaaaaaa);
+
+    bananasBox(this.graphics, 756, 366, 196, 122, 0x000000, 0xffffff);
+    bananasPixText(this.graphics, 'WIND', 838, 374, 2, 0xffffff);
+    this.drawBananasWindArrow(854, 412, turn.wind.magnitude, turn.wind.direction);
+    bananasPixText(
+      this.graphics,
+      `${turn.wind.direction > 0 ? 'RIGHT' : 'LEFT'}  ${turn.wind.magnitude}`,
+      772,
+      430,
+      2,
+      0xff5555
+    );
+    bananasPixText(this.graphics, `ROUND   ${match.round}`, 772, 450, 2, 0xffffff);
+    bananasPixText(this.graphics, 'GRAVITY 9.8', 772, 468, 2, 0xaaaaaa);
+
+    this.graphics.fillStyle(0x000000, 1);
+    this.graphics.fillRect(0, 494, 960, 46);
+    this.graphics.fillStyle(0xffffff, 1);
+    this.graphics.fillRect(0, 494, 960, 2);
+    bananasPixText(this.graphics, '<- -> ANGLE   UP DN VELOCITY   SPACE THROW', 16, 504, 2, 0x55ffff);
+    bananasPixText(this.graphics, 'V CYCLE DISPLAY   ENTER NEXT   ESC MENU', 16, 522, 2, 0x55ffff);
+
+    const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+    bananasBox(this.graphics, 820, stripY + 2, 130, 22, 0x000000, 0x555555);
+    bananasPixTextCentered(this.graphics, 'ESC', 885, stripY + 8, 2, 0xaaaaaa);
+    const throwText = `${activeName} THROWS`;
+    bananasPixText(
+      this.graphics,
+      throwText,
+      812 - bananasTextMask(throwText.toUpperCase()).w * 2,
+      504,
+      2,
+      0xffff55
+    );
+    if (turn.phase === 'projectileInFlight') {
+      const flightText = 'BANANA IN FLIGHT';
+      bananasPixText(
+        this.graphics,
+        flightText,
+        812 - bananasTextMask(flightText).w * 2,
+        522,
+        2,
+        0xffffff
+      );
+    }
+  }
+
+  private drawBananasWindArrow(cx: number, y: number, magnitude: number, direction: -1 | 1): void {
+    const len = magnitude * 7 * direction;
+    this.graphics.fillStyle(0xff5555, 1);
+    this.graphics.fillRect(Math.min(cx, cx + len), y, Math.abs(len), 3);
+    const tipX = cx + len;
+    for (let i = 0; i < 7; i += 1) {
+      this.graphics.fillRect(tipX - direction * i, y - i + 1, 2, 2 * i + 1);
+    }
   }
 
   private drawRetroPixelHud(
@@ -957,6 +1176,10 @@ export class HudSystem {
       this.addText(x + 24, y + 20, line1, 0xffb347, '24px', 'Barlow Condensed', undefined, { weight: '700' });
       // Sub-line in mono
       this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px', 'JetBrains Mono', undefined, { weight: '400' });
+    } else if (visualSystem === 'bananas') {
+      bananasBox(this.graphics, x, y, w, h, 0x000000, 0xffffff);
+      bananasPixTextCentered(this.graphics, line1, x + w / 2, y + 22, 3, 0xffff55);
+      bananasPixTextCentered(this.graphics, line2, x + w / 2, y + 68, 2, 0xffffff);
     } else if (visualSystem === 'retroPixel') {
       // Retro: boxy 2px steel + desertGold
       this.graphics.fillStyle(GAME_CONFIG.colors.steelMid, 1);

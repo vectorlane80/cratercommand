@@ -17,6 +17,56 @@ export interface PlayerPalette {
   dark: number;
 }
 
+export function drawGorilla(
+  graphics: Phaser.GameObjects.Graphics,
+  cx: number,
+  baseY: number,
+  s: number,
+  pose: 'up' | 'both' | 'right' | 'left' | 'down'
+): void {
+  const px = (a: number, b: number, w: number, h: number, color: number): void => {
+    graphics.fillStyle(color, 1);
+    graphics.fillRect(
+      Math.round(cx + a * s),
+      Math.round(baseY + b * s),
+      Math.ceil(w * s),
+      Math.ceil(h * s)
+    );
+  };
+  const brown = 0xaa5500;
+  const chest = 0xaa0000;
+
+  px(-9, -7, 6, 7, brown);
+  px(3, -7, 6, 7, brown);
+  px(-11, -2, 8, 2, brown);
+  px(3, -2, 8, 2, brown);
+  px(-8, -22, 16, 16, brown);
+  px(-6, -20, 12, 5, chest);
+  px(-11, -22, 22, 5, brown);
+  if (pose === 'up' || pose === 'both') {
+    px(-15, -34, 5, 14, brown);
+    px(10, -34, 5, 14, brown);
+  } else if (pose === 'right') {
+    px(-15, -22, 5, 13, brown);
+    px(10, -32, 5, 13, brown);
+  } else if (pose === 'left') {
+    px(-15, -32, 5, 13, brown);
+    px(10, -22, 5, 13, brown);
+  } else {
+    px(-15, -22, 5, 14, brown);
+    px(10, -22, 5, 14, brown);
+  }
+  px(-4, -25, 8, 3, brown);
+  px(-7, -34, 14, 9, brown);
+  px(-9, -32, 2, 5, brown);
+  px(7, -32, 2, 5, brown);
+  px(-6, -33, 12, 2, 0x000000);
+  px(-4, -31, 2, 2, 0x000000);
+  px(2, -31, 2, 2, 0x000000);
+  px(-4, -28, 8, 3, 0xaaaaaa);
+  px(-2, -27, 4, 1, 0x000000);
+}
+
 /**
  * Single source of truth for "what color is player N in visual mode M".
  * Each PlayerId gets its own distinctive palette so identity is consistent
@@ -218,10 +268,15 @@ export class TankSystem {
 
     tanks.forEach((tank) => {
       if (!tank.alive) return;
+
+      if (visualSystem === 'bananas') {
+        const pose = tank.id === activePlayerId ? (tank.id === 0 ? 'right' : 'left') : 'down';
+        drawGorilla(graphics, Math.round(tank.x), Math.round(tank.y), 1, pose);
+        return;
+      }
+
       const palette = getPlayerPalette(tank.id, visualSystem);
 
-      // Bananas interim: classic vector tanks until the ape figures land in
-      // slice C. retroPixel/hiRes draw sprite bodies + procedural barrels.
       if (visualSystem === 'retroPixel' || visualSystem === 'hiRes') {
         this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId, palette, visualSystem);
         return;
