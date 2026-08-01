@@ -1779,7 +1779,7 @@ export class GameScene extends Phaser.Scene {
     this.turn.phase = 'projectileInFlight';
     soundSystem.playFire();
     this.renderTanksAndHud();
-    this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
+    this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles, this.visualSystem, this.hiresShells);
   }
 
   private fireLaser(activeTank: TankState, weapon: WeaponDefinition): void {
@@ -1838,7 +1838,7 @@ export class GameScene extends Phaser.Scene {
     this.turn.phase = 'projectileInFlight';
     this.time.delayedCall(350, () => {
       this.laserResolving = false;
-      this.projectileSystem.drawAll(this.projectileGraphics, []);
+      this.projectileSystem.drawAll(this.projectileGraphics, [], this.visualSystem, this.hiresShells);
       this.endTurn();
     });
   }
@@ -1925,7 +1925,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.activeProjectiles = [...remaining, ...spawnedThisFrame];
-    this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles);
+    this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles, this.visualSystem, this.hiresShells);
     if (this.isOnlineHost) this.broadcastSnapshot();
 
     if (this.activeProjectiles.length === 0) {
@@ -2040,7 +2040,8 @@ export class GameScene extends Phaser.Scene {
 
   private endTurn(): void {
     this.activeProjectiles = [];
-    this.projectileSystem.drawAll(this.projectileGraphics, []);
+    // Pass the visual args so the hi-res shell pool gets hidden too.
+    this.projectileSystem.drawAll(this.projectileGraphics, [], this.visualSystem, this.hiresShells);
 
     if (this.turnSystem.isRoundOver(this.tanks)) {
       this.resolveRoundEnd(this.turnSystem.findWinner(this.tanks));
