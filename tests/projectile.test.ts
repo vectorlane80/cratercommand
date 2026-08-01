@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ProjectileSystem } from '../src/game/systems/ProjectileSystem';
 import { TankSystem } from '../src/game/systems/TankSystem';
 import { TerrainSystem } from '../src/game/systems/TerrainSystem';
+import type { GameSnapshot } from '../src/game/systems/NetworkSystem';
 import { GAME_CONFIG, PHYSICS_DEFAULTS, type ProjectileState } from '../src/game/types/GameTypes';
 import { makeFlatTerrain, makeTank } from './helpers';
 
@@ -992,5 +993,27 @@ describe('ProjectileSystem', () => {
     expect(deserialized.tunnelRemaining).toBe(50);
     expect(deserialized.guidanceId).toBe('heat-guidance');
     expect(deserialized.wallBounces).toBe(3);
+  });
+
+  it('snapshot round-trip: bananas skyline seed and banana weapon id survive JSON serialization', () => {
+    const snapshot: Pick<GameSnapshot, 'bananasSkylineSeed' | 'projectiles'> = {
+      bananasSkylineSeed: 12345,
+      projectiles: [{
+        ownerId: 0,
+        weaponId: 'banana',
+        x: 123.45,
+        y: 234.56,
+        velocityX: 45.67,
+        velocityY: -56.78,
+        trail: [{ x: 100, y: 200 }],
+        ageMs: 789
+      }]
+    };
+
+    const serialized = JSON.stringify(snapshot);
+    const deserialized = JSON.parse(serialized);
+
+    expect(deserialized.bananasSkylineSeed).toBe(12345);
+    expect(deserialized.projectiles[0].weaponId).toBe('banana');
   });
 });

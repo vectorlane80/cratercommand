@@ -123,6 +123,7 @@ export class GameScene extends Phaser.Scene {
   // forward local inputs (when it's our turn) to the host.
   private isOnlineHost = false;
   private isOnlineJoiner = false;
+  private onlineBananas: boolean | null = null;
   /**
    * For the joiner: the PlayerId that "we" control. Inputs apply only when
    * turn.activePlayerId === localPlayerId.
@@ -161,6 +162,7 @@ export class GameScene extends Phaser.Scene {
     roundsToWin?: number;
     wallMode?: WallMode;
     physics?: PhysicsSettings;
+    bananas?: boolean;
     online?: { isHost: boolean };
   }): void {
     if (data?.controllers && data.controllers.length >= 2) {
@@ -177,11 +179,13 @@ export class GameScene extends Phaser.Scene {
       this.pendingPhysics = data.physics;
     }
     if (data?.online) {
+      this.onlineBananas = data.bananas ?? null;
       this.isOnlineHost = data.online.isHost;
       this.isOnlineJoiner = !data.online.isHost;
       // Joiner is always slot index where 'human' (their own controller) is.
       this.localPlayerId = this.pendingControllers.indexOf('human') as PlayerId;
     } else {
+      this.onlineBananas = null;
       this.isOnlineHost = false;
       this.isOnlineJoiner = false;
     }
@@ -193,6 +197,15 @@ export class GameScene extends Phaser.Scene {
 
     // Load visual system from storage first, before layer textures are applied.
     this.loadVisualSystemFromStorage();
+    if (this.onlineBananas !== null) {
+      if (this.onlineBananas) {
+        this.visualSystem = 'bananas';
+      } else if (this.visualSystem === 'bananas') {
+        // Scorched match but this client's saved style is bananas — bananas is
+        // a ruleset, not a skin, so fall back to classic for this match.
+        this.visualSystem = 'classic';
+      }
+    }
 
     // Phaser keeps keyboard Key state across scene transitions. If the user
     // pressed a number key in MenuScene (e.g. "4" to cycle slot 4) and the
@@ -820,6 +833,7 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case 'move-step': {
+        if (this.isBananas()) break;
         const others = this.tanks.filter((t) => t.id !== activeTank.id);
         this.tankSystem.moveTank(activeTank, action.direction, 0.06, this.terrainSystem, this.terrainData, others);
         this.renderTanksAndHud();
@@ -888,6 +902,7 @@ export class GameScene extends Phaser.Scene {
   private broadcastSnapshot(): void {
     if (!this.isOnlineHost) return;
     const snapshot: GameSnapshot = {
+      bananasSkylineSeed: this.bananasSkylineSeed,
       match: JSON.parse(JSON.stringify(this.match)),
       turn: JSON.parse(JSON.stringify(this.turn)),
       tanks: JSON.parse(JSON.stringify(this.tanks)),
@@ -939,7 +954,7 @@ export class GameScene extends Phaser.Scene {
       this.terrainData.heights = snap.terrainHeights.slice();
     }
     this.activeProjectiles = snap.projectiles.map((p) => {
-      const weapon = GAME_CONFIG.weapons.find((w) => w.id === p.weaponId)!;
+      const weapon = p.weaponId === 'banana' ? BANANA_WEAPON : GAME_CONFIG.weapons.find((w) => w.id === p.weaponId)!;
       return {
         ownerId: p.ownerId as PlayerId,
         weapon,
@@ -964,6 +979,10 @@ export class GameScene extends Phaser.Scene {
     this.statusMessage = snap.statusMessage;
     this.topToast = snap.topToast;
     this.pendingShopBuys = snap.pendingShopBuys;
+    if (this.isBananas() && typeof snap.bananasSkylineSeed === 'number' && snap.bananasSkylineSeed !== this.bananasSkylineSeed) {
+      this.bananasSkylineSeed = snap.bananasSkylineSeed;
+      this.terrainSystem.setBananasSkyline(this.bananasSkylineSeed, GAME_CONFIG.width);
+    }
     this.renderAll();
   }
 
@@ -1063,8 +1082,10 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.guidanceCycleKey)) {
       this.sendInput({ kind: 'cycle-guidance' });
     }
-    if (this.moveLeftKey.isDown) this.sendInput({ kind: 'move-step', direction: -1 });
-    if (this.moveRightKey.isDown) this.sendInput({ kind: 'move-step', direction: 1 });
+    if (!this.isBananas()) {
+      if (this.moveLeftKey.isDown) this.sendInput({ kind: 'move-step', direction: -1 });
+      if (this.moveRightKey.isDown) this.sendInput({ kind: 'move-step', direction: 1 });
+    }
   }
 
   private handleJoinerShoppingInput(): void {
@@ -1355,6 +1376,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.turn.phase === 'roundOver') {
+      if (this.isOnlineJoiner) {
+        this.sendInput({ kind: 'advance-round' });
+        return;
+      }
       this.enterShoppingPhase();
       return;
     }

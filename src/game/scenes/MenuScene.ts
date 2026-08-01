@@ -358,6 +358,8 @@ export class MenuScene extends Phaser.Scene {
         this.visualSystem = 'retroPixel';
       } else if (this.visualSystem === 'retroPixel') {
         this.visualSystem = 'hiRes';
+      } else if (this.visualSystem === 'hiRes') {
+        this.visualSystem = 'bananas';
       } else {
         this.visualSystem = 'classic';
       }
@@ -370,17 +372,20 @@ export class MenuScene extends Phaser.Scene {
     const hostBtn = this.hostButtonRect();
     if (x >= hostBtn.x && x <= hostBtn.x + hostBtn.w && y >= hostBtn.y && y <= hostBtn.y + hostBtn.h) {
       soundSystem.playUiSelect();
-      const physics: PhysicsSettings = {
-        gravity: GRAVITY_STEPS[this.gravityIndex],
-        viscosity: VISCOSITY_STEPS[this.viscosityIndex],
-        tanksFall: this.tanksFall
-      };
+      const physics: PhysicsSettings = this.visualSystem === 'bananas'
+        ? { gravity: PHYSICS_DEFAULTS.gravity, viscosity: PHYSICS_DEFAULTS.viscosity, tanksFall: true }
+        : {
+            gravity: GRAVITY_STEPS[this.gravityIndex],
+            viscosity: VISCOSITY_STEPS[this.viscosityIndex],
+            tanksFall: this.tanksFall
+          };
       this.scene.start('LobbyScene', {
         mode: 'host',
         localName: this.names[0] ?? 'PLAYER 1',
         roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
-        wallMode: WALL_MODES[this.wallModeIndex],
-        physics
+        wallMode: this.visualSystem === 'bananas' ? 'none' : WALL_MODES[this.wallModeIndex],
+        physics,
+        bananas: this.visualSystem === 'bananas'
       });
       return;
     }
@@ -389,7 +394,8 @@ export class MenuScene extends Phaser.Scene {
       soundSystem.playUiSelect();
       this.scene.start('LobbyScene', {
         mode: 'join',
-        localName: this.names[0] ?? 'PLAYER 1'
+        localName: this.names[0] ?? 'PLAYER 1',
+        bananas: this.visualSystem === 'bananas'
       });
       return;
     }
