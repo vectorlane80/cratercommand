@@ -13,6 +13,18 @@ sprite art), and **Hi-Res** (4× remastered sprites, sprite ballistics and blast
 animations, gradient terrain, a glass-panel HUD with real typography, and a
 logo wordmark).
 
+## Screenshots
+
+**Hi-Res**
+
+![Hi-Res mode: remastered sprites, gradient terrain, glass-panel HUD](screenshots/match-hires.png)
+
+| Retro Pixel | Classic |
+|---|---|
+| ![Retro Pixel mode: VGA sunset sprite art with a steel-and-gold console](screenshots/match-retro.png) | ![Classic mode: the original neon vector look](screenshots/match-classic.png) |
+
+![Hi-Res match setup menu with the logo wordmark](screenshots/menu-hires.png)
+
 ## Quick start
 
 ```bash
@@ -25,10 +37,11 @@ Open the printed Vite URL. `npm run build` produces a static bundle in `dist/`;
 
 ## The game
 
-2–4 tanks take turns lobbing shells across procedurally generated, fully
-destructible terrain. Wind shifts every turn. Last tank alive wins the round;
-first to the match's win target (best of 3/5/7) takes the match. Between
-rounds, everyone spends their earnings in the shop.
+Two tanks — any mix of human and CPU — take turns lobbing shells across
+procedurally generated, fully destructible terrain. Wind shifts every turn.
+Last tank alive wins the round; first to the match's win target (best of
+3/5/7) takes the match. Between rounds, everyone spends their earnings in
+the shop.
 
 ### Arsenal — 39 weapons
 
@@ -91,7 +104,8 @@ physics settings carry over from the host's menu selections.
 | ESC | Forfeit / menu |
 
 Menu: G / A / F cycle gravity, air viscosity, tanks-fall; W walls; B match
-length. Full mouse/touch parity throughout.
+length. Tap a player's name to rename them (in-page editor, no browser
+pop-up). Full mouse/touch parity throughout.
 
 ## Architecture (short version)
 
