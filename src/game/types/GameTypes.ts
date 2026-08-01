@@ -172,6 +172,8 @@ export interface WeaponDefinition {
   salvoCount?: number;
   salvoAngleSpread?: number;
   salvoPowerSpread?: number;
+  /** Stagger between salvo launches. 0/absent = all shots fire at once. */
+  salvoDelayMs?: number;
   moundRadius?: number;
   hopCount?: number;
   funkySpawnCount?: number;
@@ -216,6 +218,8 @@ export interface ProjectileState {
   tunnelRemaining?: number;
   guidanceId?: string;
   wallBounces?: number;
+  /** Remaining ms before this salvo shot leaves the barrel; inert until 0. */
+  launchDelayMs?: number;
 }
 
 export interface WindState {
@@ -519,9 +523,12 @@ export const GAME_CONFIG = {
       behavior: 'salvo',
       category: 'missile',
       bundleSize: 1,
+      // Machine-gun burst: shots walk down the aim line one after another
+      // with slight jitter (a simultaneous wide scatter read as random).
       salvoCount: 5,
-      salvoAngleSpread: 5,
-      salvoPowerSpread: 12
+      salvoAngleSpread: 1.5,
+      salvoPowerSpread: 4,
+      salvoDelayMs: 150
     },
     {
       id: 'missile',

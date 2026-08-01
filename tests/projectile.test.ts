@@ -35,6 +35,44 @@ describe('ProjectileSystem', () => {
     expect(projectiles.length).toBe(5);
   });
 
+  it('launch stream staggers shots by salvoDelayMs, first shot immediate', () => {
+    const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'stream')!;
+
+    const projectiles = projectileSystem.launch(tank, weapon, tankSystem);
+
+    expect(projectiles[0].launchDelayMs).toBeUndefined();
+    for (let i = 1; i < projectiles.length; i += 1) {
+      expect(projectiles[i].launchDelayMs).toBe(i * weapon.salvoDelayMs!);
+    }
+  });
+
+  it('delayed shot is inert until its launch delay elapses, then flies', () => {
+    const terrain = makeFlatTerrain(340);
+    const tank = makeTank({ angle: 90, power: 50, x: 480, y: 248 });
+    const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'stream')!;
+    const projectile = projectileSystem.launch(tank, weapon, tankSystem)[2];
+    projectile.y = 50;
+    const startX = projectile.x;
+    const startY = projectile.y;
+    const startVelocityY = projectile.velocityY;
+
+    // Two 100ms ticks against a 300ms delay: still in the barrel.
+    projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, []);
+    const tick = projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, []);
+    expect(tick.impact).toBeNull();
+    expect(projectile.x).toBe(startX);
+    expect(projectile.y).toBe(startY);
+    expect(projectile.velocityY).toBe(startVelocityY);
+    expect(projectile.ageMs).toBe(0);
+
+    // Third tick crosses the delay and flies the same tick — no dead frame.
+    projectileSystem.update(projectile, 100, noWind, 'none', terrainSystem, terrain, tankSystem, []);
+    expect(projectile.launchDelayMs).toBe(0);
+    expect(projectile.y).not.toBe(startY);
+    expect(projectile.ageMs).toBe(100);
+  });
+
   it('launch bouncing-bomb has bouncesLeft set', () => {
     const tank = makeTank({ angle: 45, power: 50, x: 480, y: 248 });
     const weapon = GAME_CONFIG.weapons.find((w) => w.id === 'bouncing-bomb')!;

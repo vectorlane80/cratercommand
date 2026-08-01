@@ -35,7 +35,11 @@ export class ProjectileSystem {
       for (let i = 0; i < count; i += 1) {
         const angleOffset = (Math.random() * 2 - 1) * aSpread;
         const powerOffset = (Math.random() * 2 - 1) * pSpread;
-        projectiles.push(this.buildProjectile(owner, weapon, tankSystem, angleOffset, powerOffset));
+        const projectile = this.buildProjectile(owner, weapon, tankSystem, angleOffset, powerOffset);
+        // Burst weapons stagger their shots; the first fires immediately.
+        const delay = i * (weapon.salvoDelayMs ?? 0);
+        if (delay > 0) projectile.launchDelayMs = delay;
+        projectiles.push(projectile);
       }
       return projectiles;
     }
@@ -85,6 +89,15 @@ export class ProjectileSystem {
     tanks: TankState[],
     physics: PhysicsSettings = PHYSICS_DEFAULTS
   ): ProjectileTick {
+    // Still in the barrel: burn down the launch delay, no physics yet.
+    if (projectile.launchDelayMs !== undefined && projectile.launchDelayMs > 0) {
+      projectile.launchDelayMs -= deltaMs;
+      if (projectile.launchDelayMs > 0) {
+        return { impact: null, spawned: [] };
+      }
+      projectile.launchDelayMs = 0;
+    }
+
     const deltaSeconds = deltaMs / 1000;
     projectile.ageMs += deltaMs;
     const spawned: ProjectileState[] = [];
@@ -553,6 +566,8 @@ export class ProjectileSystem {
     }
 
     projectiles.forEach((projectile, index) => {
+      // Shots still waiting on their launch delay haven't left the barrel.
+      if (projectile.launchDelayMs !== undefined && projectile.launchDelayMs > 0) return;
       graphics.fillStyle(GAME_CONFIG.colors.white, 1);
       projectile.trail.forEach((point, pointIndex) => {
         if (pointIndex % 2 === 0) {

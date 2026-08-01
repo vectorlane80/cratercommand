@@ -868,7 +868,8 @@ export class GameScene extends Phaser.Scene {
         tunneling: p.tunneling,
         tunnelRemaining: p.tunnelRemaining,
         guidanceId: p.guidanceId,
-        wallBounces: p.wallBounces
+        wallBounces: p.wallBounces,
+        launchDelayMs: p.launchDelayMs
       })),
       statusMessage: this.statusMessage,
       topToast: this.topToast,
@@ -915,7 +916,8 @@ export class GameScene extends Phaser.Scene {
         tunneling: p.tunneling,
         tunnelRemaining: p.tunnelRemaining,
         guidanceId: p.guidanceId,
-        wallBounces: p.wallBounces
+        wallBounces: p.wallBounces,
+        launchDelayMs: p.launchDelayMs
       };
     });
     this.statusMessage = snap.statusMessage;
