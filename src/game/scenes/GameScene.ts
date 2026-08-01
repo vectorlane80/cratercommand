@@ -72,6 +72,7 @@ export class GameScene extends Phaser.Scene {
   private activeProjectiles: ProjectileState[] = [];
   private statusMessage: string | null = null;
   private visualSystem: VisualSystem = GAME_CONFIG.visuals.defaultSystem;
+  private chuteFlashUntil: number[] = [0, 0];
 
   // AI turn state. When the active tank is CPU-controlled, the scene
   // computes an AIDecision once and then animates the tank's angle/power
@@ -178,6 +179,9 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
 
+    // Load visual system from storage first, before layer textures are applied.
+    this.loadVisualSystemFromStorage();
+
     // Phaser keeps keyboard Key state across scene transitions. If the user
     // pressed a number key in MenuScene (e.g. "4" to cycle slot 4) and the
     // GameScene's first update() polls JustDown on that same code, the stale
@@ -202,6 +206,7 @@ export class GameScene extends Phaser.Scene {
     this.aiShopElapsedMs = 0;
     this.activeProjectiles = [];
     this.statusMessage = null;
+    this.chuteFlashUntil = [0, 0];
 
     this.backgroundGraphics = this.add.graphics();
 
@@ -355,7 +360,6 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    this.loadVisualSystemFromStorage();
     this.renderAll();
 
     // The joiner's network handler may not be registered yet when the host's
@@ -2012,6 +2016,9 @@ export class GameScene extends Phaser.Scene {
           color: fall.usedParachute ? GAME_CONFIG.colors.yellow : GAME_CONFIG.colors.red,
           expiresAt: Date.now() + 2200
         };
+        if (fall.usedParachute) {
+          this.chuteFlashUntil[fall.tankId] = Date.now() + 1600;
+        }
       }
     });
   }
@@ -2140,7 +2147,7 @@ export class GameScene extends Phaser.Scene {
         // Chutes
         const chute = this.hiresChutes[idx];
         if (chute) {
-          if (tank.alive && tank.parachutes > 0) {
+          if (tank.alive && Date.now() < this.chuteFlashUntil[idx]) {
             chute.setPosition(Math.round(tank.x) - 24, Math.round(tank.y - 32) + 14);
             chute.visible = true;
           } else {
