@@ -7,6 +7,12 @@ terrain, a 39-weapon arsenal, shields and guidance systems, five CPU
 personalities, a between-round economy with a drifting free market, and
 peer-to-peer online play. Built with Vite + TypeScript + Phaser 3. No backend.
 
+Three visual modes, switchable from the menu or with `V` in-match (your choice
+persists across visits): **Classic** (neon vector), **Retro Pixel** (VGA sunset
+sprite art), and **Hi-Res** (4× remastered sprites, sprite ballistics and blast
+animations, gradient terrain, a glass-panel HUD with real typography, and a
+logo wordmark).
+
 ## Quick start
 
 ```bash
