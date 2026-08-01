@@ -2122,8 +2122,12 @@ export class GameScene extends Phaser.Scene {
           rock.visible = true;
         });
 
-        // Show mini-tank player cards in hiRes
-        this.hiresPlayerCards.forEach((card) => (card.visible = true));
+        // Show mini-tank player cards in hiRes (hide during shopping)
+        const inShop = this.turn.phase === 'shopping' && this.match.shoppingPlayerId !== null;
+        this.hiresPlayerCards.forEach((card) => (card.visible = !inShop));
+
+        // Hide chute indicators during shopping
+        this.hiresChutes.forEach((chute) => (chute.visible = false));
       }
     }
   }

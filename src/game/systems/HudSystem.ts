@@ -222,24 +222,25 @@ export class HudSystem {
     const cardY = (H - cardH) / 2;
 
     if (visualSystem === 'hiRes') {
-      // Glass panel treatment: gradient fill + subtle border + inset highlight
-      this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.95);
-      this.graphics.fillRoundedRect(cardX, cardY, cardW, cardH, 6);
-      this.graphics.lineStyle(1, 0xffbe78, 0.2);
-      this.graphics.strokeRoundedRect(cardX, cardY, cardW, cardH, 6);
-      // Inset highlight (top edge)
-      this.graphics.lineStyle(1, 0xffbe78, 0.15);
+      // Glass panel treatment: match drawHiResPanelFrame exactly
+      // gradient alphas .92 top → .95 bottom, border 0xffbe78 alpha .16, inset highlight WHITE 0xffffff alpha .07, corner radius 3
+      this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.92, 0.92, 0.95, 0.95);
+      this.graphics.fillRoundedRect(cardX, cardY, cardW, cardH, 3);
+      this.graphics.lineStyle(1, 0xffbe78, 0.16);
+      this.graphics.strokeRoundedRect(cardX, cardY, cardW, cardH, 3);
+      // Inset highlight (top edge, white, alpha .07)
+      this.graphics.lineStyle(1, 0xffffff, 0.07);
       this.graphics.beginPath();
-      this.graphics.moveTo(cardX + 2, cardY + 2);
-      this.graphics.lineTo(cardX + cardW - 2, cardY + 2);
+      this.graphics.moveTo(cardX + 2, cardY + 1);
+      this.graphics.lineTo(cardX + cardW - 2, cardY + 1);
       this.graphics.strokePath();
 
       // Heading in orange/coral
       this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', 0xff8a6c, '22px', 'Barlow Condensed', undefined, { weight: '700' });
 
       // Body in mono
-      this.addTextCenteredMono(cx, cardY + 80, 'Return to the menu?', 0xffffff, '10px');
-      this.addTextCenteredMono(cx, cardY + 108, 'This counts as a forfeit.', 0xffbe78, '10px');
+      this.addTextCenteredMono(cx, cardY + 80, 'Return to the menu?', 0xffffff, '10px', { weight: '400' });
+      this.addTextCenteredMono(cx, cardY + 108, 'This counts as a forfeit.', 0xffbe78, '10px', { weight: '400' });
 
       // YES button: red gradient
       const btnH = 44;
@@ -253,14 +254,14 @@ export class HudSystem {
       this.graphics.fillRoundedRect(yesX, btnY, btnW, btnH, 4);
       this.graphics.lineStyle(1, 0xffb48c, 0.5);
       this.graphics.strokeRoundedRect(yesX, btnY, btnW, btnH, 4);
-      this.addTextCenteredBarlow(yesX + btnW / 2, btnY + btnH / 2 - 6, 'YES (Y)', 0xfff5ec, 'bold 18px');
+      this.addTextCenteredBarlow(yesX + btnW / 2, btnY + btnH / 2 - 6, 'YES (Y)', 0xfff5ec, '18px', { weight: '700' });
 
-      // NO button: dark ghost with green text
+      // NO button: dark ghost with green text, Barlow label (both buttons Barlow)
       this.graphics.fillStyle(0x0c0a08, 1);
       this.graphics.fillRoundedRect(noX, btnY, btnW, btnH, 4);
       this.graphics.lineStyle(1, 0x58d98b, 0.4);
       this.graphics.strokeRoundedRect(noX, btnY, btnW, btnH, 4);
-      this.addTextCenteredMono(noX + btnW / 2, btnY + btnH / 2 - 6, 'NO (N)', 0x58d98b, 'bold 18px');
+      this.addTextCenteredBarlow(noX + btnW / 2, btnY + btnH / 2 - 6, 'NO (N)', 0x58d98b, '18px', { weight: '700' });
 
     } else if (visualSystem === 'retroPixel') {
       // Steel/boxy treatment with desertGold title
@@ -557,7 +558,7 @@ export class HudSystem {
 
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, 0, GAME_CONFIG.width, 82);
-    this.graphics.lineStyle(2, colors.steelLight, 1);
+    this.graphics.lineStyle(2, colors.desertGold, 0.7);
     this.graphics.strokeRect(2, 2, GAME_CONFIG.width - 4, GAME_CONFIG.height - 4);
     this.graphics.lineStyle(1, colors.steelDark, 1);
     this.graphics.strokeRect(6, 6, GAME_CONFIG.width - 12, GAME_CONFIG.height - 12);
@@ -578,8 +579,8 @@ export class HudSystem {
 
     this.graphics.fillStyle(colors.steelMid, 1);
     this.graphics.fillRect(0, top, GAME_CONFIG.width, 134);
-    this.graphics.lineStyle(3, colors.steelLight, 1);
-    this.graphics.strokeRect(0, top, GAME_CONFIG.width, 134);
+    this.graphics.lineStyle(3, colors.desertGold, 0.7);
+    this.graphics.strokeRect(1, top + 1, 958, 132);
 
     this.drawRetroPanelFrame(8, top + 8, 208, 122, 'WEAPONS');
     this.drawRetroWeaponRows(18, top + 32, activeTank, activePalette.primary, weaponWindowStart);
@@ -658,12 +659,21 @@ export class HudSystem {
     const colors = GAME_CONFIG.colors;
     this.graphics.fillStyle(colors.steelDark, 1);
     this.graphics.fillRect(x, y, w, h);
-    this.graphics.lineStyle(3, colors.steelLight, 1);
+    this.graphics.lineStyle(2, colors.steelLight, 1);
     this.graphics.strokeRect(x, y, w, h);
     this.graphics.lineStyle(1, colors.black, 1);
     this.graphics.strokeRect(x + 5, y + 5, w - 10, h - 10);
     if (title) {
-      this.addText(x + (w - title.length * 11) / 2, y + 8, title, colors.white, GAME_CONFIG.font.medium);
+      // Create text to measure width, then center it, then add it properly
+      const titleText = this.scene.add.text(x + w / 2, y + 8, title, {
+        color: Phaser.Display.Color.IntegerToColor(colors.desertGold).rgba,
+        fontFamily: GAME_CONFIG.font.family,
+        fontSize: GAME_CONFIG.font.medium,
+        fontStyle: 'bold'
+      });
+      titleText.setOrigin(0.5, 0);
+      titleText.setResolution(2);
+      this.texts.push(titleText);
     }
   }
 
@@ -714,7 +724,7 @@ export class HudSystem {
     // Quarter-zone markers (frame x: 220..396, this x offset by 220 so actual x = x-16)
     // x+14=234 (-5), x+70=290 (-1), x+114=334 (+1), x+158=378 (+5)
     this.addText(x - 6, y - 4, '<<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
-    this.addText(x + 50, y - 4, '<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    // Stray '<' at x+50 removed per R1
     this.addText(x + 98, y - 4, '>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
     this.addText(x + 142, y - 4, '>>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
   }
@@ -736,7 +746,7 @@ export class HudSystem {
     // Quarter-zone markers (frame x: 400..604, this x offset by 400 so actual x = x-16)
     // x+11=427 (-5), x+76=492 (-1), x+137=553 (+1), x+178=594 (+5)
     this.addText(x - 5, y - 4, '<<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
-    this.addText(x + 60, y - 4, '<', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
+    // Stray '<' at x+60 removed per R1
     this.addText(x + 121, y - 4, '>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
     this.addText(x + 162, y - 4, '>>', GAME_CONFIG.colors.dimGray, GAME_CONFIG.font.small);
   }
@@ -927,24 +937,33 @@ export class HudSystem {
     const y = 130;
 
     if (visualSystem === 'hiRes') {
-      // Glass panel treatment for hi-res
-      this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.95);
-      this.graphics.fillRoundedRect(x, y, w, h, 6);
-      this.graphics.lineStyle(1, 0xffbe78, 0.2);
-      this.graphics.strokeRoundedRect(x, y, w, h, 6);
-      // Inset highlight
-      this.graphics.lineStyle(1, 0xffbe78, 0.15);
+      // Glass panel treatment for hi-res: match drawHiResPanelFrame exactly
+      // gradient alphas .92 top → .95 bottom, border 0xffbe78 alpha .16, inset highlight WHITE 0xffffff alpha .07, corner radius 3
+      this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.92, 0.92, 0.95, 0.95);
+      this.graphics.fillRoundedRect(x, y, w, h, 3);
+      this.graphics.lineStyle(1, 0xffbe78, 0.16);
+      this.graphics.strokeRoundedRect(x, y, w, h, 3);
+      // Inset highlight (white, top edge, alpha .07)
+      this.graphics.lineStyle(1, 0xffffff, 0.07);
       this.graphics.beginPath();
-      this.graphics.moveTo(x + 2, y + 2);
-      this.graphics.lineTo(x + w - 2, y + 2);
+      this.graphics.moveTo(x + 2, y + 1);
+      this.graphics.lineTo(x + w - 2, y + 1);
       this.graphics.strokePath();
 
-      // Headline in Barlow700
-      this.addText(x + 24, y + 20, line1, 0xffbe78, '24px', 'Barlow Condensed', undefined, { weight: '700' });
+      // Headline in Barlow 700
+      this.addText(x + 24, y + 20, line1, 0xffb347, '24px', 'Barlow Condensed', undefined, { weight: '700' });
       // Sub-line in mono
-      this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px', 'JetBrains Mono');
+      this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px', 'JetBrains Mono', undefined, { weight: '400' });
+    } else if (visualSystem === 'retroPixel') {
+      // Retro: boxy 2px steel + desertGold
+      this.graphics.fillStyle(GAME_CONFIG.colors.steelMid, 1);
+      this.graphics.fillRect(x, y, w, h);
+      this.graphics.lineStyle(2, GAME_CONFIG.colors.steelLight, 1);
+      this.graphics.strokeRect(x, y, w, h);
+      this.addText(x + 24, y + 22, line1, GAME_CONFIG.colors.desertGold, GAME_CONFIG.font.title);
+      this.addText(x + 24, y + 68, line2, GAME_CONFIG.colors.white, GAME_CONFIG.font.medium);
     } else {
-      // Classic and retro-pixel: original treatment
+      // Classic: original treatment
       this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.82);
       this.graphics.fillRect(x, y, w, h);
       this.graphics.lineStyle(3, palette.frame, 1);
@@ -955,10 +974,20 @@ export class HudSystem {
   }
 
   private drawShopOverlay(match: MatchState, visualSystem: VisualSystem = 'classic'): void {
+    if (visualSystem === 'hiRes') {
+      this.drawShopOverlayHiRes(match);
+    } else if (visualSystem === 'retroPixel') {
+      this.drawShopOverlayRetro(match);
+    } else {
+      this.drawShopOverlayClassic(match);
+    }
+  }
+
+  private drawShopOverlayClassic(match: MatchState): void {
     const shopperId = match.shoppingPlayerId as PlayerId;
     const profile = match.profiles[shopperId];
     const colors = GAME_CONFIG.colors;
-    const palette = this.uiPalette(visualSystem);
+    const palette = this.uiPalette('classic');
     const pending = this.currentPendingShop;
     const effectiveCash = pending.effectiveCash(profile);
     const totalCost = profile.cash - effectiveCash;
@@ -1141,10 +1170,396 @@ export class HudSystem {
     );
   }
 
+  private drawShopOverlayHiRes(match: MatchState): void {
+    const shopperId = match.shoppingPlayerId as PlayerId;
+    const profile = match.profiles[shopperId];
+    const pending = this.currentPendingShop;
+    const effectiveCash = pending.effectiveCash(profile);
+    const totalCost = profile.cash - effectiveCash;
+    const hasPending = pending.hasPending();
+    const saleKey = pending.saleItem();
+    const saleDiscountPct = Math.round(pending.saleDiscount() * 100);
+
+    const panelX = SHOP_LAYOUT.panelX;
+    const panelY = SHOP_LAYOUT.panelY;
+    const panelW = SHOP_LAYOUT.panelW;
+    const panelH = SHOP_LAYOUT.panelH;
+
+    // Warm-dark backdrop at 0.9 alpha, full screen
+    this.graphics.fillStyle(0x0a0705, 0.9);
+    this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+    // Glass panel frame using hi-res idiom
+    this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.92);
+    this.graphics.fillRoundedRect(panelX, panelY, panelW, panelH, 3);
+    this.graphics.lineStyle(1, 0xffbe78, 0.16);
+    this.graphics.strokeRoundedRect(panelX, panelY, panelW, panelH, 3);
+    // Inset highlight (white, top edge)
+    this.graphics.lineStyle(1, 0xffffff, 0.07);
+    this.graphics.beginPath();
+    this.graphics.moveTo(panelX + 2, panelY + 1);
+    this.graphics.lineTo(panelX + panelW - 2, panelY + 1);
+    this.graphics.strokePath();
+
+    // ----- HEADER -----
+    // ROUND N SHOP title in Barlow Condensed 22px weight 700
+    this.addText(panelX + 20, panelY + 10, `ROUND ${match.round} SHOP`, 0xffb347, '22px', 'Barlow Condensed', undefined, { weight: '700' });
+
+    // Shopper name via getPlayerPalette(shopperId, visualSystem)
+    const shopperId_playerColor = getPlayerPalette(shopperId, 'hiRes').primary;
+    this.addText(panelX + 20, panelY + 48, profile.displayName ?? `PLAYER ${shopperId + 1}`, shopperId_playerColor, '22px', 'Barlow Condensed', undefined, { weight: '700' });
+
+    // CASH label JetBrains Mono 9px letterSpacing 2 alpha .85 color 0xffb347
+    this.addText(panelX + 380, panelY + 18, 'CASH', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+    // Cash value Barlow 22px weight 600 green
+    this.addText(panelX + 380, panelY + 48, `$${effectiveCash}`, 0x58d98b, '22px', 'Barlow Condensed', undefined, { weight: '600' });
+
+    // FINISH button: red gradient key (3-stop ff7043→c22c0c→8f2106, radius 4)
+    // Glow layer (larger, lower alpha)
+    this.graphics.fillStyle(0xff7043, 0.15);
+    this.graphics.fillRoundedRect(SHOP_LAYOUT.finishX - 2, SHOP_LAYOUT.finishY - 2, SHOP_LAYOUT.finishW + 4, SHOP_LAYOUT.finishH + 4, 5);
+
+    // 3-stop gradient: #ff7043 → #c22c0c → #8f2106
+    this.graphics.fillGradientStyle(0xff7043, 0xff7043, 0x8f2106, 0x8f2106, 1);
+    this.graphics.fillRoundedRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH, 4);
+
+    // Inset highlight
+    this.graphics.lineStyle(1, 0xffb48c, 0.8);
+    this.graphics.beginPath();
+    this.graphics.moveTo(SHOP_LAYOUT.finishX + 1, SHOP_LAYOUT.finishY + 1);
+    this.graphics.lineTo(SHOP_LAYOUT.finishX + SHOP_LAYOUT.finishW - 1, SHOP_LAYOUT.finishY + 1);
+    this.graphics.strokePath();
+
+    // FINISH label Barlow 18px weight 700 0xfff5ec centered
+    this.addText(SHOP_LAYOUT.finishX + SHOP_LAYOUT.finishW / 2, SHOP_LAYOUT.finishY + SHOP_LAYOUT.finishH / 2, 'FINISH', 0xfff5ec, '18px', 'Barlow Condensed', undefined, { weight: '700', originX: 0.5, originY: 0.5 });
+
+    // ----- LEFT SIDEBAR (INVENTORY + UNDO) -----
+    const sideX = panelX + 14;
+    const sideY = panelY + 90;
+    const sideW = 168;
+    const sideH = panelH - 100;
+
+    // Glass mini-panel for sidebar using hi-res idiom
+    this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.92);
+    this.graphics.fillRoundedRect(sideX, sideY, sideW, sideH, 3);
+    this.graphics.lineStyle(1, 0xffbe78, 0.16);
+    this.graphics.strokeRoundedRect(sideX, sideY, sideW, sideH, 3);
+    // Inset highlight (white, top edge, alpha .07)
+    this.graphics.lineStyle(1, 0xffffff, 0.07);
+    this.graphics.beginPath();
+    this.graphics.moveTo(sideX + 2, sideY + 1);
+    this.graphics.lineTo(sideX + sideW - 2, sideY + 1);
+    this.graphics.strokePath();
+
+    // INVENTORY title: mono 9px ls 2 0xffb347 @.85
+    this.addText(sideX + 12, sideY + 10, 'INVENTORY', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+
+    // Inventory rows: same data as classic
+    const totalWeapons = GAME_CONFIG.weapons.reduce((sum, w) => {
+      const owned = profile.ammo[w.id] ?? 0;
+      if (owned === -1) return sum; // skip unlimited (Small Missile)
+      return sum + owned + pending.pendingFor(w.id) * pending.bundleSize(w.id);
+    }, 0);
+
+    // WEAPONS row: dim label + bright count
+    this.addText(sideX + 12, sideY + 46, 'WEAPONS', 0xf4ece2, '9px', 'JetBrains Mono', undefined, { alpha: 0.42, weight: '400' });
+    this.addText(sideX + sideW - 30, sideY + 46, `${totalWeapons}`, 0xf4ece2, '9px', 'JetBrains Mono', undefined, { weight: '400' });
+
+    // Item rows: dim label + bright count (same data as classic)
+    GAME_CONFIG.items.forEach((item, idx) => {
+      const itemTotal = pending.ownedFor(item.id) + pending.pendingFor(item.id) * pending.bundleSize(item.id);
+      const itemLabel = item.sidebarLabel ?? item.name.toUpperCase() + 'S';
+      const itemY = sideY + 72 + idx * 20;
+      this.addText(sideX + 12, itemY, itemLabel, 0xf4ece2, '9px', 'JetBrains Mono', undefined, { alpha: 0.42, weight: '400' });
+      this.addText(sideX + sideW - 30, itemY, `${itemTotal}`, 0xf4ece2, '9px', 'JetBrains Mono', undefined, { weight: '400' });
+    });
+
+    // UNDO ghost chip at its hit rect when pending
+    if (hasPending) {
+      this.graphics.lineStyle(1, 0xff7a3c, 0.5);
+      this.graphics.strokeRoundedRect(SHOP_LAYOUT.undoX, SHOP_LAYOUT.undoY, SHOP_LAYOUT.undoW, SHOP_LAYOUT.undoH, 3);
+      this.addText(SHOP_LAYOUT.undoX + SHOP_LAYOUT.undoW / 2, SHOP_LAYOUT.undoY + SHOP_LAYOUT.undoH / 2, 'UNDO', 0xff7a3c, '9px', 'JetBrains Mono', 2, { originX: 0.5, originY: 0.5, weight: '400' });
+    }
+
+    // ----- MAIN TABLE -----
+    const tableX = SHOP_LAYOUT.tableX;
+    const tableY = SHOP_LAYOUT.tableY;
+    const tableW = panelX + panelW - tableX - 14;
+
+    const colKey = tableX + 16;
+    const colName = tableX + 52;
+    const colPrice = tableX + 256;
+    const colOwn = tableX + 376;
+    const colCost = tableX + 590;
+
+    // Column headers: mono 9px ls 2 color 0xffb347 alpha .85
+    this.addText(colName, tableY + 8, 'ITEM', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+    this.addText(colPrice, tableY + 8, 'PRICE', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+    this.addText(colOwn, tableY + 8, 'OWNED', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+    this.addText(668, tableY + 8, 'BUY', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+    this.addText(colCost, tableY + 8, 'COST', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+
+    let rowY = SHOP_LAYOUT.listYStart;
+    const drawRow = (
+      keyLabel: string,
+      itemKey: string,
+      itemName: string,
+      basePrice: number,
+      ownedDisplay: number
+    ) => {
+      const pendingQty = pending.pendingFor(itemKey);
+      const price = pending.effectivePrice(basePrice, itemKey);
+      const onSale = saleKey === itemKey;
+      const buyable = basePrice > 0;
+      const canAfford = buyable && effectiveCash >= price;
+      const rowColor = !buyable ? 0xaaaaaa : canAfford ? 0xf4ece2 : 0xaaaaaa;
+      const rowAlpha = ownedDisplay === 0 && !buyable ? 0.4 : 1;
+
+      const bundleSize = pending.bundleSize(itemKey);
+      const displayName = bundleSize > 1 ? `${itemName} x${bundleSize}` : itemName;
+
+      this.addText(colKey, rowY, keyLabel, rowColor, '10px', 'JetBrains Mono', undefined, { alpha: rowAlpha, weight: '400' });
+      this.addText(colName, rowY, displayName, rowColor, '10px', 'JetBrains Mono', undefined, { alpha: rowAlpha, weight: '400' });
+      this.addText(colPrice, rowY, buyable ? `$${price}` : 'FREE', rowColor, '10px', 'JetBrains Mono', undefined, { alpha: rowAlpha, weight: '400' });
+      if (onSale) {
+        this.addText(colPrice + 76, rowY + 2, `-${saleDiscountPct}%`, 0xffb347, '9px', 'JetBrains Mono', undefined, { weight: '400' });
+      }
+      const ownedText = ownedDisplay === -1 ? '--' : `${ownedDisplay}`;
+      this.addText(colOwn + 20, rowY, ownedText, rowColor, '10px', 'JetBrains Mono', undefined, { alpha: rowAlpha, weight: '400' });
+
+      // Hi-res rocker buttons: rounded-3 chips (fill 0x1a140f, 1px 0xffbe78 @.3 stroke, glyph mono centered)
+      const minusActive = pendingQty > 0;
+      this.drawHiResRockerChip(SHOP_LAYOUT.colMinus, rowY, '-', minusActive ? 0xff7043 : 0x888888);
+      this.addText(SHOP_LAYOUT.colMinus + 18, rowY + 12, `${pendingQty}`, 0xf4ece2, '10px', 'JetBrains Mono', undefined, { originX: 0.5, originY: 0.5, weight: '400' });
+      this.drawHiResRockerChip(SHOP_LAYOUT.colPlus, rowY, '+', canAfford ? 0x58d98b : 0x888888);
+
+      // Cost cell
+      const cost = pendingQty * price;
+      this.addText(colCost + 4, rowY, `$${cost}`, cost > 0 ? 0x58d98b : 0x888888, '10px', 'JetBrains Mono', undefined, { weight: '400' });
+
+      // Subtle row divider
+      this.graphics.lineStyle(1, 0xffbe78, 0.08);
+      this.graphics.beginPath();
+      this.graphics.moveTo(tableX + 8, rowY + SHOP_LAYOUT.rowH - 4);
+      this.graphics.lineTo(tableX + tableW - 8, rowY + SHOP_LAYOUT.rowH - 4);
+      this.graphics.strokePath();
+
+      rowY += SHOP_LAYOUT.rowH;
+    };
+
+    const visibleRows = pending.visibleRows();
+    visibleRows.forEach((entry, idx) => {
+      const keyLabel = entry.kind === 'weapon' ? String((idx + 1) % 10) : (GAME_CONFIG.items.find((it) => it.id === entry.key)?.hotkey ?? String((idx + 1) % 10));
+      const owned = pending.ownedFor(entry.key);
+      drawRow(keyLabel, entry.key, entry.name, entry.basePrice, owned);
+    });
+
+    // ----- PAGE CONTROLS -----
+    // Page prev/next: same chip treatment + 'PAGE N/M' mono between
+    const pageButtonColor = pending.shopPageCount() > 1 ? 0xf4ece2 : 0x888888;
+    this.drawHiResRockerChip(SHOP_LAYOUT.pagePrevX, SHOP_LAYOUT.pageY, '<', pageButtonColor);
+    this.addText(SHOP_LAYOUT.pagePrevX + 52, SHOP_LAYOUT.pageY + 12, pending.pageLabel(), 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, originY: 0.5, weight: '400' });
+    this.drawHiResRockerChip(SHOP_LAYOUT.pageNextX, SHOP_LAYOUT.pageY, '>', pageButtonColor);
+
+    // ----- FOOTER -----
+    const footerY = panelY + panelH - 38;
+    this.addText(colOwn, footerY, 'TOTAL COST', 0xffb347, '9px', 'JetBrains Mono', 2, { alpha: 0.85, weight: '400' });
+    this.addText(colCost, footerY, `$${totalCost}`, totalCost > 0 ? 0x58d98b : 0x888888, '20px', 'Barlow Condensed', undefined, { weight: '600' });
+
+    // Bottom hint: mono 9px alpha .45 centered
+    this.addText(
+      panelX + panelW / 2,
+      panelY + panelH - 16,
+      'TAP + / - TO ADJUST  ·  ENTER TO CONFIRM',
+      0xf4ece2,
+      '9px',
+      'JetBrains Mono',
+      1,
+      { alpha: 0.45, originX: 0.5, weight: '400' }
+    );
+  }
+
+  private drawShopOverlayRetro(match: MatchState): void {
+    const shopperId = match.shoppingPlayerId as PlayerId;
+    const profile = match.profiles[shopperId];
+    const colors = GAME_CONFIG.colors;
+    const pending = this.currentPendingShop;
+    const effectiveCash = pending.effectiveCash(profile);
+    const totalCost = profile.cash - effectiveCash;
+    const hasPending = pending.hasPending();
+    const saleKey = pending.saleItem();
+    const saleDiscountPct = Math.round(pending.saleDiscount() * 100);
+
+    const panelX = SHOP_LAYOUT.panelX;
+    const panelY = SHOP_LAYOUT.panelY;
+    const panelW = SHOP_LAYOUT.panelW;
+    const panelH = SHOP_LAYOUT.panelH;
+
+    // Dim full-screen backdrop
+    this.graphics.fillStyle(colors.black, 0.86);
+    this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+    // Steel body: steelMid fill, steelDark inset panels, uniform 2px steelLight borders
+    this.graphics.fillStyle(colors.steelMid, 1);
+    this.graphics.fillRect(panelX, panelY, panelW, panelH);
+    this.graphics.lineStyle(2, colors.steelLight, 1);
+    this.graphics.strokeRect(panelX, panelY, panelW, panelH);
+
+    // ----- HEADER -----
+    const playerName = profile.displayName ?? `PLAYER ${shopperId + 1}`;
+    const playerColor = getPlayerPalette(shopperId, 'retroPixel').primary;
+    this.addText(panelX + 20, panelY + 10, `ROUND ${match.round} SHOP`, colors.desertGold, GAME_CONFIG.font.large);
+    this.addText(panelX + 20, panelY + 48, playerName, playerColor, GAME_CONFIG.font.large);
+
+    this.addText(panelX + 380, panelY + 18, 'CASH', colors.desertGold, GAME_CONFIG.font.medium);
+    this.addText(panelX + 380, panelY + 48, `$${effectiveCash}`, colors.green, GAME_CONFIG.font.large);
+
+    this.graphics.fillStyle(colors.steelDark, 1);
+    this.graphics.fillRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH);
+    this.graphics.lineStyle(2, colors.steelLight, 1);
+    this.graphics.strokeRect(SHOP_LAYOUT.finishX, SHOP_LAYOUT.finishY, SHOP_LAYOUT.finishW, SHOP_LAYOUT.finishH);
+    this.addText(SHOP_LAYOUT.finishX + 16, SHOP_LAYOUT.finishY + 12, 'FINISH ⏎', colors.desertGold, GAME_CONFIG.font.medium);
+
+    // ----- LEFT SIDEBAR (INVENTORY summary + UNDO) -----
+    const sideX = panelX + 14;
+    const sideY = panelY + 90;
+    const sideW = 168;
+    const sideH = panelH - 100;
+    this.graphics.fillStyle(colors.steelDark, 1);
+    this.graphics.fillRect(sideX, sideY, sideW, sideH);
+    this.graphics.lineStyle(2, colors.steelLight, 1);
+    this.graphics.strokeRect(sideX, sideY, sideW, sideH);
+
+    this.addText(sideX + 12, sideY + 10, 'INVENTORY', colors.desertGold, GAME_CONFIG.font.medium);
+
+    const totalWeapons = GAME_CONFIG.weapons.reduce((sum, w) => {
+      const owned = profile.ammo[w.id] ?? 0;
+      if (owned === -1) return sum; // skip unlimited (Small Missile)
+      return sum + owned + pending.pendingFor(w.id) * pending.bundleSize(w.id);
+    }, 0);
+
+    this.addText(sideX + 12, sideY + 46, 'WEAPONS', colors.white, GAME_CONFIG.font.small);
+    this.addText(sideX + sideW - 40, sideY + 46, `${totalWeapons}`, colors.white, GAME_CONFIG.font.small);
+
+    GAME_CONFIG.items.forEach((item, idx) => {
+      const itemTotal = pending.ownedFor(item.id) + pending.pendingFor(item.id) * pending.bundleSize(item.id);
+      const itemColor = item.id === 'parachute' ? colors.yellow : colors.white;
+      const itemY = sideY + 72 + idx * 20;
+      const label = item.sidebarLabel ?? item.name.toUpperCase() + 'S';
+      this.addText(sideX + 12, itemY, label, itemColor, GAME_CONFIG.font.tiny);
+      this.addText(sideX + sideW - 30, itemY, `${itemTotal}`, colors.white, GAME_CONFIG.font.tiny);
+    });
+
+    // UNDO button at the bottom of the sidebar
+    if (hasPending) {
+      this.graphics.fillStyle(colors.steelDark, 1);
+      this.graphics.fillRect(SHOP_LAYOUT.undoX, SHOP_LAYOUT.undoY, SHOP_LAYOUT.undoW, SHOP_LAYOUT.undoH);
+      this.graphics.lineStyle(2, colors.steelLight, 1);
+      this.graphics.strokeRect(SHOP_LAYOUT.undoX, SHOP_LAYOUT.undoY, SHOP_LAYOUT.undoW, SHOP_LAYOUT.undoH);
+      this.addText(SHOP_LAYOUT.undoX + 32, SHOP_LAYOUT.undoY + 8, 'UNDO ⌫', colors.desertGold, GAME_CONFIG.font.medium);
+    }
+
+    // ----- MAIN TABLE -----
+    const tableX = SHOP_LAYOUT.tableX;
+    const tableY = SHOP_LAYOUT.tableY;
+    const tableW = panelX + panelW - tableX - 14;
+
+    const colKey = tableX + 16;
+    const colName = tableX + 52;
+    const colPrice = tableX + 256;
+    const colOwn = tableX + 376;
+    const colCost = tableX + 590;
+
+    // Column headers: retro row idiom
+    this.addText(colName, tableY + 8, 'ITEM', colors.desertGold, GAME_CONFIG.font.medium);
+    this.addText(colPrice, tableY + 8, 'PRICE', colors.desertGold, GAME_CONFIG.font.medium);
+    this.addText(colOwn, tableY + 8, 'OWNED', colors.desertGold, GAME_CONFIG.font.medium);
+    this.addText(668, tableY + 8, 'BUY', colors.desertGold, GAME_CONFIG.font.medium);
+    this.addText(colCost, tableY + 8, 'COST', colors.desertGold, GAME_CONFIG.font.medium);
+
+    let rowY = SHOP_LAYOUT.listYStart;
+    const drawRow = (
+      keyLabel: string,
+      itemKey: string,
+      itemName: string,
+      basePrice: number,
+      ownedDisplay: number
+    ) => {
+      const pendingQty = pending.pendingFor(itemKey);
+      const price = pending.effectivePrice(basePrice, itemKey);
+      const onSale = saleKey === itemKey;
+      const buyable = basePrice > 0;
+      const canAfford = buyable && effectiveCash >= price;
+      // Retro row idiom: green available / dimGray zero-owned / white selected
+      const rowColor = !buyable
+        ? colors.dimGray
+        : canAfford
+          ? colors.green
+          : colors.dimGray;
+
+      const bundleSize = pending.bundleSize(itemKey);
+      const displayName = bundleSize > 1 ? `${itemName} x${bundleSize}` : itemName;
+
+      this.addText(colKey, rowY, keyLabel, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colName, rowY, displayName, rowColor, GAME_CONFIG.font.medium);
+      this.addText(colPrice, rowY, buyable ? `$${price}` : 'FREE', rowColor, GAME_CONFIG.font.medium);
+      if (onSale) {
+        this.addText(colPrice + 76, rowY + 2, `-${saleDiscountPct}%`, colors.yellow, GAME_CONFIG.font.small);
+      }
+      const ownedText = ownedDisplay === -1 ? '--' : `${ownedDisplay}`;
+      this.addText(colOwn + 20, rowY, ownedText, rowColor, GAME_CONFIG.font.medium);
+
+      // Rocker buttons + pending count
+      const minusActive = pendingQty > 0;
+      this.drawRockerButton(SHOP_LAYOUT.colMinus, rowY, '-', minusActive ? colors.red : colors.dimGray);
+      this.addText(SHOP_LAYOUT.colMinus + 50, rowY, `${pendingQty}`, colors.white, GAME_CONFIG.font.medium);
+      this.drawRockerButton(SHOP_LAYOUT.colPlus, rowY, '+', canAfford ? colors.green : colors.dimGray);
+
+      // Cost cell
+      const cost = pendingQty * price;
+      this.addText(colCost + 4, rowY, `$${cost}`, cost > 0 ? colors.green : colors.dimGray, GAME_CONFIG.font.medium);
+
+      // Subtle row divider
+      this.graphics.lineStyle(1, colors.steelDark, 0.5);
+      this.graphics.beginPath();
+      this.graphics.moveTo(tableX + 8, rowY + SHOP_LAYOUT.rowH - 4);
+      this.graphics.lineTo(tableX + tableW - 8, rowY + SHOP_LAYOUT.rowH - 4);
+      this.graphics.strokePath();
+
+      rowY += SHOP_LAYOUT.rowH;
+    };
+
+    const visibleRows = pending.visibleRows();
+    visibleRows.forEach((entry, idx) => {
+      const keyLabel = entry.kind === 'weapon' ? String((idx + 1) % 10) : (GAME_CONFIG.items.find((it) => it.id === entry.key)?.hotkey ?? String((idx + 1) % 10));
+      const owned = pending.ownedFor(entry.key);
+      drawRow(keyLabel, entry.key, entry.name, entry.basePrice, owned);
+    });
+
+    // ----- PAGE STRIP -----
+    const pageButtonColor = pending.shopPageCount() > 1 ? colors.white : colors.dimGray;
+    this.drawRockerButton(SHOP_LAYOUT.pagePrevX, SHOP_LAYOUT.pageY, '<', pageButtonColor);
+    this.addText(SHOP_LAYOUT.pagePrevX + 52, SHOP_LAYOUT.pageY + 2, pending.pageLabel(), colors.white, GAME_CONFIG.font.medium);
+    this.drawRockerButton(SHOP_LAYOUT.pageNextX, SHOP_LAYOUT.pageY, '>', pageButtonColor);
+
+    // ----- FOOTER -----
+    const footerY = panelY + panelH - 38;
+    this.addText(colOwn, footerY, 'TOTAL COST', colors.desertGold, GAME_CONFIG.font.medium);
+    this.addText(colCost, footerY, `$${totalCost}`, totalCost > 0 ? colors.green : colors.dimGray, GAME_CONFIG.font.large);
+
+    // Hint sits below the table, centered.
+    this.addText(
+      panelX + panelW / 2 - 220,
+      panelY + panelH - 16,
+      'TAP + / - TO ADJUST  ·  ENTER TO CONFIRM',
+      colors.white,
+      GAME_CONFIG.font.small
+    );
+  }
+
   /**
    * Filled "rocker" button used in the shop overlay for +/- quantity
-   * adjustments. The text label (+/-) is centered in a fixed-size cell so
-   * the click hitboxes in GameScene line up with the visuals.
+   * adjustments (classic/retro). The text label (+/-) is centered in a fixed-size cell.
    */
   private drawRockerButton(x: number, y: number, label: string, accent: number): void {
     const w = SHOP_LAYOUT.buttonW;
@@ -1157,6 +1572,9 @@ export class HudSystem {
     this.addText(x + 10, y, label, accent, GAME_CONFIG.font.medium);
   }
 
+  /**
+   * Hi-res rocker button with rounded corners and warm accent border.
+   */
   private addText(
     x: number,
     y: number,
@@ -1212,6 +1630,20 @@ export class HudSystem {
     if (title) {
       this.addText(x + (w - title.length * 6) / 2, y + 8, title, 0xffbe78, '10px', 'JetBrains Mono', 2);
     }
+  }
+
+  /**
+   * Hi-res rocker button chip for shop (rounded-3, fill 0x1a140f, 1px border)
+   */
+  private drawHiResRockerChip(x: number, y: number, label: string, accentColor: number): void {
+    const w = SHOP_LAYOUT.buttonW;
+    const h = SHOP_LAYOUT.buttonH;
+    this.graphics.fillStyle(0x1a140f, 1);
+    this.graphics.fillRoundedRect(x, y - 2, w, h, 3);
+    this.graphics.lineStyle(1, accentColor, 0.3);
+    this.graphics.strokeRoundedRect(x, y - 2, w, h, 3);
+    // Center the glyph via origin 0.5
+    this.addText(x + w / 2, y + h / 2 - 2, label, accentColor, '9px', 'JetBrains Mono', undefined, { originX: 0.5, originY: 0.5, weight: '400' });
   }
 
   /**
