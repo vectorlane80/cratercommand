@@ -10,8 +10,12 @@ import { TerrainSystem } from '../systems/TerrainSystem';
 import { TurnSystem } from '../systems/TurnSystem';
 import { adjustWindow, cycleWeapon } from '../systems/WeaponWindow';
 import {
+  BANANA_WEAPON,
+  BANANAS_DISPLAY_CYCLE,
   GAME_CONFIG,
   PHYSICS_DEFAULTS,
+  nextBananasDisplay,
+  type BananasDisplay,
   type ControllerKind,
   type PlayerProfile,
   type ImpactResult,
@@ -72,6 +76,7 @@ export class GameScene extends Phaser.Scene {
   private activeProjectiles: ProjectileState[] = [];
   private statusMessage: string | null = null;
   private visualSystem: VisualSystem = GAME_CONFIG.visuals.defaultSystem;
+  private bananasDisplay: BananasDisplay = '16color';
   private chuteFlashUntil: number[] = [0, 0];
 
   // AI turn state. When the active tank is CPU-controlled, the scene
@@ -142,6 +147,10 @@ export class GameScene extends Phaser.Scene {
 
   constructor() {
     super('GameScene');
+  }
+
+  private isBananas(): boolean {
+    return this.visualSystem === 'bananas';
   }
 
   init(data: {
@@ -374,16 +383,23 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.vKey)) {
-      if (this.visualSystem === 'classic') {
-        this.visualSystem = 'retroPixel';
-      } else if (this.visualSystem === 'retroPixel') {
-        this.visualSystem = 'hiRes';
+      if (this.isBananas()) {
+        // A Bananas match stays Bananas: V cycles the display, not the mode.
+        this.bananasDisplay = nextBananasDisplay(this.bananasDisplay);
+        this.saveBananasDisplayToStorage();
+        this.renderAll();
       } else {
-        this.visualSystem = 'classic';
+        if (this.visualSystem === 'classic') {
+          this.visualSystem = 'retroPixel';
+        } else if (this.visualSystem === 'retroPixel') {
+          this.visualSystem = 'hiRes';
+        } else {
+          this.visualSystem = 'classic';
+        }
+        this.applyVisualLayerTextures();
+        this.saveVisualSystemToStorage();
+        this.renderAll();
       }
-      this.applyVisualLayerTextures();
-      this.saveVisualSystemToStorage();
-      this.renderAll();
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.soundToggleKey)) {
@@ -636,6 +652,7 @@ export class GameScene extends Phaser.Scene {
     // renderScale× the fixed 960×540 world.
     this.terrainData = this.terrainSystem.generate(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
+    if (this.isBananas()) this.tanks.forEach((t) => { t.ammo['banana'] = -1; });
 
     // Auto-arm shields for players with autoDefense or AI
     for (const tank of this.tanks) {
@@ -659,22 +676,30 @@ export class GameScene extends Phaser.Scene {
   private resolveRoundEnd(winnerId: PlayerId | null): void {
     this.turnSystem.saveTanksToProfiles(this.tanks, this.match);
 
-    this.tanks.forEach((tank) => {
-      const earned = tank.damageDealt * GAME_CONFIG.match.damageCashMultiplier;
-      this.match.profiles[tank.id].cash += earned;
-    });
+    if (!this.isBananas()) {
+      this.tanks.forEach((tank) => {
+        const earned = tank.damageDealt * GAME_CONFIG.match.damageCashMultiplier;
+        this.match.profiles[tank.id].cash += earned;
+      });
+    }
 
     // SE interest on held cash
-    this.match.profiles.forEach((profile) => {
-      const interest = Math.round(profile.cash * GAME_CONFIG.match.interestRate);
-      profile.cash += interest;
-    });
+    if (!this.isBananas()) {
+      this.match.profiles.forEach((profile) => {
+        const interest = Math.round(profile.cash * GAME_CONFIG.match.interestRate);
+        profile.cash += interest;
+      });
+    }
 
     if (winnerId !== null) {
       this.match.profiles[winnerId].wins += 1;
-      this.match.profiles[winnerId].cash += GAME_CONFIG.match.roundWinBonus;
+      if (!this.isBananas()) {
+        this.match.profiles[winnerId].cash += GAME_CONFIG.match.roundWinBonus;
+      }
       if (this.tanks[winnerId].alive) {
-        this.match.profiles[winnerId].cash += GAME_CONFIG.match.survivalBonus;
+        if (!this.isBananas()) {
+          this.match.profiles[winnerId].cash += GAME_CONFIG.match.survivalBonus;
+        }
       }
 
       this.turn.winnerId = winnerId;
@@ -699,6 +724,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private enterShoppingPhase(): void {
+    if (this.isBananas()) {
+      // No economy in Bananas: round banner goes straight to the next round.
+      this.match.shoppingPlayerId = null;
+      this.match.round += 1;
+      const n = this.match.profiles.length;
+      const nextStarter = (((this.turn.winnerId ?? 0) + 1) % n) as PlayerId;
+      this.beginRound(nextStarter);
+      return;
+    }
     const winnerId = this.turn.winnerId ?? 0;
     this.match.shoppingPlayerId = winnerId;
     // Every player gets a shopping turn, dead or alive (they'll respawn at
@@ -1187,6 +1221,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovementInput(delta: number): boolean {
+    if (this.isBananas()) return false;
     const activeTank = this.tanks[this.turn.activePlayerId];
     const others = this.tanks.filter((t) => t.id !== activeTank.id);
     const deltaSeconds = delta / 1000;
@@ -1206,6 +1241,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleWeaponSelection(): boolean {
+    if (this.isBananas()) return false;
     const activeTank = this.tanks[this.turn.activePlayerId];
     for (let i = 0; i < this.weaponKeys.length; i += 1) {
       if (Phaser.Input.Keyboard.JustDown(this.weaponKeys[i])) {
@@ -1653,6 +1689,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryPointerMove(targetX: number, delta: number): boolean {
+    if (this.isBananas()) return false;
     const activeTank = this.tanks[this.turn.activePlayerId];
     const others = this.tanks.filter((t) => t.id !== activeTank.id);
     const deltaSeconds = Math.min(delta, 64) / 1000;
@@ -1693,6 +1730,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private activeWeapon(): WeaponDefinition {
+    if (this.isBananas()) return BANANA_WEAPON;
     const activeTank = this.tanks[this.turn.activePlayerId];
     return GAME_CONFIG.weapons[activeTank.selectedWeaponIndex];
   }
@@ -1700,7 +1738,7 @@ export class GameScene extends Phaser.Scene {
   private fireActiveWeapon(): void {
     const activeTank = this.tanks[this.turn.activePlayerId];
     const weapon = this.activeWeapon();
-    if (!this.tankHasAmmo(activeTank, activeTank.selectedWeaponIndex)) return;
+    if (!this.isBananas() && !this.tankHasAmmo(activeTank, activeTank.selectedWeaponIndex)) return;
 
     const batteryCost = weapon.batteryCost ?? 0;
     if (batteryCost > activeTank.batteries) {
@@ -2259,8 +2297,16 @@ export class GameScene extends Phaser.Scene {
   private loadVisualSystemFromStorage(): void {
     try {
       const stored = localStorage.getItem('cratercmd.visual');
-      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel' || stored === 'hiRes')) {
+      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel' || stored === 'hiRes' || stored === 'bananas')) {
         this.visualSystem = stored as VisualSystem;
+      }
+    } catch (e) {
+      // If parsing fails, just use default (already initialized)
+    }
+    try {
+      const storedDisplay = localStorage.getItem('cratercmd.bananas.display');
+      if (storedDisplay && BANANAS_DISPLAY_CYCLE.includes(storedDisplay as BananasDisplay)) {
+        this.bananasDisplay = storedDisplay as BananasDisplay;
       }
     } catch (e) {
       // If parsing fails, just use default (already initialized)
@@ -2270,6 +2316,14 @@ export class GameScene extends Phaser.Scene {
   private saveVisualSystemToStorage(): void {
     try {
       localStorage.setItem('cratercmd.visual', this.visualSystem);
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
+  }
+
+  private saveBananasDisplayToStorage(): void {
+    try {
+      localStorage.setItem('cratercmd.bananas.display', this.bananasDisplay);
     } catch (e) {
       // Silently fail if localStorage is not available
     }

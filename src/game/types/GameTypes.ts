@@ -7,7 +7,16 @@ export type GamePhase =
   | 'matchOver';
 export type ImpactKind = 'terrain' | 'tank' | 'outOfBounds';
 export type WeaponBehavior = 'single' | 'split' | 'bounce' | 'dirt' | 'salvo' | 'leapfrog' | 'funky' | 'roller' | 'digger' | 'sandhog' | 'liquid' | 'settle' | 'napalm' | 'laser';
-export type VisualSystem = 'classic' | 'retroPixel' | 'hiRes';
+export type VisualSystem = 'classic' | 'retroPixel' | 'hiRes' | 'bananas';
+export type BananasDisplay = '16color' | 'amber' | 'green' | 'white';
+
+export const BANANAS_DISPLAY_CYCLE: BananasDisplay[] = ['16color', 'amber', 'green', 'white'];
+
+export function nextBananasDisplay(display: BananasDisplay): BananasDisplay {
+  const idx = BANANAS_DISPLAY_CYCLE.indexOf(display);
+  return BANANAS_DISPLAY_CYCLE[(idx + 1) % BANANAS_DISPLAY_CYCLE.length];
+}
+
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 export type WallMode = 'none' | 'concrete' | 'padded' | 'rubber' | 'spring' | 'wraparound' | 'random' | 'erratic';
 export type Sale = { itemKey: string; discount: number } | null;
@@ -964,3 +973,18 @@ export const GAME_CONFIG = {
     'OUT WITH A BANG!'
   ]
 } as const;
+
+// Bananas mode's only weapon. Deliberately NOT in GAME_CONFIG.weapons —
+// the Scorched arsenal stays untouched at 39 entries.
+export const BANANA_WEAPON: WeaponDefinition = {
+  id: 'banana',
+  name: 'Banana',
+  startingAmmo: -1,
+  price: 0,
+  damage: 175,
+  craterRadius: 30,
+  projectileSpeedScale: 1,
+  behavior: 'single',
+  category: 'missile',
+  bundleSize: 1
+};

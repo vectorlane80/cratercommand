@@ -335,6 +335,7 @@ export class MenuScene extends Phaser.Scene {
     // Settings button
     const settingsBtn = this.settingsButtonRect();
     if (x >= settingsBtn.x && x <= settingsBtn.x + settingsBtn.w && y >= settingsBtn.y && y <= settingsBtn.y + settingsBtn.h) {
+      if (this.visualSystem === 'bananas') return;
       this.view = 'settings';
       soundSystem.playUiSelect();
       this.render();
@@ -552,19 +553,27 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startMatch(): void {
-    const physics: PhysicsSettings = {
-      gravity: GRAVITY_STEPS[this.gravityIndex],
-      viscosity: VISCOSITY_STEPS[this.viscosityIndex],
-      tanksFall: this.tanksFall
-    };
+    let physics: PhysicsSettings;
+    let wallMode: WallMode;
+    if (this.visualSystem === 'bananas') {
+      physics = { gravity: PHYSICS_DEFAULTS.gravity, viscosity: PHYSICS_DEFAULTS.viscosity, tanksFall: true };
+      wallMode = 'none';
+    } else {
+      physics = {
+        gravity: GRAVITY_STEPS[this.gravityIndex],
+        viscosity: VISCOSITY_STEPS[this.viscosityIndex],
+        tanksFall: this.tanksFall
+      };
+      wallMode = WALL_MODES[this.wallModeIndex];
+      this.savePhysicsToStorage(physics);
+    }
     const result: MenuResult = {
       controllers: this.participants(),
       names: this.participantNames(),
       roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
-      wallMode: WALL_MODES[this.wallModeIndex],
+      wallMode: wallMode,
       physics
     };
-    this.savePhysicsToStorage(physics);
     this.scene.start('GameScene', result);
   }
 
@@ -690,9 +699,10 @@ export class MenuScene extends Phaser.Scene {
     const settingsBtn = this.settingsButtonRect();
     this.graphics.fillStyle(colors.panelDark, 1);
     this.graphics.fillRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
-    this.graphics.lineStyle(2, palette.settingsButton, 1);
+    const settingsColor = this.visualSystem === 'bananas' ? 0x555555 : palette.settingsButton;
+    this.graphics.lineStyle(2, settingsColor, 1);
     this.graphics.strokeRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
-    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', palette.settingsButton, GAME_CONFIG.font.large);
+    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', settingsColor, GAME_CONFIG.font.large);
 
     // Visuals button
     const visualsBtn = this.visualsButtonRect();
@@ -703,7 +713,8 @@ export class MenuScene extends Phaser.Scene {
     const visualsLabel =
       this.visualSystem === 'classic' ? 'VISUALS: CLASSIC' :
       this.visualSystem === 'retroPixel' ? 'VISUALS: RETRO PIXEL' :
-      'VISUALS: HI-RES';
+      this.visualSystem === 'hiRes' ? 'VISUALS: HI-RES' :
+      'VISUALS: BANANAS';
     this.addText(visualsBtn.x + 90, visualsBtn.y + 6, visualsLabel, palette.visualsButton, GAME_CONFIG.font.medium);
 
     // Online buttons
@@ -1293,7 +1304,7 @@ export class MenuScene extends Phaser.Scene {
   private loadVisualSystemFromStorage(): void {
     try {
       const stored = localStorage.getItem('cratercmd.visual');
-      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel' || stored === 'hiRes')) {
+      if (stored && typeof stored === 'string' && (stored === 'classic' || stored === 'retroPixel' || stored === 'hiRes' || stored === 'bananas')) {
         this.visualSystem = stored as VisualSystem;
       }
     } catch (e) {

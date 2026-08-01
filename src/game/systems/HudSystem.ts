@@ -148,7 +148,10 @@ export class HudSystem {
     }
 
     if (!inShop && !matchOver) {
-      if (visualSystem === 'retroPixel') {
+      // Bananas interim: draw the retro console so drawing matches the retro
+      // pointer map it routes through. The real Bananas console replaces this
+      // branch in slice C.
+      if (visualSystem === 'retroPixel' || visualSystem === 'bananas') {
         this.drawRetroPixelHud(turn, tanks, weapon, match, weaponWindowStart);
       } else if (visualSystem === 'hiRes') {
         this.drawHiResHud(turn, tanks, weapon, match, weaponWindowStart);
