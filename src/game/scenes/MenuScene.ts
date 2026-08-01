@@ -496,10 +496,11 @@ export class MenuScene extends Phaser.Scene {
       }
       this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, 260);
     }
-    // Show logo in hiRes on both main and settings views
+    // Show logo in hiRes on both main and settings views — scale per view (0.2 main / 0.14 settings)
     this.hiresLogo.visible = this.visualSystem === 'hiRes';
     if (this.hiresLogo.visible) {
-      this.hiresLogo.setOrigin(0, 0).setPosition(88, 10).setScale(0.2);
+      const logoScale = this.view === 'main' ? 0.2 : 0.14;
+      this.hiresLogo.setOrigin(0, 0).setPosition(88, 10).setScale(logoScale);
     }
 
     // Mini-tank sprites: visible only in hiRes main view
@@ -508,9 +509,27 @@ export class MenuScene extends Phaser.Scene {
     this.miniTankRed.setVisible(showMiniTanks);
 
     this.graphics.clear();
-    if (this.visualSystem !== 'classic') {
-      this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.45);
-      this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+    // Scrim: retro NO scrim; hi-res vertical gradient + warm radial glow
+    if (this.visualSystem === 'hiRes') {
+      // Hi-res scrim: vertical gradient limited to top 360 (main) or 400 (settings)
+      const gradientHeight = this.view === 'main' ? 360 : 400;
+      this.graphics.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.4, 0.4, 0.05, 0.05);
+      this.graphics.fillRect(0, 0, GAME_CONFIG.width, gradientHeight);
+
+      // Warm radial glow approximation at backdrop sun (~x480, y195)
+      const sunX = 480;
+      const sunY = 195;
+      // Layer 1: largest, lowest alpha
+      this.graphics.fillStyle(0xff9633, 0.08);
+      this.graphics.beginPath();
+      this.graphics.arc(sunX, sunY, 120, 0, Math.PI * 2);
+      this.graphics.fillPath();
+      // Layer 2: medium
+      this.graphics.fillStyle(0xff9633, 0.12);
+      this.graphics.beginPath();
+      this.graphics.arc(sunX, sunY, 80, 0, Math.PI * 2);
+      this.graphics.fillPath();
     }
     if (this.view === 'main') {
       this.renderMain();
@@ -624,22 +643,29 @@ export class MenuScene extends Phaser.Scene {
     // Player rows
     const p1Color = 0x238cff;
     const p2Color = 0xff4b16;
-    this.drawSlotRowRetro(134, 'PLAYER 1', this.slots[0], p1Color);
-    this.drawSlotRowRetro(194, 'PLAYER 2', this.slots[1], p2Color);
+    this.drawSlotRowRetro(0, 134, 'PLAYER 1', this.slots[0], p1Color);
+    this.drawSlotRowRetro(1, 194, 'PLAYER 2', this.slots[1], p2Color);
 
     // Hint
     this.addText(310, 262, 'Tap name to rename · Tap box to cycle', 0xa8a8a8, '12px', 'Courier New');
 
-    // Start button
+    // Start button — check enabled state like classic version
+    const enabled = this.canStart();
     const startX = 310;
     const startY = 300;
     const startW = 334;
     const startH = 40;
+    const startButtonColor = enabled ? 0xc68417 : 0x8a8a8a;
     this.graphics.fillStyle(0x050505, 1);
     this.graphics.fillRect(startX, startY, startW, startH);
-    this.graphics.lineStyle(3, 0xc68417, 1);
+    this.graphics.lineStyle(3, startButtonColor, 1);
     this.graphics.strokeRect(startX, startY, startW, startH);
-    this.addText(375, 310, 'START MATCH', 0xc68417, '28px', 'Courier New');
+    this.addText(375, 310, 'START MATCH', startButtonColor, '28px', 'Courier New');
+
+    // Show warning if not enabled
+    if (!enabled) {
+      this.addText(310, 352, 'Need at least 1 human player.', 0xff0000, '12px', 'Courier New');
+    }
 
     // Settings button
     const settingsX = 310;
@@ -697,23 +723,54 @@ export class MenuScene extends Phaser.Scene {
     this.drawSlotRowHiRes(0, 134, 'PLAYER 1', this.slots[0], getPlayerPalette(0, 'hiRes').primary);
     this.drawSlotRowHiRes(1, 194, 'PLAYER 2', this.slots[1], getPlayerPalette(1, 'hiRes').primary);
 
-    // Hint line
-    this.addText(88, 262, '1 / 2 CYCLES CONTROLLER · ENTER STARTS', 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+    // Hint line at y250
+    this.addText(GAME_CONFIG.width / 2, 250, '1 / 2 CYCLES CONTROLLER · ENTER STARTS', 0x8a8078, '10px', 'JetBrains Mono', 1.6, { alpha: 0.4, originX: 0.5, weight: '400' });
 
-    // Start button — large gold gradient
+    // Start button — warm gradient fill (#ffcf7a → #e08a1c 58% → #a85f10)
     const startX = GAME_CONFIG.width / 2 - 170;
     const startY = 300;
     const startW = 340;
     const startH = 46;
     const canStart = this.canStart();
-    const buttonColor = canStart ? 0xffb347 : 0x666666;
-    this.graphics.fillStyle(0x050505, 1);
-    this.graphics.fillRect(startX, startY, startW, startH);
-    this.graphics.lineStyle(2, buttonColor, 1);
-    this.graphics.strokeRect(startX, startY, startW, startH);
-    this.addText(startX + 65, startY + 10, 'START MATCH', buttonColor, '21px', 'Barlow Condensed');
 
-    if (!canStart) {
+    if (canStart) {
+      // Glow layer (larger, low alpha)
+      this.graphics.fillStyle(0xffcf7a, 0.15);
+      this.graphics.fillRoundedRect(startX - 2, startY - 2, startW + 4, startH + 4, 4);
+
+      // 3-stop gradient approximated with two stacked passes
+      // First pass: light to mid (#ffcf7a → #e08a1c)
+      this.graphics.fillGradientStyle(0xffcf7a, 0xffcf7a, 0xe08a1c, 0xe08a1c, 1);
+      this.graphics.fillRoundedRect(startX, startY, startW, startH * 0.58, 4);
+      // Second pass: mid to dark (#e08a1c → #a85f10)
+      this.graphics.fillGradientStyle(0xe08a1c, 0xe08a1c, 0xa85f10, 0xa85f10, 1);
+      this.graphics.fillRoundedRect(startX, startY + startH * 0.58, startW, startH * 0.42, 4);
+
+      // Hairline border
+      this.graphics.lineStyle(1, 0xffe8be, 0.6);
+      this.graphics.strokeRoundedRect(startX, startY, startW, startH, 4);
+
+      // START MATCH label: 29px dark centered
+      this.addText(startX + startW / 2, startY + startH / 2, 'START MATCH', 0x241505, '29px', 'Barlow Condensed', 4.64, { originX: 0.5, originY: 0.5, weight: '600' });
+
+      // ENTER keycap chip: 9px mono, bordered, 12px right of label
+      const chipX = startX + startW / 2 + 100;
+      const chipY = startY + startH / 2 - 6;
+      const chipW = 32;
+      const chipH = 20;
+      this.graphics.fillStyle(0x241505, 0.35);
+      this.graphics.fillRoundedRect(chipX, chipY, chipW, chipH, 2);
+      this.graphics.lineStyle(1, 0x241505, 0.35);
+      this.graphics.strokeRoundedRect(chipX, chipY, chipW, chipH, 2);
+      this.addText(chipX + chipW / 2, chipY + chipH / 2, 'ENTER', 0xf0dcc2, '9px', 'JetBrains Mono', undefined, { originX: 0.5, originY: 0.5, weight: '400' });
+    } else {
+      // Disabled button styling
+      this.graphics.fillStyle(0x050505, 1);
+      this.graphics.fillRect(startX, startY, startW, startH);
+      this.graphics.lineStyle(1, 0x666666, 1);
+      this.graphics.strokeRect(startX, startY, startW, startH);
+      this.addText(startX + startW / 2, startY + startH / 2, 'START MATCH', 0x666666, '29px', 'Barlow Condensed', 4.64, { originX: 0.5, originY: 0.5, weight: '600' });
+
       this.addText(
         GAME_CONFIG.width / 2 - 150,
         352,
@@ -723,47 +780,52 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    // Settings button
+    // Settings button: fill rgba(24,18,14,.66), border 0xffbe78 @.28, Barlow 600 22px 0xf0dcc2 centered
     const settingsBtn = this.settingsButtonRect();
-    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillStyle(0x18120e, 0.66);
     this.graphics.fillRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
-    this.graphics.lineStyle(1, 0xd8cfc4, 0.5);
+    this.graphics.lineStyle(1, 0xffbe78, 0.28);
     this.graphics.strokeRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
-    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', 0xd8cfc4, '16px');
+    this.addText(settingsBtn.x + settingsBtn.w / 2, settingsBtn.y + settingsBtn.h / 2, 'SETTINGS', 0xf0dcc2, '22px', 'Barlow Condensed', 4.4, { originX: 0.5, originY: 0.5, weight: '600' });
 
-    // Visuals row — draw inside hit rect
+    // Visuals row — chrome fill/border, label 10px ls .22em @.5, value 11px right-aligned WITH letterspacing
     const visualsRect = this.visualsButtonRect();
-    this.graphics.fillStyle(0x120d09, 1);
+    this.graphics.fillStyle(0x18120e, 0.66);
     this.graphics.fillRect(visualsRect.x, visualsRect.y, visualsRect.w, visualsRect.h);
-    this.graphics.lineStyle(1, 0x3a2d22, 1);
+    this.graphics.lineStyle(1, 0xffbe78, 0.28);
     this.graphics.strokeRect(visualsRect.x, visualsRect.y, visualsRect.w, visualsRect.h);
 
-    this.addText(GAME_CONFIG.width / 2 - 156, 417, 'VISUALS', 0xd8cfc4, '9px', 'JetBrains Mono', 1.8);
+    // VISUALS label: 10px ls .22em @.5
+    this.addText(GAME_CONFIG.width / 2 - 156, 417, 'VISUALS', 0xd8cfc4, '10px', 'JetBrains Mono', 2.2, { alpha: 0.5, weight: '400' });
+
+    // Value: 11px right-aligned WITH letterspacing
     const visualsLabel = this.visualSystem === 'hiRes' ? 'HI-RES' : 'RETRO PIXEL';
     const visualsValueObj = this.add.text(0, 0, visualsLabel, {
       color: Phaser.Display.Color.IntegerToColor(0xffb347).rgba,
       fontFamily: 'JetBrains Mono',
-      fontSize: '9px'
+      fontSize: '11px'
     });
     visualsValueObj.setResolution(2);
+    // Measure width WITH letterspacing
+    visualsValueObj.setLetterSpacing(1.8);
     const vw = visualsValueObj.width;
     visualsValueObj.destroy();
-    this.addText(GAME_CONFIG.width / 2 + 156 - vw, 417, visualsLabel, 0xffb347, '9px', 'JetBrains Mono', 1.8);
+    this.addText(GAME_CONFIG.width / 2 + 156 - vw, 417, visualsLabel, 0xffb347, '11px', 'JetBrains Mono', 1.8, { weight: '400' });
 
-    // Online buttons
+    // Online buttons: tinted fills .1 / borders @.45, mono 11px ls .24em light tints centered
     const host = this.hostButtonRect();
-    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillStyle(0x3f9dff, 0.1);
     this.graphics.fillRect(host.x, host.y, host.w, host.h);
-    this.graphics.lineStyle(1, 0x3f9dff, 0.5);
+    this.graphics.lineStyle(1, 0x3f9dff, 0.45);
     this.graphics.strokeRect(host.x, host.y, host.w, host.h);
-    this.addText(host.x + 50, host.y + 6, 'HOST ONLINE', 0x3f9dff, '12px');
+    this.addText(host.x + host.w / 2, host.y + host.h / 2, 'HOST ONLINE', 0x8ec8ff, '11px', 'JetBrains Mono', 2.64, { originX: 0.5, originY: 0.5, weight: '400' });
 
     const join = this.joinButtonRect();
-    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillStyle(0xff7a3c, 0.1);
     this.graphics.fillRect(join.x, join.y, join.w, join.h);
-    this.graphics.lineStyle(1, 0xff7a3c, 0.5);
+    this.graphics.lineStyle(1, 0xff7a3c, 0.45);
     this.graphics.strokeRect(join.x, join.y, join.w, join.h);
-    this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', 0xff7a3c, '12px');
+    this.addText(join.x + join.w / 2, join.y + join.h / 2, 'JOIN ONLINE', 0xffa877, '11px', 'JetBrains Mono', 2.64, { originX: 0.5, originY: 0.5, weight: '400' });
   }
 
   private drawSlotRowClassic(idx: number, y: number, label: string, slot: Slot, accent: number): void {
@@ -785,7 +847,7 @@ export class MenuScene extends Phaser.Scene {
     this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
   }
 
-  private drawSlotRowRetro(y: number, label: string, slot: Slot, accent: number): void {
+  private drawSlotRowRetro(idx: number, y: number, label: string, slot: Slot, accent: number): void {
     const boxX = 280;
     const boxY = y;
     const boxW = 396;
@@ -796,8 +858,10 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.lineStyle(2, accent, 1);
     this.graphics.strokeRect(boxX, boxY, boxW, boxH);
 
-    // Label on the left (outside the box in the design)
-    this.addText(120, y + 6, label, accent, '24px', 'Courier New');
+    // Label on the left (outside the box in the design) — use custom name if available
+    const customName = this.names[idx];
+    const displayName = customName ?? label;
+    this.addText(120, y + 6, displayName, accent, '24px', 'Courier New');
 
     // Value on the right inside the box
     this.addText(296, y + 8, CONTROLLER_LABELS[slot], 0xffffff, '18px', 'Courier New');
@@ -812,22 +876,28 @@ export class MenuScene extends Phaser.Scene {
     // Card background with gradient
     this.graphics.fillStyle(0x1a1408, 1);
     this.graphics.fillRect(boxX, boxY, boxW, boxH);
-    this.graphics.lineStyle(1, 0x3f9dff, 0.34);
+    // P2 border ORANGE, P1 border blue (use accent per-player)
+    this.graphics.lineStyle(1, accent, 0.34);
     this.graphics.strokeRect(boxX, boxY, boxW, boxH);
 
-    // Mini-tank sprite
+    // Row icon: hires-tank sprite ~46×34 at x≈125 centered in card
     const tank = idx === 0 ? this.miniTankBlue : this.miniTankRed;
-    tank.setPosition(100, boxY + 6);
+    tank.setPosition(125, boxY + 20);
+    tank.setScale(0.13);
     tank.setVisible(true);
 
-    // Player label
-    this.addText(boxX + 70, boxY + 12, label, accent, '16px', 'Barlow Condensed', 0.96);
+    // Player label — 25px light tints, ls .05em
+    const customName = this.names[idx];
+    const displayName = customName ?? label;
+    // Light tint: P1 light blue, P2 light orange
+    const nameColor = idx === 0 ? 0x5aa9ff : 0xff8a4c;
+    this.addText(boxX + 70, boxY + 12, displayName, nameColor, '25px', 'Barlow Condensed', 1.25, { weight: '400' });
 
-    // Helper text: row 1 = rename, row 2 = cycle
+    // Helper text INLINE right of name: 8px @.36
     const helperText = idx === 0 ? 'TAP NAME TO RENAME' : 'TAP BOX TO CYCLE';
-    this.addText(boxX + 70, boxY + 28, helperText, 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+    this.addText(boxX + 70, boxY + 28, helperText, 0x8a8078, '8px', 'JetBrains Mono', 1.8, { alpha: 0.36, weight: '400' });
 
-    // Right-aligned value chip: size from text width, right edge at x=856
+    // Right-aligned value chip: size from text width WITH letterspacing, right edge at x=856
     const valueText = CONTROLLER_LABELS[slot];
     const valueTextObj = this.add.text(0, 0, valueText, {
       color: Phaser.Display.Color.IntegerToColor(accent).rgba,
@@ -835,6 +905,8 @@ export class MenuScene extends Phaser.Scene {
       fontSize: '10px'
     });
     valueTextObj.setResolution(2);
+    // Include letterspacing in width measurement
+    valueTextObj.setLetterSpacing(1.6);
     const textW = valueTextObj.width;
     valueTextObj.destroy();
     const chipW = textW + 20;
@@ -843,7 +915,8 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.fillRect(chipX, boxY + 6, chipW, 28);
     this.graphics.lineStyle(1, accent, 0.5);
     this.graphics.strokeRect(chipX, boxY + 6, chipW, 28);
-    this.addText(chipX + chipW / 2, boxY + 22, valueText, accent, '10px', 'JetBrains Mono', 1.6);
+    // Center text via origin
+    this.addText(chipX + chipW / 2, boxY + 22, valueText, accent, '10px', 'JetBrains Mono', 1.6, { originX: 0.5, originY: 0.5 });
   }
 
   private renderSettings(): void {
@@ -912,13 +985,13 @@ export class MenuScene extends Phaser.Scene {
     ];
 
     for (const row of settingRows) {
-      this.addText(220, row.y + 8, row.label, 0xd8cfc4, '12px', 'Courier New');
+      this.addText(220, row.y + 8, row.label, 0xa8a8a8, '18px', 'Courier New');
       const btn = this.settingsButtonForRow(row.y);
       this.graphics.fillStyle(0x050505, 1);
       this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
       this.graphics.lineStyle(2, 0xc68417, 1);
       this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
-      this.addText(btn.x + 16, btn.y + 8, row.value, 0xc68417, '12px', 'Courier New');
+      this.addText(btn.x + 16, btn.y + 8, row.value, 0xc68417, '18px', 'Courier New');
     }
 
     const backBtn = this.backButtonRect();
@@ -931,9 +1004,9 @@ export class MenuScene extends Phaser.Scene {
     this.addText(
       GAME_CONFIG.width / 2 - 290,
       452,
-      'Settings apply to local and hosted matches',
-      0x8a8a8a,
-      '10px',
+      'Settings apply to local and hosted online matches',
+      0xa8a8a8,
+      '12px',
       'Courier New'
     );
   }
@@ -941,44 +1014,72 @@ export class MenuScene extends Phaser.Scene {
   private renderSettingsHiRes(): void {
     // Logo image is positioned in render() method — nothing drawn here
 
-    // SETTINGS label below logo
-    this.addText(90, 112, 'SETTINGS', 0xd8cfc4, '10px', 'JetBrains Mono', 3);
+    // SETTINGS label below logo (kicker at 90, 84 — under scaled logo y10..78)
+    this.addText(90, 84, 'SETTINGS', 0xd8cfc4, '10px', 'JetBrains Mono', 3, { alpha: 0.5, weight: '400' });
 
     const settingRows = [
-      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, hint: '(B)' },
-      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], hint: '(W)' },
-      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], hint: '(G)' },
-      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], hint: '(A)' },
-      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', hint: '(F)' }
+      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, hint: 'KEY B', isTanksFall: false },
+      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], hint: 'KEY W', isTanksFall: false },
+      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], hint: 'KEY G', isTanksFall: false },
+      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], hint: 'KEY A', isTanksFall: false },
+      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', hint: 'KEY F', isTanksFall: true }
     ];
 
     for (const row of settingRows) {
-      this.addText(88, row.y + 8, row.label, 0xd8cfc4, '10px', 'Barlow Condensed', 0.96);
-      this.addText(260, row.y + 8, row.hint, 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+      // Label: x220 Barlow 600 21px ls .1em 0xf0dcc2
+      this.addText(220, row.y + 8, row.label, 0xf0dcc2, '21px', 'Barlow Condensed', 2.1, { weight: '600' });
+
+      // KEY hint: 'KEY B' mono 8px ls .2em @.34 inline 12px after label
+      this.addText(220 + 180, row.y + 8, row.hint, 0xf0dcc2, '8px', 'JetBrains Mono', 1.6, { alpha: 0.34, weight: '400' });
+
       const btn = this.settingsButtonForRow(row.y);
-      this.graphics.fillStyle(0x050505, 1);
-      this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
-      this.graphics.lineStyle(1, 0xffb347, 0.5);
-      this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
-      this.addText(btn.x + 16, btn.y + 8, row.value, 0xffb347, '9px', 'JetBrains Mono');
+
+      // Value button: gradient fill (0x302214 @.9 → 0x140e09 @.92) r3 + inset highlight
+      this.graphics.fillGradientStyle(0x302214, 0x302214, 0x140e09, 0x140e09, 0.9, 0.9, 0.92, 0.92);
+      this.graphics.fillRoundedRect(btn.x, btn.y, btn.w, btn.h, 3);
+
+      // Inset highlight at top
+      this.graphics.lineStyle(1, 0xffffff, 0.1);
+      this.graphics.beginPath();
+      this.graphics.moveTo(btn.x + 1, btn.y + 1);
+      this.graphics.lineTo(btn.x + btn.w - 1, btn.y + 1);
+      this.graphics.strokePath();
+
+      // Value text: 13px ls .16em at x494
+      const valueColor = row.isTanksFall && this.tanksFall ? 0x58d98b : 0xf0dcc2;
+      this.addText(494, row.y + 8, row.value, valueColor, '13px', 'JetBrains Mono', 2.08, { weight: '400' });
+
+      // › chevron: 11px 0xffb347 @.5 right-aligned
+      this.addText(btn.x + btn.w - 8, row.y + 8, '›', 0xffb347, '11px', 'JetBrains Mono', undefined, { alpha: 0.5, originX: 1, weight: '400' });
     }
 
+    // BACK button: chrome like SETTINGS + ESC keycap chip
     const backBtn = this.backButtonRect();
-    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillStyle(0x18120e, 0.66);
     this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
-    this.graphics.lineStyle(1, 0xd8cfc4, 0.5);
+    this.graphics.lineStyle(1, 0xffbe78, 0.28);
     this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
-    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK', 0xd8cfc4, '12px');
-    this.addText(backBtn.x + 180, backBtn.y + 8, '(ESC)', 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+    this.addText(backBtn.x + backBtn.w / 2, backBtn.y + backBtn.h / 2, 'BACK', 0xf0dcc2, '22px', 'Barlow Condensed', 4.4, { originX: 0.5, originY: 0.5, weight: '600' });
 
+    // ESC keycap chip: 10px right of label
+    const chipX = backBtn.x + backBtn.w + 10;
+    const chipY = backBtn.y;
+    const chipW = 40;
+    const chipH = backBtn.h;
+    this.graphics.lineStyle(1, 0xffffff, 0.2);
+    this.graphics.strokeRoundedRect(chipX, chipY, chipW, chipH, 2);
+    this.addText(chipX + chipW / 2, chipY + chipH / 2, 'ESC', 0xf0dcc2, '9px', 'JetBrains Mono', undefined, { originX: 0.5, originY: 0.5, weight: '400' });
+
+    // Bottom hint: uppercase incl. ONLINE, centered, 10px ls .16em @.4
     this.addText(
-      88,
+      GAME_CONFIG.width / 2,
       452,
-      'Settings apply to local and hosted matches',
+      'SETTINGS APPLY TO LOCAL AND HOSTED ONLINE MATCHES',
       0x8a8078,
-      '9px',
+      '10px',
       'JetBrains Mono',
-      1.8
+      1.6,
+      { alpha: 0.4, originX: 0.5, weight: '400' }
     );
   }
 
