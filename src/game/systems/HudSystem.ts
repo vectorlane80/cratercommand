@@ -14,7 +14,7 @@ import {
   type WeaponDefinition
 } from '../types/GameTypes';
 import { soundSystem } from './SoundSystem';
-import { getPlayerPalette } from './TankSystem';
+import { getPlayerPalette, type PlayerPalette } from './TankSystem';
 import { WEAPON_WINDOW_SIZE } from './WeaponWindow';
 import type { ShopCatalogEntry } from './EconomySystem';
 
@@ -1060,8 +1060,8 @@ export class HudSystem {
     this.graphics.lineStyle(1, colors.steelDark, 1);
     this.graphics.strokeRect(6, 6, GAME_CONFIG.width - 12, GAME_CONFIG.height - 12);
 
-    this.drawRetroPlayerPanel(22, 14, tanks[0], match, getPlayerPalette(0, 'hiRes').primary);
-    this.drawRetroPlayerPanel(774, 14, tanks[1], match, getPlayerPalette(1, 'hiRes').primary);
+    this.drawHiResPlayerPanel(22, 14, tanks[0], match, getPlayerPalette(0, 'hiRes'));
+    this.drawHiResPlayerPanel(774, 14, tanks[1], match, getPlayerPalette(1, 'hiRes'));
 
     const windArrow = turn.wind.direction < 0 ? '<' : '>';
     this.addText(434, 12, `ROUND ${match.round}`, colors.white, GAME_CONFIG.font.medium, 'JetBrains Mono', 1);
@@ -1091,9 +1091,11 @@ export class HudSystem {
     this.drawHiResPanelFrame(8, top + 8, 208, 122, 'WEAPONS');
     this.drawRetroWeaponRows(18, top + 32, activeTank, activePalette.primary, weaponWindowStart);
     this.drawHiResPanelFrame(220, top + 8, 176, 122, 'ANGLE');
-    this.drawRetroAnglePanel(236, top + 42, activeTank, activePalette.primary);
+    this.addText(302, top + 42, `${Math.round(activeTank.angle)}`, activePalette.primary, GAME_CONFIG.font.large, 'Barlow Condensed', 0);
+    this.drawHiResAngleDial(236, top + 42, activeTank, activePalette.primary);
     this.drawHiResPanelFrame(400, top + 8, 204, 122, 'POWER');
-    this.drawRetroPowerPanel(416, top + 42, activeTank, activePalette.primary);
+    this.addText(476, top + 42, `${Math.round(activeTank.power)}`, activePalette.primary, GAME_CONFIG.font.large, 'Barlow Condensed', 0);
+    this.drawHiResPowerSegments(416, top + 42, activeTank);
     this.drawHiResPanelFrame(610, top + 8, 140, 122, '');
     this.drawHiResFireButton(632, top + 36, turn.phase === 'aiming');
     this.drawHiResPanelFrame(756, top + 8, 196, 122, 'STATUS');
@@ -1105,24 +1107,8 @@ export class HudSystem {
     this.graphics.lineStyle(2, colors.steelLight, 1);
     this.graphics.strokeRect(0, top + 136, GAME_CONFIG.width, 46);
 
-    this.addText(
-      16,
-      top + 144,
-      '←→ Aim  ↑↓ Power  A/D·TAP MOVE  1-8 Weapon',
-      colors.cyan,
-      GAME_CONFIG.font.small,
-      'JetBrains Mono',
-      1
-    );
-    this.addText(
-      16,
-      top + 162,
-      'SPACE Fire  V Visual  ENTER Advance',
-      colors.cyan,
-      GAME_CONFIG.font.small,
-      'JetBrains Mono',
-      1
-    );
+    this.drawHiResKeycapChips(top);
+
     this.addText(
       720,
       top + 144,
@@ -1167,6 +1153,131 @@ export class HudSystem {
     this.graphics.fillRoundedRect(x, y, 94, 58, 4);
     const labelColor = canFire ? 0x1a0d05 : 0x777777;
     this.addText(x + 20, y + 14, 'FIRE', labelColor, GAME_CONFIG.font.title, 'Barlow Condensed', 0);
+  }
+
+  private drawHiResPlayerPanel(x: number, y: number, tank: TankState, match: MatchState, palette: PlayerPalette): void {
+    const colors = GAME_CONFIG.colors;
+    this.addText(x, y, `PLAYER ${tank.id + 1}`, palette.primary, GAME_CONFIG.font.medium, 'Barlow Condensed', 0);
+    // Mini-tank sprite replaces drawMiniTank - sprite already positioned in GameScene
+    this.addText(x + 56, y + 22, `${tank.health}`, colors.white, GAME_CONFIG.font.medium, 'Barlow Condensed', 0);
+    // HP bar with gradient
+    this.graphics.fillStyle(colors.steelDark, 1);
+    this.graphics.fillRect(x + 102, y + 28, 74, 8);
+    this.graphics.fillGradientStyle(0x9be564, 0x9be564, 0x4f9f2f, 0x4f9f2f, 1);
+    this.graphics.fillRect(x + 104, y + 30, Math.max(0, tank.health / GAME_CONFIG.tank.maxHealth) * 70, 4);
+    this.addText(
+      x + 56,
+      y + 44,
+      `$ ${match.profiles[tank.id].cash}  W:${match.profiles[tank.id].wins}`,
+      colors.yellow,
+      GAME_CONFIG.font.small,
+      'JetBrains Mono',
+      1
+    );
+  }
+
+  private drawHiResAngleDial(_x: number, _y: number, activeTank: TankState, highlightColor: number): void {
+    const top = GAME_CONFIG.layout.consoleTop;
+    const cx = 308;
+    const cy = top + 100;
+    const radius = 34;
+
+    // Track arc (15-165 degrees sweep)
+    this.graphics.lineStyle(3, 0x3a2d22, 1);
+    this.graphics.beginPath();
+    this.graphics.arc(cx, cy, radius, Phaser.Math.DegToRad(-165), Phaser.Math.DegToRad(-15), false);
+    this.graphics.strokePath();
+
+    // Tick marks at 15/45/90/135/165 degrees
+    const tickDegrees = [15, 45, 90, 135, 165];
+    this.graphics.lineStyle(1, 0xffbe78, 0.4);
+    tickDegrees.forEach((deg) => {
+      const rad = Phaser.Math.DegToRad(deg);
+      const x1 = cx + Math.cos(rad) * 30;
+      const y1 = cy - Math.sin(rad) * 30;
+      const x2 = cx + Math.cos(rad) * 34;
+      const y2 = cy - Math.sin(rad) * 34;
+      this.graphics.beginPath();
+      this.graphics.moveTo(x1, y1);
+      this.graphics.lineTo(x2, y2);
+      this.graphics.strokePath();
+    });
+
+    // Needle from center to angle
+    const needleRad = Phaser.Math.DegToRad(activeTank.angle);
+    const needleX = cx + Math.cos(needleRad) * 30;
+    const needleY = cy - Math.sin(needleRad) * 30;
+    this.graphics.lineStyle(2, highlightColor, 1);
+    this.graphics.beginPath();
+    this.graphics.moveTo(cx, cy);
+    this.graphics.lineTo(needleX, needleY);
+    this.graphics.strokePath();
+
+    // Hub circle
+    this.graphics.fillStyle(0xffb347, 1);
+    this.graphics.fillCircle(cx, cy, 3);
+  }
+
+  private drawHiResPowerSegments(_x: number, _y: number, activeTank: TankState): void {
+    const top = GAME_CONFIG.layout.consoleTop;
+    const x0 = 416;
+    const y0 = top + 112;
+    const segmentW = 15;
+    const gap = 3;
+    const segmentH = 10;
+    const filledCount = Math.round(activeTank.power / 10);
+
+    for (let i = 0; i < 10; i += 1) {
+      const segX = x0 + i * (segmentW + gap);
+      const isFilled = i < filledCount;
+
+      if (isFilled) {
+        this.graphics.fillGradientStyle(0x9be564, 0x9be564, 0x4f9f2f, 0x4f9f2f, 1);
+        this.graphics.fillRoundedRect(segX, y0, segmentW, segmentH, 2);
+        this.graphics.lineStyle(1, 0xd6ff9e, 0.5);
+      } else {
+        this.graphics.fillStyle(0x1a140f, 1);
+        this.graphics.fillRoundedRect(segX, y0, segmentW, segmentH, 2);
+        this.graphics.lineStyle(1, 0x3a2d22, 1);
+      }
+      this.graphics.strokeRoundedRect(segX, y0, segmentW, segmentH, 2);
+    }
+  }
+
+  private drawHiResKeycapChips(top: number): void {
+    const chipY1 = top + 144;
+    const chipY2 = top + 162;
+    let currentX = 16;
+
+    // Helper to draw a keycap chip
+    const drawChip = (keyText: string, descText: string, yPos: number) => {
+      const chipW = keyText.length * 9 + 8;
+      const chipH = 16;
+      // Chip background
+      this.graphics.fillStyle(0x1a140f, 1);
+      this.graphics.fillRoundedRect(currentX, yPos - 2, chipW, chipH, 3);
+      this.graphics.lineStyle(1, 0xffbe78, 0.25);
+      this.graphics.strokeRoundedRect(currentX, yPos - 2, chipW, chipH, 3);
+      // Key text
+      this.addText(currentX + 4, yPos, keyText, 0xffd9a0, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+      currentX += chipW + 10;
+      // Description text
+      const descW = descText.length * 6 + 2;
+      this.addText(currentX, yPos, descText, 0x8a8078, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+      currentX += descW + 10;
+    };
+
+    // Line 1
+    drawChip('←→', 'Aim', chipY1);
+    drawChip('↑↓', 'Power', chipY1);
+    drawChip('A/D', 'TAP MOVE', chipY1);
+    drawChip('1-8', 'Weapon', chipY1);
+
+    // Line 2
+    currentX = 16;
+    drawChip('SPACE', 'Fire', chipY2);
+    drawChip('V', 'Visual', chipY2);
+    drawChip('ENTER', 'Advance', chipY2);
   }
 
   private clearTexts(): void {

@@ -55,6 +55,7 @@ export class GameScene extends Phaser.Scene {
   private hiresChutes: Phaser.GameObjects.Image[] = [];
   private hiresShells: Phaser.GameObjects.Image[] = [];
   private hiresRocks: Phaser.GameObjects.Image[] = [];
+  private hiresPlayerCards: Phaser.GameObjects.Image[] = [];
 
   private terrainSystem!: TerrainSystem;
   private tankSystem!: TankSystem;
@@ -248,6 +249,12 @@ export class GameScene extends Phaser.Scene {
     this.hiresRocks = HIRES_ROCK_POSITIONS.map(() =>
       this.add.image(0, 0, 'hires-rock').setOrigin(0.5, 1).setScale(0.3)
     );
+
+    // HiRes-mode player card mini-tanks (for the top bar).
+    this.hiresPlayerCards = [
+      this.add.image(24, 44, 'hires-mini-tank-blue').setOrigin(0, 0).setScale(0.25),
+      this.add.image(776, 44, 'hires-mini-tank-red').setOrigin(0, 0).setScale(0.25)
+    ];
 
     this.applyVisualLayerTextures();
 
@@ -2062,6 +2069,7 @@ export class GameScene extends Phaser.Scene {
     this.hiresChutes.forEach((chute) => (chute.visible = false));
     this.hiresShells.forEach((shell) => (shell.visible = false));
     this.hiresRocks.forEach((rock) => (rock.visible = false));
+    this.hiresPlayerCards.forEach((card) => (card.visible = false));
 
     if (retro && this.terrainData) {
       RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
@@ -2099,6 +2107,9 @@ export class GameScene extends Phaser.Scene {
           rock.setPosition(Math.round(x), Math.round(y) + 2);
           rock.visible = true;
         });
+
+        // Show mini-tank player cards in hiRes
+        this.hiresPlayerCards.forEach((card) => (card.visible = true));
       }
     }
   }
