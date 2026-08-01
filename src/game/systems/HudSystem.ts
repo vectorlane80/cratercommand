@@ -249,13 +249,17 @@ export class HudSystem {
       );
     } else if (turn.phase === 'aiming' && statusMessage) {
       // AI is thinking — small banner that doesn't block visibility.
-      this.addText(
-        (GAME_CONFIG.width - statusMessage.length * 11) / 2,
-        140,
-        statusMessage,
-        GAME_CONFIG.colors.yellow,
-        GAME_CONFIG.font.medium
-      );
+      if (visualSystem === 'bananas') {
+        bananasPixTextCentered(this.graphics, statusMessage, GAME_CONFIG.width / 2, 140, 2, bananasInk(0xffff55));
+      } else {
+        this.addText(
+          (GAME_CONFIG.width - statusMessage.length * 11) / 2,
+          140,
+          statusMessage,
+          GAME_CONFIG.colors.yellow,
+          GAME_CONFIG.font.medium
+        );
+      }
     } else if (matchOver) {
       this.drawFullScreenBackdrop();
       const winId = match.matchWinnerId!;
@@ -276,11 +280,16 @@ export class HudSystem {
       const labelW = topToast.text.length * 11;
       const x = (GAME_CONFIG.width - labelW) / 2;
       const y = 96;
+      const toastColor = visualSystem === 'bananas' ? bananasInk(topToast.color) : topToast.color;
       this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.7);
       this.graphics.fillRect(x - 10, y - 4, labelW + 20, 26);
-      this.graphics.lineStyle(2, topToast.color, 1);
+      this.graphics.lineStyle(2, toastColor, 1);
       this.graphics.strokeRect(x - 10, y - 4, labelW + 20, 26);
-      this.addText(x, y, topToast.text, topToast.color, GAME_CONFIG.font.medium);
+      if (visualSystem === 'bananas') {
+        bananasPixTextCentered(this.graphics, topToast.text, GAME_CONFIG.width / 2, y, 2, toastColor);
+      } else {
+        this.addText(x, y, topToast.text, topToast.color, GAME_CONFIG.font.medium);
+      }
     }
 
   }
@@ -347,6 +356,22 @@ export class HudSystem {
       this.graphics.lineStyle(1, 0x58d98b, 0.4);
       this.graphics.strokeRoundedRect(noX, btnY, btnW, btnH, 4);
       this.addTextCenteredBarlow(noX + btnW / 2, btnY + btnH / 2 - 6, 'NO (N)', 0x58d98b, '18px', { weight: '700' });
+
+    } else if (visualSystem === 'bananas') {
+      bananasBox(this.graphics, cardX, cardY, cardW, cardH, bananasInk(0x000000), bananasInk(0xffffff));
+      bananasPixTextCentered(this.graphics, 'FORFEIT MATCH?', cx, cardY + 24, 3, bananasInk(0xffff55));
+
+      const btnH = 44;
+      const btnW = 140;
+      const btnY = cardY + cardH - btnH - 20;
+      const gap = 24;
+      const yesX = cx - btnW - gap / 2;
+      const noX = cx + gap / 2;
+
+      bananasBox(this.graphics, yesX, btnY, btnW, btnH, bananasInk(0x000000), bananasInk(0xffffff));
+      bananasPixTextCentered(this.graphics, 'YES (Y)', yesX + btnW / 2, btnY + 13, 2, bananasInk(0xffffff));
+      bananasBox(this.graphics, noX, btnY, btnW, btnH, bananasInk(0x000000), bananasInk(0xffffff));
+      bananasPixTextCentered(this.graphics, 'NO (N)', noX + btnW / 2, btnY + 13, 2, bananasInk(0xffffff));
 
     } else if (visualSystem === 'retroPixel') {
       // Steel/boxy treatment with desertGold title

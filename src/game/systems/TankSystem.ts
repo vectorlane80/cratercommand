@@ -273,7 +273,7 @@ export class TankSystem {
 
       if (visualSystem === 'bananas') {
         const pose = tank.id === activePlayerId ? (tank.id === 0 ? 'right' : 'left') : 'down';
-        drawGorilla(graphics, Math.round(tank.x), Math.round(tank.y), 1, pose);
+        drawGorilla(graphics, Math.round(tank.x), Math.round(tank.y) + 2, 1, pose);
         return;
       }
 

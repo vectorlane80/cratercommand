@@ -124,6 +124,7 @@ export class GameScene extends Phaser.Scene {
   private isOnlineHost = false;
   private isOnlineJoiner = false;
   private onlineBananas: boolean | null = null;
+  private startBananas: boolean | null = null;
   /**
    * For the joiner: the PlayerId that "we" control. Inputs apply only when
    * turn.activePlayerId === localPlayerId.
@@ -165,6 +166,7 @@ export class GameScene extends Phaser.Scene {
     bananas?: boolean;
     online?: { isHost: boolean };
   }): void {
+    this.startBananas = data?.bananas ?? null;
     if (data?.controllers && data.controllers.length >= 2) {
       this.pendingControllers = data.controllers;
     }
@@ -203,6 +205,13 @@ export class GameScene extends Phaser.Scene {
       } else if (this.visualSystem === 'bananas') {
         // Scorched match but this client's saved style is bananas — bananas is
         // a ruleset, not a skin, so fall back to classic for this match.
+        this.visualSystem = 'classic';
+      }
+    }
+    if (!this.isOnlineHost && !this.isOnlineJoiner && this.startBananas !== null) {
+      if (this.startBananas) {
+        this.visualSystem = 'bananas';
+      } else if (this.visualSystem === 'bananas') {
         this.visualSystem = 'classic';
       }
     }
@@ -454,18 +463,22 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.turn.phase === 'matchOver') {
+      if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
+        if (this.isOnlineHost || this.isOnlineJoiner) {
+          this.returnToMenu();
+        } else {
+          this.scene.restart();
+        }
+      }
+      return;
+    }
+
     // Joiner runs no sim — it just forwards inputs to the host and renders
     // whatever snapshots come back. All sim/AI/projectile/shop logic below
     // belongs to the local + host paths.
     if (this.isOnlineJoiner) {
       this.updateJoiner();
-      return;
-    }
-
-    if (this.turn.phase === 'matchOver') {
-      if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
-        this.scene.restart();
-      }
       return;
     }
 
@@ -672,7 +685,12 @@ export class GameScene extends Phaser.Scene {
       this.terrainData = this.terrainSystem.generate(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
     }
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
-    if (this.isBananas()) this.tanks.forEach((t) => { t.ammo['banana'] = -1; });
+    if (this.isBananas()) {
+      this.tanks.forEach((t) => {
+        t.ammo['banana'] = -1;
+        t.parachutes = 0;
+      });
+    }
 
     // Auto-arm shields for players with autoDefense or AI
     for (const tank of this.tanks) {
@@ -792,6 +810,7 @@ export class GameScene extends Phaser.Scene {
 
   private returnToMenu(): void {
     soundSystem.playUiClick();
+    if (this.isOnlineHost || this.isOnlineJoiner) networkSystem.disconnect();
     this.scene.start('MenuScene');
   }
 
@@ -1372,7 +1391,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.turn.phase === 'matchOver') {
-      this.scene.restart();
+      if (this.isOnlineHost || this.isOnlineJoiner) {
+        this.returnToMenu();
+      } else {
+        this.scene.restart();
+      }
       return;
     }
     if (this.turn.phase === 'roundOver') {
@@ -1385,6 +1408,12 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.turn.phase === 'shopping') {
       if (!this.isCurrentShopperAI()) this.handleShopPointer(x, y);
+      return;
+    }
+    // Host mirror of the joiner guard: pointer taps must not act for the
+    // remote player's tank during their turn (keyboard already returns early
+    // in update(); the pointer path needs the same gate).
+    if (this.turn.phase === 'aiming' && this.isOnlineHost && this.isActivePlayerRemote()) {
       return;
     }
     if (this.turn.phase === 'aiming' && !this.isActivePlayerAI()) {
@@ -1426,6 +1455,147 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleAimingPointer(x: number, y: number): void {
+    if (this.isOnlineJoiner) {
+      const top = GAME_CONFIG.layout.consoleTop;
+      const activeTank = this.tanks[this.localPlayerId];
+
+      // ESC: MENU button in bottom strip (820..950, stripY+2..+24)
+      const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+      if (x >= 820 && x <= 950 && y >= stripY + 2 && y <= stripY + 24) {
+        this.quitConfirmActive = true;
+        soundSystem.playUiClick();
+        this.renderTanksAndHud();
+        return;
+      }
+
+      if (this.turn.activePlayerId !== this.localPlayerId) return;
+
+      if (this.visualSystem === 'classic') {
+        // FIRE button (drawn at x=386..496, y=top+8..top+44).
+        if (x >= 386 && x <= 496 && y >= top + 8 && y <= top + 44) {
+          this.sendInput({ kind: 'fire' });
+          return;
+        }
+
+        // Weapon list: x=14..296, rows at top+36 + i*13, 8 rows.
+        if (x >= 14 && x <= 296 && y >= top + 36 && y < top + 36 + 8 * 13) {
+          const rowIdx = Math.floor((y - (top + 36)) / 13);
+          const weaponIndex = this.weaponWindowStart + rowIdx;
+          if (weaponIndex >= 0 && weaponIndex < GAME_CONFIG.weapons.length) {
+            this.sendInput({ kind: 'select-weapon', index: weaponIndex });
+          }
+          return;
+        }
+
+        // The console's middle inner panel (x=328..533) holds BOTH the Angle
+        // value (top half, y < top+84) and the Power value + bar (bottom half).
+        // Split the hitbox top/bottom; within each half, use quarter zones for fine adjustments.
+        if (x >= 328 && x <= 533 && y >= top + 42 && y <= top + 146) {
+          let horizontalDelta = 0;
+          if (x < 376) {
+            horizontalDelta = -5;
+          } else if (x < 430.5) {
+            horizontalDelta = -1;
+          } else if (x < 456) {
+            horizontalDelta = 1;
+          } else {
+            horizontalDelta = 5;
+          }
+          const isAngleHalf = y < top + 84;
+          const angle = isAngleHalf
+            ? Phaser.Math.Clamp(
+                activeTank.angle + horizontalDelta,
+                GAME_CONFIG.aiming.minAngle,
+                GAME_CONFIG.aiming.maxAngle
+              )
+            : activeTank.angle;
+          const power = isAngleHalf
+            ? activeTank.power
+            : Phaser.Math.Clamp(
+                activeTank.power + horizontalDelta,
+                GAME_CONFIG.aiming.minPower,
+                GAME_CONFIG.aiming.maxPower
+              );
+          this.sendInput({ kind: 'aim', angle, power });
+          return;
+        }
+
+        // Battlefield (above the console): clicking left or right of the active
+        // tank moves it that direction, consuming move budget.
+        if (y < GAME_CONFIG.layout.consoleTop) {
+          const dx = x - activeTank.x;
+          this.sendInput({ kind: 'move-step', direction: dx < 0 ? -1 : 1 });
+        }
+        return;
+      }
+
+      // FIRE button: (632, top+36, 94, 58)
+      if (x >= 632 && x <= 726 && y >= top + 36 && y <= top + 94) {
+        this.sendInput({ kind: 'fire' });
+        return;
+      }
+
+      // Weapon rows: x 18..206, rows starting at top+32 with 11px spacing
+      if (x >= 18 && x <= 206 && y >= top + 32 && y < top + 32 + 8 * 11) {
+        if (this.isBananas()) return;
+        const rowIdx = Math.floor((y - (top + 32)) / 11);
+        const weaponIndex = this.weaponWindowStart + rowIdx;
+        if (weaponIndex >= 0 && weaponIndex < GAME_CONFIG.weapons.length) {
+          this.sendInput({ kind: 'select-weapon', index: weaponIndex });
+        }
+        return;
+      }
+
+      // ANGLE panel: frame (220, top+8, 176, 122) — y range top+8..top+130
+      if (x >= 220 && x <= 396 && y >= top + 8 && y <= top + 130) {
+        let horizontalDelta = 0;
+        if (x < 264) {
+          horizontalDelta = -5;
+        } else if (x < 308) {
+          horizontalDelta = -1;
+        } else if (x < 352) {
+          horizontalDelta = 1;
+        } else {
+          horizontalDelta = 5;
+        }
+        const angle = Phaser.Math.Clamp(
+          activeTank.angle + horizontalDelta,
+          GAME_CONFIG.aiming.minAngle,
+          GAME_CONFIG.aiming.maxAngle
+        );
+        this.sendInput({ kind: 'aim', angle, power: activeTank.power });
+        return;
+      }
+
+      // POWER panel: frame (400, top+8, 204, 122) — y range top+8..top+130
+      if (x >= 400 && x <= 604 && y >= top + 8 && y <= top + 130) {
+        let horizontalDelta = 0;
+        if (x < 451) {
+          horizontalDelta = -5;
+        } else if (x < 502) {
+          horizontalDelta = -1;
+        } else if (x < 553) {
+          horizontalDelta = 1;
+        } else {
+          horizontalDelta = 5;
+        }
+        const power = Phaser.Math.Clamp(
+          activeTank.power + horizontalDelta,
+          GAME_CONFIG.aiming.minPower,
+          GAME_CONFIG.aiming.maxPower
+        );
+        this.sendInput({ kind: 'aim', angle: activeTank.angle, power });
+        return;
+      }
+
+      // Battlefield tap-move (above the console)
+      if (!this.isBananas() && y < GAME_CONFIG.layout.consoleTop) {
+        const dx = x - activeTank.x;
+        this.sendInput({ kind: 'move-step', direction: dx < 0 ? -1 : 1 });
+      }
+      return;
+    }
+
     if (this.visualSystem !== 'classic') {
       this.handleRetroAimingPointer(x, y);
       return;
@@ -1528,6 +1698,7 @@ export class GameScene extends Phaser.Scene {
 
     // Weapon rows: x 18..206, rows starting at top+32 with 11px spacing
     if (x >= 18 && x <= 206 && y >= top + 32 && y < top + 32 + 8 * 11) {
+      if (this.isBananas()) return;
       const rowIdx = Math.floor((y - (top + 32)) / 11);
       const weaponIndex = this.weaponWindowStart + rowIdx;
       if (weaponIndex >= 0 && weaponIndex < GAME_CONFIG.weapons.length) {

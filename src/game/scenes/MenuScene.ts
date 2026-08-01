@@ -32,6 +32,7 @@ export interface MenuResult {
   names: Array<string | null>;
   wallMode: WallMode;
   physics: PhysicsSettings;
+  bananas: boolean;
 }
 
 const MAX_NAME_LEN = 12;
@@ -280,7 +281,21 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private nameEditorAccent(idx: number): string {
-    if (this.visualSystem === 'bananas') return idx === 0 ? '#55ffff' : '#ff55ff';
+    if (this.visualSystem === 'bananas') {
+      let display: BananasDisplay = '16color';
+      try {
+        const storedDisplay = localStorage.getItem('cratercmd.bananas.display');
+        if (storedDisplay && BANANAS_DISPLAY_CYCLE.includes(storedDisplay as BananasDisplay)) {
+          display = storedDisplay as BananasDisplay;
+        }
+      } catch {
+        // localStorage is optional; the editor defaults to 16-color.
+      }
+      if (display === 'amber') return '#ffb000';
+      if (display === 'green') return '#33ff33';
+      if (display === 'white') return '#f0f0f0';
+      return idx === 0 ? '#55ffff' : '#ff55ff';
+    }
     if (this.visualSystem === 'retroPixel') return idx === 0 ? '#238cff' : '#ff4b16';
     if (this.visualSystem === 'hiRes') return idx === 0 ? '#5aa9ff' : '#ff8a4c';
     return idx === 0 ? '#00ffff' : '#ff00ff';
@@ -588,7 +603,8 @@ export class MenuScene extends Phaser.Scene {
       names: this.participantNames(),
       roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
       wallMode: wallMode,
-      physics
+      physics,
+      bananas: this.visualSystem === 'bananas'
     };
     this.scene.start('GameScene', result);
   }
@@ -862,12 +878,16 @@ export class MenuScene extends Phaser.Scene {
 
     bananasBox(this.graphics, 280, 134, 400, 40, bananasInk(0x000000), bananasInk(0x55ffff));
     if (this.nameEditIdx !== 0) {
-      bananasPixText(this.graphics, this.names[0] ?? 'PLAYER 1', 120, 142, 3, bananasInk(0x55ffff));
+      const name = this.names[0] ?? 'PLAYER 1';
+      const cell = name.length > 8 ? 2 : 3;
+      bananasPixText(this.graphics, name, 120, 142 + (cell === 2 ? 4 : 0), cell, bananasInk(0x55ffff));
     }
     bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[0]], 296, 146, 2, bananasInk(0xffffff));
     bananasBox(this.graphics, 280, 194, 400, 40, bananasInk(0x000000), bananasInk(0xff55ff));
     if (this.nameEditIdx !== 1) {
-      bananasPixText(this.graphics, this.names[1] ?? 'PLAYER 2', 120, 202, 3, bananasInk(0xff55ff));
+      const name = this.names[1] ?? 'PLAYER 2';
+      const cell = name.length > 8 ? 2 : 3;
+      bananasPixText(this.graphics, name, 120, 202 + (cell === 2 ? 4 : 0), cell, bananasInk(0xff55ff));
     }
     bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[1]], 296, 206, 2, bananasInk(0xffffff));
 
