@@ -55,6 +55,8 @@ export class MenuScene extends Phaser.Scene {
   private graphics!: Phaser.GameObjects.Graphics;
   private retroBackdrop!: Phaser.GameObjects.Image;
   private hiresLogo!: Phaser.GameObjects.Image;
+  private miniTankBlue!: Phaser.GameObjects.Image;
+  private miniTankRed!: Phaser.GameObjects.Image;
   private view: 'main' | 'settings' = 'main';
 
   private slotKeys: Phaser.Input.Keyboard.Key[] = [];
@@ -82,6 +84,10 @@ export class MenuScene extends Phaser.Scene {
     this.hiresLogo = this.add.image(GAME_CONFIG.width / 2, 6, 'hires-logo').setOrigin(0.5, 0).setScale(0.22);
 
     this.graphics = this.add.graphics();
+
+    // Mini-tank images for hiRes player rows — created AFTER graphics so they render above
+    this.miniTankBlue = this.add.image(0, 0, 'hires-mini-tank-blue').setOrigin(0.5, 0.5).setScale(0.2).setVisible(false);
+    this.miniTankRed = this.add.image(0, 0, 'hires-mini-tank-red').setOrigin(0.5, 0.5).setScale(0.2).setVisible(false);
 
     const keyCodes = [
       Phaser.Input.Keyboard.KeyCodes.ONE,
@@ -490,8 +496,16 @@ export class MenuScene extends Phaser.Scene {
       }
       this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, 260);
     }
-    // Show logo only in hiRes main view
-    this.hiresLogo.visible = this.visualSystem === 'hiRes' && this.view === 'main';
+    // Show logo in hiRes on both main and settings views
+    this.hiresLogo.visible = this.visualSystem === 'hiRes';
+    if (this.hiresLogo.visible) {
+      this.hiresLogo.setOrigin(0, 0).setPosition(88, 10).setScale(0.2);
+    }
+
+    // Mini-tank sprites: visible only in hiRes main view
+    const showMiniTanks = this.visualSystem === 'hiRes' && this.view === 'main';
+    this.miniTankBlue.setVisible(showMiniTanks);
+    this.miniTankRed.setVisible(showMiniTanks);
 
     this.graphics.clear();
     if (this.visualSystem !== 'classic') {
@@ -507,21 +521,30 @@ export class MenuScene extends Phaser.Scene {
 
   private renderMain(): void {
     this.clearTexts();
+
+    if (this.visualSystem === 'retroPixel') {
+      this.renderMainRetro();
+    } else if (this.visualSystem === 'hiRes') {
+      this.renderMainHiRes();
+    } else {
+      this.renderMainClassic();
+    }
+  }
+
+  private renderMainClassic(): void {
     const colors = GAME_CONFIG.colors;
     const palette = this.menuPalette();
 
-    // Title (logo replaces text in hiRes)
-    if (this.visualSystem !== 'hiRes') {
-      this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
-      this.addCenteredText(60, 'MATCH SETUP', palette.subtitle, GAME_CONFIG.font.large);
-    }
+    // Title
+    this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
+    this.addCenteredText(60, 'MATCH SETUP', palette.subtitle, GAME_CONFIG.font.large);
 
     // Player rows (2-player only)
     const labels = ['PLAYER 1', 'PLAYER 2'];
     const rowYs = [140, 200];
-    const palettes = [getPlayerPalette(0, this.visualSystem).primary, getPlayerPalette(1, this.visualSystem).primary];
+    const palettes = [getPlayerPalette(0, 'classic').primary, getPlayerPalette(1, 'classic').primary];
     for (let i = 0; i < 2; i += 1) {
-      this.drawSlotRow(i, rowYs[i], labels[i], this.slots[i], palettes[i]);
+      this.drawSlotRowClassic(i, rowYs[i], labels[i], this.slots[i], palettes[i]);
     }
 
     // Hint
@@ -591,65 +614,159 @@ export class MenuScene extends Phaser.Scene {
     this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', palette.joinButton, GAME_CONFIG.font.medium);
   }
 
-  private renderSettings(): void {
-    this.clearTexts();
+  private renderMainRetro(): void {
     const colors = GAME_CONFIG.colors;
-    const palette = this.menuPalette();
 
-    // Title (logo replaces text in hiRes)
-    if (this.visualSystem !== 'hiRes') {
-      this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
-      this.addCenteredText(60, 'SETTINGS', palette.subtitle, GAME_CONFIG.font.large);
-    } else {
-      // hiRes settings: no title, but keep 'SETTINGS' at y=60 with hiRes styling
-      this.addCenteredText(60, 'SETTINGS', 0xffbe78, GAME_CONFIG.font.large, 'Barlow Condensed', 0);
-    }
+    // Title
+    this.addText(306, 20, 'CRATER COMMAND', 0xc68417, '28px', 'Courier New');
+    this.addText(400, 60, 'MATCH SETUP', colors.white, '24px', 'Courier New');
 
-    // Settings rows with labels and value buttons
-    const settingRows = [
-      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: palette.settingsValue },
-      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: palette.settingsValue },
-      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
-      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
-      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
-    ];
-
-    for (const row of settingRows) {
-      // Label on the left
-      this.addText(220, row.y + 8, row.label, palette.settingsLabel, GAME_CONFIG.font.medium);
-
-      // Value button on the right
-      const btn = this.settingsButtonForRow(row.y);
-      this.graphics.fillStyle(colors.panelDark, 1);
-      this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
-      this.graphics.lineStyle(2, row.color, 1);
-      this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
-      this.addText(btn.x + 16, btn.y + 8, row.value, row.color, GAME_CONFIG.font.medium);
-    }
-
-    // Back button
-    const backBtn = this.backButtonRect();
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
-    this.graphics.lineStyle(2, palette.backButton, 1);
-    this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
-    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK (ESC)', palette.backButton, GAME_CONFIG.font.large);
+    // Player rows
+    const p1Color = 0x238cff;
+    const p2Color = 0xff4b16;
+    this.drawSlotRowRetro(134, 'PLAYER 1', this.slots[0], p1Color);
+    this.drawSlotRowRetro(194, 'PLAYER 2', this.slots[1], p2Color);
 
     // Hint
-    this.addText(
-      GAME_CONFIG.width / 2 - 290,
-      452,
-      'Settings apply to local and hosted online matches',
-      palette.hint,
-      GAME_CONFIG.font.small
-    );
+    this.addText(310, 262, 'Tap name to rename · Tap box to cycle', 0xa8a8a8, '12px', 'Courier New');
+
+    // Start button
+    const startX = 310;
+    const startY = 300;
+    const startW = 334;
+    const startH = 40;
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(startX, startY, startW, startH);
+    this.graphics.lineStyle(3, 0xc68417, 1);
+    this.graphics.strokeRect(startX, startY, startW, startH);
+    this.addText(375, 310, 'START MATCH', 0xc68417, '28px', 'Courier New');
+
+    // Settings button
+    const settingsX = 310;
+    const settingsY = 366;
+    const settingsW = 336;
+    const settingsH = 32;
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(settingsX, settingsY, settingsW, settingsH);
+    this.graphics.lineStyle(2, 0xa8a8a8, 1);
+    this.graphics.strokeRect(settingsX, settingsY, settingsW, settingsH);
+    this.addText(440, 374, 'SETTINGS', 0xa8a8a8, '24px', 'Courier New');
+
+    // Visuals button
+    const visualsX = 310;
+    const visualsY = 410;
+    const visualsW = 336;
+    const visualsH = 24;
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(visualsX, visualsY, visualsW, visualsH);
+    this.graphics.lineStyle(2, 0xa8a8a8, 1);
+    this.graphics.strokeRect(visualsX, visualsY, visualsW, visualsH);
+    this.addText(400, 416, 'VISUALS: RETRO PIXEL', 0xa8a8a8, '18px', 'Courier New');
+
+    // Online buttons
+    const hostX = 220;
+    const hostY = 452;
+    const hostW = 236;
+    const hostH = 28;
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(hostX, hostY, hostW, hostH);
+    this.graphics.lineStyle(2, p1Color, 1);
+    this.graphics.strokeRect(hostX, hostY, hostW, hostH);
+    this.addText(270, 458, 'HOST ONLINE', p1Color, '18px', 'Courier New');
+
+    const joinX = 500;
+    const joinY = 452;
+    const joinW = 236;
+    const joinH = 28;
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(joinX, joinY, joinW, joinH);
+    this.graphics.lineStyle(2, p2Color, 1);
+    this.graphics.strokeRect(joinX, joinY, joinW, joinH);
+    this.addText(550, 458, 'JOIN ONLINE', p2Color, '18px', 'Courier New');
   }
 
-  private settingsButtonForRow(y: number): { x: number; y: number; w: number; h: number } {
-    return { x: 480, y, w: 260, h: 36 };
+  private renderMainHiRes(): void {
+    const colors = GAME_CONFIG.colors;
+
+    // Logo image is positioned in render() method — nothing drawn here
+
+    // MATCH SETUP label below logo
+    this.addText(90, 112, 'MATCH SETUP', 0xd8cfc4, '10px', 'JetBrains Mono', 3);
+
+    // Player rows — full-width cards with mini-tank sprites
+    this.drawSlotRowHiRes(0, 134, 'PLAYER 1', this.slots[0], getPlayerPalette(0, 'hiRes').primary);
+    this.drawSlotRowHiRes(1, 194, 'PLAYER 2', this.slots[1], getPlayerPalette(1, 'hiRes').primary);
+
+    // Hint line
+    this.addText(88, 262, '1 / 2 CYCLES CONTROLLER · ENTER STARTS', 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+
+    // Start button — large gold gradient
+    const startX = GAME_CONFIG.width / 2 - 170;
+    const startY = 300;
+    const startW = 340;
+    const startH = 46;
+    const canStart = this.canStart();
+    const buttonColor = canStart ? 0xffb347 : 0x666666;
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(startX, startY, startW, startH);
+    this.graphics.lineStyle(2, buttonColor, 1);
+    this.graphics.strokeRect(startX, startY, startW, startH);
+    this.addText(startX + 65, startY + 10, 'START MATCH', buttonColor, '21px', 'Barlow Condensed');
+
+    if (!canStart) {
+      this.addText(
+        GAME_CONFIG.width / 2 - 150,
+        352,
+        'Need at least 1 human player.',
+        colors.red,
+        '9px'
+      );
+    }
+
+    // Settings button
+    const settingsBtn = this.settingsButtonRect();
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
+    this.graphics.lineStyle(1, 0xd8cfc4, 0.5);
+    this.graphics.strokeRect(settingsBtn.x, settingsBtn.y, settingsBtn.w, settingsBtn.h);
+    this.addText(settingsBtn.x + 130, settingsBtn.y + 8, 'SETTINGS', 0xd8cfc4, '16px');
+
+    // Visuals row — draw inside hit rect
+    const visualsRect = this.visualsButtonRect();
+    this.graphics.fillStyle(0x120d09, 1);
+    this.graphics.fillRect(visualsRect.x, visualsRect.y, visualsRect.w, visualsRect.h);
+    this.graphics.lineStyle(1, 0x3a2d22, 1);
+    this.graphics.strokeRect(visualsRect.x, visualsRect.y, visualsRect.w, visualsRect.h);
+
+    this.addText(GAME_CONFIG.width / 2 - 156, 417, 'VISUALS', 0xd8cfc4, '9px', 'JetBrains Mono', 1.8);
+    const visualsLabel = this.visualSystem === 'hiRes' ? 'HI-RES' : 'RETRO PIXEL';
+    const visualsValueObj = this.add.text(0, 0, visualsLabel, {
+      color: Phaser.Display.Color.IntegerToColor(0xffb347).rgba,
+      fontFamily: 'JetBrains Mono',
+      fontSize: '9px'
+    });
+    visualsValueObj.setResolution(2);
+    const vw = visualsValueObj.width;
+    visualsValueObj.destroy();
+    this.addText(GAME_CONFIG.width / 2 + 156 - vw, 417, visualsLabel, 0xffb347, '9px', 'JetBrains Mono', 1.8);
+
+    // Online buttons
+    const host = this.hostButtonRect();
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(host.x, host.y, host.w, host.h);
+    this.graphics.lineStyle(1, 0x3f9dff, 0.5);
+    this.graphics.strokeRect(host.x, host.y, host.w, host.h);
+    this.addText(host.x + 50, host.y + 6, 'HOST ONLINE', 0x3f9dff, '12px');
+
+    const join = this.joinButtonRect();
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(join.x, join.y, join.w, join.h);
+    this.graphics.lineStyle(1, 0xff7a3c, 0.5);
+    this.graphics.strokeRect(join.x, join.y, join.w, join.h);
+    this.addText(join.x + 50, join.y + 6, 'JOIN ONLINE', 0xff7a3c, '12px');
   }
 
-  private drawSlotRow(idx: number, y: number, label: string, slot: Slot, accent: number): void {
+  private drawSlotRowClassic(idx: number, y: number, label: string, slot: Slot, accent: number): void {
     const colors = GAME_CONFIG.colors;
     const boxX = 280;
     const boxY = y - 6;
@@ -661,14 +778,214 @@ export class MenuScene extends Phaser.Scene {
     this.graphics.lineStyle(2, accent, 1);
     this.graphics.strokeRect(boxX, boxY, boxW, boxH);
 
-    // Player label is either the default "PLAYER N" or the custom name.
-    // Tappable area is x=100..280 (handlePointerDown).
     const customName = this.names[idx];
     const displayName = customName ?? label;
     this.addText(120, y, displayName, accent, GAME_CONFIG.font.large);
 
     this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
   }
+
+  private drawSlotRowRetro(y: number, label: string, slot: Slot, accent: number): void {
+    const boxX = 280;
+    const boxY = y;
+    const boxW = 396;
+    const boxH = 36;
+
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(boxX, boxY, boxW, boxH);
+    this.graphics.lineStyle(2, accent, 1);
+    this.graphics.strokeRect(boxX, boxY, boxW, boxH);
+
+    // Label on the left (outside the box in the design)
+    this.addText(120, y + 6, label, accent, '24px', 'Courier New');
+
+    // Value on the right inside the box
+    this.addText(296, y + 8, CONTROLLER_LABELS[slot], 0xffffff, '18px', 'Courier New');
+  }
+
+  private drawSlotRowHiRes(idx: number, y: number, label: string, slot: Slot, accent: number): void {
+    const boxX = 88;
+    const boxY = y;
+    const boxW = 784;
+    const boxH = 40;
+
+    // Card background with gradient
+    this.graphics.fillStyle(0x1a1408, 1);
+    this.graphics.fillRect(boxX, boxY, boxW, boxH);
+    this.graphics.lineStyle(1, 0x3f9dff, 0.34);
+    this.graphics.strokeRect(boxX, boxY, boxW, boxH);
+
+    // Mini-tank sprite
+    const tank = idx === 0 ? this.miniTankBlue : this.miniTankRed;
+    tank.setPosition(100, boxY + 6);
+    tank.setVisible(true);
+
+    // Player label
+    this.addText(boxX + 70, boxY + 12, label, accent, '16px', 'Barlow Condensed', 0.96);
+
+    // Helper text: row 1 = rename, row 2 = cycle
+    const helperText = idx === 0 ? 'TAP NAME TO RENAME' : 'TAP BOX TO CYCLE';
+    this.addText(boxX + 70, boxY + 28, helperText, 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+
+    // Right-aligned value chip: size from text width, right edge at x=856
+    const valueText = CONTROLLER_LABELS[slot];
+    const valueTextObj = this.add.text(0, 0, valueText, {
+      color: Phaser.Display.Color.IntegerToColor(accent).rgba,
+      fontFamily: 'JetBrains Mono',
+      fontSize: '10px'
+    });
+    valueTextObj.setResolution(2);
+    const textW = valueTextObj.width;
+    valueTextObj.destroy();
+    const chipW = textW + 20;
+    const chipX = 856 - chipW;
+    this.graphics.fillStyle(0x1a1408, 1);
+    this.graphics.fillRect(chipX, boxY + 6, chipW, 28);
+    this.graphics.lineStyle(1, accent, 0.5);
+    this.graphics.strokeRect(chipX, boxY + 6, chipW, 28);
+    this.addText(chipX + chipW / 2, boxY + 22, valueText, accent, '10px', 'JetBrains Mono', 1.6);
+  }
+
+  private renderSettings(): void {
+    this.clearTexts();
+
+    if (this.visualSystem === 'retroPixel') {
+      this.renderSettingsRetro();
+    } else if (this.visualSystem === 'hiRes') {
+      this.renderSettingsHiRes();
+    } else {
+      this.renderSettingsClassic();
+    }
+  }
+
+  private renderSettingsClassic(): void {
+    const colors = GAME_CONFIG.colors;
+    const palette = this.menuPalette();
+
+    this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
+    this.addCenteredText(60, 'SETTINGS', palette.subtitle, GAME_CONFIG.font.large);
+
+    const settingRows = [
+      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: palette.settingsValue },
+      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: palette.settingsValue },
+      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
+      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
+      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
+    ];
+
+    for (const row of settingRows) {
+      this.addText(220, row.y + 8, row.label, palette.settingsLabel, GAME_CONFIG.font.medium);
+      const btn = this.settingsButtonForRow(row.y);
+      this.graphics.fillStyle(colors.panelDark, 1);
+      this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
+      this.graphics.lineStyle(2, row.color, 1);
+      this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
+      this.addText(btn.x + 16, btn.y + 8, row.value, row.color, GAME_CONFIG.font.medium);
+    }
+
+    const backBtn = this.backButtonRect();
+    this.graphics.fillStyle(colors.panelDark, 1);
+    this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.graphics.lineStyle(2, palette.backButton, 1);
+    this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK (ESC)', palette.backButton, GAME_CONFIG.font.large);
+
+    this.addText(
+      GAME_CONFIG.width / 2 - 290,
+      452,
+      'Settings apply to local and hosted online matches',
+      palette.hint,
+      GAME_CONFIG.font.small
+    );
+  }
+
+  private renderSettingsRetro(): void {
+    this.addText(306, 20, 'CRATER COMMAND', 0xc68417, '28px', 'Courier New');
+    this.addText(400, 60, 'SETTINGS', 0xffffff, '24px', 'Courier New');
+
+    const settingRows = [
+      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label },
+      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]] },
+      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]] },
+      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]] },
+      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF' }
+    ];
+
+    for (const row of settingRows) {
+      this.addText(220, row.y + 8, row.label, 0xd8cfc4, '12px', 'Courier New');
+      const btn = this.settingsButtonForRow(row.y);
+      this.graphics.fillStyle(0x050505, 1);
+      this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
+      this.graphics.lineStyle(2, 0xc68417, 1);
+      this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
+      this.addText(btn.x + 16, btn.y + 8, row.value, 0xc68417, '12px', 'Courier New');
+    }
+
+    const backBtn = this.backButtonRect();
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.graphics.lineStyle(2, 0xa8a8a8, 1);
+    this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK (ESC)', 0xa8a8a8, '24px', 'Courier New');
+
+    this.addText(
+      GAME_CONFIG.width / 2 - 290,
+      452,
+      'Settings apply to local and hosted matches',
+      0x8a8a8a,
+      '10px',
+      'Courier New'
+    );
+  }
+
+  private renderSettingsHiRes(): void {
+    // Logo image is positioned in render() method — nothing drawn here
+
+    // SETTINGS label below logo
+    this.addText(90, 112, 'SETTINGS', 0xd8cfc4, '10px', 'JetBrains Mono', 3);
+
+    const settingRows = [
+      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, hint: '(B)' },
+      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], hint: '(W)' },
+      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], hint: '(G)' },
+      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], hint: '(A)' },
+      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', hint: '(F)' }
+    ];
+
+    for (const row of settingRows) {
+      this.addText(88, row.y + 8, row.label, 0xd8cfc4, '10px', 'Barlow Condensed', 0.96);
+      this.addText(260, row.y + 8, row.hint, 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+      const btn = this.settingsButtonForRow(row.y);
+      this.graphics.fillStyle(0x050505, 1);
+      this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
+      this.graphics.lineStyle(1, 0xffb347, 0.5);
+      this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
+      this.addText(btn.x + 16, btn.y + 8, row.value, 0xffb347, '9px', 'JetBrains Mono');
+    }
+
+    const backBtn = this.backButtonRect();
+    this.graphics.fillStyle(0x050505, 1);
+    this.graphics.fillRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.graphics.lineStyle(1, 0xd8cfc4, 0.5);
+    this.graphics.strokeRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h);
+    this.addText(backBtn.x + 60, backBtn.y + 8, 'BACK', 0xd8cfc4, '12px');
+    this.addText(backBtn.x + 180, backBtn.y + 8, '(ESC)', 0x8a8078, '9px', 'JetBrains Mono', 1.8);
+
+    this.addText(
+      88,
+      452,
+      'Settings apply to local and hosted matches',
+      0x8a8078,
+      '9px',
+      'JetBrains Mono',
+      1.8
+    );
+  }
+
+  private settingsButtonForRow(y: number): { x: number; y: number; w: number; h: number } {
+    return { x: 480, y, w: 260, h: 36 };
+  }
+
 
   private addText(
     x: number,
