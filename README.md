@@ -13,6 +13,16 @@ sprite art), and **Hi-Res** (4× remastered sprites, sprite ballistics and blast
 animations, gradient terrain, a glass-panel HUD with real typography, and a
 logo wordmark).
 
+Plus a fourth entry on the VISUALS cycle that is a whole different game:
+**BANANAS** — a QBasic-era artillery homage. Apes on a procedurally
+generated city skyline, one exploding banana that spins through the air,
+one-hit kills, a smiling sun that gapes when a banana flies too close, and
+no shop, no items, no walking. Entirely code-drawn in the EGA 16-color
+palette; in a Bananas match `V` cycles the display instead — 16-COLOR →
+AMBER → GREEN → WHITE, the last three strict two-tone phosphor-monitor
+looks. Online, the host's mode decides the game for both players; the
+display choice stays personal.
+
 ## Screenshots
 
 **Hi-Res**
@@ -99,7 +109,7 @@ physics settings carry over from the host's menu selections.
 | B | Use battery (heal) |
 | X | Arm a shield |
 | C | Cycle guidance system |
-| V | Cycle visual mode (classic / retro pixel / hi-res) |
+| V | Cycle visual mode in Scorched matches (classic / retro pixel / hi-res); cycle the display in Bananas matches (16-color / amber / green / white) |
 | F10 | Sound on/off |
 | ESC | Forfeit / menu |
 
