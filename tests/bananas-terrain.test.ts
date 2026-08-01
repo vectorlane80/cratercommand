@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+// Pinned against the design mock's xorshift32 stream (seed 90210) — a wrong
+// port would still be self-consistent, so determinism alone can't catch it.
+const MOCK_STREAM_90210 = [0.6784054571762681, 0.5472011861857027, 0.1378268119879067, 0.1302190322894603];
 import { TerrainSystem, bananasRng, bananasBuildings } from '../src/game/systems/TerrainSystem';
 import { GAME_CONFIG } from '../src/game/types/GameTypes';
 
@@ -16,6 +19,22 @@ describe('Bananas terrain', () => {
       expect(output).toBeGreaterThanOrEqual(0);
       expect(output).toBeLessThan(1);
     });
+  });
+
+  it('bananasRng reproduces the design mock stream exactly (seed 90210)', () => {
+    const rand = bananasRng(90210);
+    MOCK_STREAM_90210.forEach((expected) => {
+      expect(rand()).toBe(expected);
+    });
+  });
+
+  it('first buildings match the mock exactly for seed 90210: w 101 h 202, then w 68 h 140', () => {
+    const buildings = bananasBuildings(90210, 960);
+    expect(buildings[0].w).toBe(101);
+    expect(buildings[0].roof).toBe(356 - 202);
+    expect(buildings[1].x).toBe(101);
+    expect(buildings[1].w).toBe(68);
+    expect(buildings[1].roof).toBe(356 - 140);
   });
 
   it('bananasBuildings covers the skyline with preview dimensions and metadata', () => {
