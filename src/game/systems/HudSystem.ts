@@ -110,9 +110,13 @@ export class HudSystem {
 
   private uiPalette(visualSystem: VisualSystem) {
     const c = GAME_CONFIG.colors;
-    return visualSystem === 'retroPixel'
-      ? { frame: c.steelLight, title: c.desertGold, accent: c.desertGold, header: c.desertGold, label: c.white }
-      : { frame: c.yellow, title: c.magenta, accent: c.cyan, header: c.cyan, label: c.cyan };
+    if (visualSystem === 'retroPixel') {
+      return { frame: c.steelLight, title: c.desertGold, accent: c.desertGold, header: c.desertGold, label: c.white };
+    }
+    if (visualSystem === 'hiRes') {
+      return { frame: 0xffbe78, title: 0xffb347, accent: 0xff7a3c, header: 0xffb347, label: 0xf4ece2 };
+    }
+    return { frame: c.yellow, title: c.magenta, accent: c.cyan, header: c.cyan, label: c.cyan };
   }
 
   render(
@@ -231,7 +235,7 @@ export class HudSystem {
       this.graphics.strokePath();
 
       // Heading in orange/coral
-      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', 0xff8a6c, 'bold 22px Barlow Condensed');
+      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', 0xff8a6c, '22px', 'Barlow Condensed', undefined, { weight: '700' });
 
       // Body in mono
       this.addTextCenteredMono(cx, cardY + 80, 'Return to the menu?', 0xffffff, '10px');
@@ -266,11 +270,11 @@ export class HudSystem {
       this.graphics.strokeRect(cardX, cardY, cardW, cardH);
 
       // Title in desertGold
-      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', colors.desertGold, '24px Courier New');
+      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', colors.desertGold, '24px', 'Courier New', undefined, { weight: '700' });
 
       // Body in white/yellow
-      this.addTextCentered(cx, cardY + 80, 'Return to the menu?', colors.white, '18px Courier New');
-      this.addTextCentered(cx, cardY + 108, 'This counts as a forfeit.', colors.yellow, '18px Courier New');
+      this.addTextCentered(cx, cardY + 80, 'Return to the menu?', colors.white, '18px', 'Courier New', undefined, { weight: '400' });
+      this.addTextCentered(cx, cardY + 108, 'This counts as a forfeit.', colors.yellow, '18px', 'Courier New', undefined, { weight: '400' });
 
       // YES button: red border
       const btnH = 44;
@@ -284,14 +288,14 @@ export class HudSystem {
       this.graphics.fillRect(yesX, btnY, btnW, btnH);
       this.graphics.lineStyle(2, colors.red, 1);
       this.graphics.strokeRect(yesX, btnY, btnW, btnH);
-      this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, '18px Courier New');
+      this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, '18px', 'Courier New', undefined, { weight: '700' });
 
       // NO button: green border
       this.graphics.fillStyle(0x050505, 1);
       this.graphics.fillRect(noX, btnY, btnW, btnH);
       this.graphics.lineStyle(2, colors.green, 1);
       this.graphics.strokeRect(noX, btnY, btnW, btnH);
-      this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, '18px Courier New');
+      this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, '18px', 'Courier New', undefined, { weight: '700' });
 
     } else {
       // Classic: byte-identical
@@ -339,37 +343,72 @@ export class HudSystem {
     }
   }
 
-  private addTextCentered(cx: number, y: number, value: string, color: number, fontSize: string): void {
+  private addTextCentered(cx: number, y: number, value: string, color: number, fontSize: string, fontFamily?: string, letterSpacing?: number, opts?: { alpha?: number; originX?: number; originY?: number; weight?: '400' | '600' | '700' }): void {
+    let fontStyle: string = 'bold';
+    if (opts?.weight === '400') {
+      fontStyle = '';
+    } else if (opts?.weight === '600') {
+      fontStyle = '600';
+    }
+
     const text = this.scene.add.text(cx, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
-      fontFamily: GAME_CONFIG.font.family,
+      fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
-      fontStyle: 'bold'
+      fontStyle
     });
-    text.setOrigin(0.5, 0);
+    text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
     text.setResolution(2);
+    if (letterSpacing !== undefined) {
+      text.setLetterSpacing(letterSpacing);
+    }
+    if (opts?.alpha !== undefined) {
+      text.setAlpha(opts.alpha);
+    }
     this.texts.push(text);
   }
 
-  private addTextCenteredMono(cx: number, y: number, value: string, color: number, fontSize: string): void {
+  private addTextCenteredMono(cx: number, y: number, value: string, color: number, fontSize: string, opts?: { alpha?: number; originX?: number; originY?: number; weight?: '400' | '600' | '700' }): void {
+    let fontStyle: string = '';
+    if (opts?.weight === '600') {
+      fontStyle = '600';
+    } else if (opts?.weight === '700') {
+      fontStyle = 'bold';
+    }
+
     const text = this.scene.add.text(cx, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
       fontFamily: 'JetBrains Mono',
-      fontSize
+      fontSize,
+      fontStyle
     });
-    text.setOrigin(0.5, 0);
+    text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
     text.setResolution(2);
+    if (opts?.alpha !== undefined) {
+      text.setAlpha(opts.alpha);
+    }
     this.texts.push(text);
   }
 
-  private addTextCenteredBarlow(cx: number, y: number, value: string, color: number, fontSize: string): void {
+  private addTextCenteredBarlow(cx: number, y: number, value: string, color: number, fontSize: string, opts?: { alpha?: number; originX?: number; originY?: number; weight?: '400' | '600' | '700' }): void {
+    let fontStyle: string = 'bold';
+    if (opts?.weight === '400') {
+      fontStyle = '';
+    } else if (opts?.weight === '600') {
+      fontStyle = '600';
+    }
+
     const text = this.scene.add.text(cx, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
       fontFamily: 'Barlow Condensed',
-      fontSize
+      fontSize,
+      fontStyle
     });
-    text.setOrigin(0.5, 0);
+    text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
     text.setResolution(2);
+    if (opts?.alpha !== undefined) {
+      text.setAlpha(opts.alpha);
+    }
     this.texts.push(text);
   }
 
@@ -901,9 +940,9 @@ export class HudSystem {
       this.graphics.strokePath();
 
       // Headline in Barlow700
-      this.addText(x + 24, y + 20, line1, 0xffbe78, 'bold 24px Barlow Condensed');
+      this.addText(x + 24, y + 20, line1, 0xffbe78, '24px', 'Barlow Condensed', undefined, { weight: '700' });
       // Sub-line in mono
-      this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px JetBrains Mono');
+      this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px', 'JetBrains Mono');
     } else {
       // Classic and retro-pixel: original treatment
       this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.82);
@@ -1125,18 +1164,33 @@ export class HudSystem {
     color: number,
     fontSize: string,
     fontFamily?: string,
-    letterSpacing?: number
+    letterSpacing?: number,
+    opts?: { alpha?: number; originX?: number; originY?: number; weight?: '400' | '600' | '700' }
   ): void {
+    // Convert weight to fontStyle: '400' → '', '600' → '600', '700' → 'bold' (default)
+    let fontStyle: string = 'bold';
+    if (opts?.weight === '400') {
+      fontStyle = '';
+    } else if (opts?.weight === '600') {
+      fontStyle = '600';
+    }
+
     const text = this.scene.add.text(x, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
       fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
-      fontStyle: 'bold'
+      fontStyle
     });
     // Higher resolution makes text crisp under Phaser scale.zoom + CSS scale.
     text.setResolution(2);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
+    }
+    if (opts?.alpha !== undefined) {
+      text.setAlpha(opts.alpha);
+    }
+    if (opts?.originX !== undefined || opts?.originY !== undefined) {
+      text.setOrigin(opts?.originX ?? 0, opts?.originY ?? 0);
     }
     this.texts.push(text);
   }
@@ -1260,13 +1314,16 @@ export class HudSystem {
     // Fire panel: rect (626, top+28, 108, 52) with gradient, FIRE at (680, top+44), SPACE/CLICK at (680, top+96)
     this.drawHiResPanelFrame(610, top + 8, 140, 122, '');
     const fireAlpha = turn.phase === 'aiming' ? 1 : 0.35;
+    // FIRE key button: draw at exactly hit rect (632, top+36, 94, 58)
     this.graphics.fillGradientStyle(0xff7043, 0xff7043, 0xc22c0c, 0xc22c0c, fireAlpha);
-    this.graphics.fillRoundedRect(626, top + 28, 108, 52, 6);
+    this.graphics.fillRoundedRect(632, top + 36, 94, 58, 4);
     this.graphics.lineStyle(1, 0xff9a73, 0.5);
-    this.graphics.strokeRoundedRect(626, top + 28, 108, 52, 6);
+    this.graphics.strokeRoundedRect(632, top + 36, 94, 58, 4);
     const fireTextColor = turn.phase === 'aiming' ? 0xfff1e8 : 0x999999;
-    this.addText(680, top + 44, 'FIRE', fireTextColor, '22px', 'Barlow Condensed');
-    this.addText(680, top + 96, 'SPACE / CLICK', 0xf4ece2, '8px', 'JetBrains Mono', 2);
+    // Center FIRE label within the rect
+    this.addText(679, top + 55, 'FIRE', fireTextColor, '22px', 'Barlow Condensed', undefined, { originX: 0.5, originY: 0.5 });
+    // Center SPACE / CLICK below FIRE inside the panel
+    this.addText(679, top + 81, 'SPACE / CLICK', 0xf4ece2, '8px', 'JetBrains Mono', 2, { originX: 0.5 });
 
     // Status panel: title at (770, top+14), rows with labels at x 770, values right-aligned to x 938
     this.drawHiResPanelFrame(756, top + 8, 196, 122, '');
@@ -1292,12 +1349,14 @@ export class HudSystem {
     this.addText(598, stripY + 3, statusText, statusColor, '9px', 'JetBrains Mono');
     this.addText(598, stripY + 15, weapon.name.toUpperCase(), 0xf4ece2, '9px', 'JetBrains Mono');
 
-    // ESC MENU chip: (820, stripY+2, 130, 22)
+    // ESC MENU chip: draw at exactly hit rect (820, stripY+2, 130, 22)
+    // where stripY = GAME_CONFIG.layout.bottomStatusTop - 5
+    const chipStripY = GAME_CONFIG.layout.bottomStatusTop - 5;
     this.graphics.fillStyle(0x1a0d0a, 1);
-    this.graphics.fillRoundedRect(820, stripY + 2, 130, 22, 3);
+    this.graphics.fillRoundedRect(820, chipStripY + 2, 130, 22, 3);
     this.graphics.lineStyle(1, 0xff5a3c, 0.7);
-    this.graphics.strokeRoundedRect(820, stripY + 2, 130, 22, 3);
-    this.addText(885, stripY + 7, 'ESC MENU', 0xff8a6c, '9px', 'JetBrains Mono');
+    this.graphics.strokeRoundedRect(820, chipStripY + 2, 130, 22, 3);
+    this.addText(885, chipStripY + 12, 'ESC MENU', 0xff8a6c, '9px', 'JetBrains Mono', undefined, { originX: 0.5, originY: 0.5 });
   }
 
 
@@ -1345,7 +1404,7 @@ export class HudSystem {
 
   private drawHiResWeaponRows(x: number, y: number, tank: TankState, weaponWindowStart: number): void {
     const weapons = GAME_CONFIG.weapons;
-    for (let i = 0; i < 3 && weaponWindowStart + i < weapons.length; i += 1) {
+    for (let i = 0; i < WEAPON_WINDOW_SIZE && weaponWindowStart + i < weapons.length; i += 1) {
       const w = weapons[weaponWindowStart + i];
       const idx = weaponWindowStart + i;
       const isSelected = idx === tank.selectedWeaponIndex;

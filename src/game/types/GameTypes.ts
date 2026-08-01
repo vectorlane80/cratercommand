@@ -294,6 +294,10 @@ export const GAME_CONFIG = {
       retroPixel: {
         label: 'Retro Pixel',
         toggleHint: 'V Visual: Retro Pixel'
+      },
+      hiRes: {
+        label: 'Hi-Res',
+        toggleHint: 'V Visual: Hi-Res'
       }
     }
   },

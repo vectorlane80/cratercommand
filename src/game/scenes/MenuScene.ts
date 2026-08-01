@@ -994,17 +994,31 @@ export class MenuScene extends Phaser.Scene {
     color: number,
     fontSize: string,
     fontFamily?: string,
-    letterSpacing?: number
+    letterSpacing?: number,
+    opts?: { alpha?: number; originX?: number; originY?: number; weight?: '400' | '600' | '700' }
   ): void {
+    let fontStyle: string = 'bold';
+    if (opts?.weight === '400') {
+      fontStyle = '';
+    } else if (opts?.weight === '600') {
+      fontStyle = '600';
+    }
+
     const text = this.add.text(x, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
       fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
-      fontStyle: 'bold'
+      fontStyle
     });
     text.setResolution(2);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
+    }
+    if (opts?.alpha !== undefined) {
+      text.setAlpha(opts.alpha);
+    }
+    if (opts?.originX !== undefined || opts?.originY !== undefined) {
+      text.setOrigin(opts?.originX ?? 0, opts?.originY ?? 0);
     }
     this.texts.push(text);
   }
@@ -1015,18 +1029,29 @@ export class MenuScene extends Phaser.Scene {
     color: number,
     fontSize: string,
     fontFamily?: string,
-    letterSpacing?: number
+    letterSpacing?: number,
+    opts?: { alpha?: number; originX?: number; originY?: number; weight?: '400' | '600' | '700' }
   ): void {
+    let fontStyle: string = 'bold';
+    if (opts?.weight === '400') {
+      fontStyle = '';
+    } else if (opts?.weight === '600') {
+      fontStyle = '600';
+    }
+
     const text = this.add.text(GAME_CONFIG.width / 2, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
       fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
-      fontStyle: 'bold'
+      fontStyle
     });
-    text.setOrigin(0.5, 0);
+    text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
     text.setResolution(2);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
+    }
+    if (opts?.alpha !== undefined) {
+      text.setAlpha(opts.alpha);
     }
     this.texts.push(text);
   }

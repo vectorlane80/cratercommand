@@ -257,8 +257,8 @@ export class GameScene extends Phaser.Scene {
 
     // HiRes-mode player card mini-tanks (for the top bar).
     this.hiresPlayerCards = [
-      this.add.image(24, 44, 'hires-mini-tank-blue').setOrigin(0, 0).setScale(0.25),
-      this.add.image(776, 44, 'hires-mini-tank-red').setOrigin(0, 0).setScale(0.25)
+      this.add.image(24, 24, 'hires-mini-tank-blue').setOrigin(0, 0).setScale(0.4).setDepth(1),
+      this.add.image(874, 24, 'hires-mini-tank-red').setOrigin(0, 0).setScale(0.4).setDepth(1)
     ];
 
     this.applyVisualLayerTextures();
