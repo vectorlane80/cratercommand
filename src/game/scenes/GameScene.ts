@@ -2106,15 +2106,7 @@ export class GameScene extends Phaser.Scene {
       });
 
       // Position tank sprites at each tank's current position.
-      this.tanks.forEach((tank, idx) => {
-        const tankImg = this.retroTankBodies[idx];
-        if (!tankImg) return;
-        if (!tank.alive) {
-          tankImg.visible = false;
-          return;
-        }
-        tankImg.setPosition(Math.round(tank.x), Math.round(tank.y) + 2);
-      });
+      this.syncTankBodySprites();
 
       // HiRes rocks: position them along terrain
       if (hiRes) {
@@ -2146,6 +2138,26 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Keep the retro/hi-res tank body sprites glued to the simulated tanks.
+   * Must run on every tank re-render, not just full renderAll passes —
+   * movement re-renders via renderTanksAndHud, and syncing only in
+   * updateRetroLayerVisibility left the body behind while the barrel moved.
+   */
+  private syncTankBodySprites(): void {
+    if (this.visualSystem === 'classic') return;
+    this.tanks.forEach((tank, idx) => {
+      const tankImg = this.retroTankBodies[idx];
+      if (!tankImg) return;
+      if (!tank.alive) {
+        tankImg.visible = false;
+        return;
+      }
+      tankImg.visible = true;
+      tankImg.setPosition(Math.round(tank.x), Math.round(tank.y) + 2);
+    });
+  }
+
   private renderTanksAndHud(): void {
     // Clear expired fall toast before rendering.
     if (this.topToast && Date.now() > this.topToast.expiresAt) {
@@ -2154,6 +2166,7 @@ export class GameScene extends Phaser.Scene {
     // Host broadcasts a snapshot every time the state would re-render.
     if (this.isOnlineHost) this.broadcastSnapshot();
     this.tankSystem.draw(this.tankGraphics, this.tanks, this.turn.activePlayerId, this.visualSystem);
+    this.syncTankBodySprites();
 
     // Position hiRes barrel and chute sprites.
     if (this.visualSystem === 'hiRes') {
