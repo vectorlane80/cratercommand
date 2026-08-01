@@ -1247,24 +1247,36 @@ export class HudSystem {
   private drawHiResKeycapChips(top: number): void {
     const chipY1 = top + 144;
     const chipY2 = top + 162;
+    const chipH = 16;
+    const chipPadding = 8;
+    const gapAfterChip = 10;
+    const gapAfterDesc = 12;
     let currentX = 16;
 
     // Helper to draw a keycap chip
     const drawChip = (keyText: string, descText: string, yPos: number) => {
-      const chipW = keyText.length * 9 + 8;
-      const chipH = 16;
-      // Chip background
+      // Create key-token text and measure its actual width
+      this.addText(currentX + 4, yPos, keyText, 0xffd9a0, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
+      const keyToken = this.texts[this.texts.length - 1];
+      const tokenW = keyToken.width;
+
+      // Draw chip rect using actual width
+      const chipW = tokenW + chipPadding;
       this.graphics.fillStyle(0x1a140f, 1);
       this.graphics.fillRoundedRect(currentX, yPos - 2, chipW, chipH, 3);
       this.graphics.lineStyle(1, 0xffbe78, 0.25);
       this.graphics.strokeRoundedRect(currentX, yPos - 2, chipW, chipH, 3);
-      // Key text
-      this.addText(currentX + 4, yPos, keyText, 0xffd9a0, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
-      currentX += chipW + 10;
-      // Description text
-      const descW = descText.length * 6 + 2;
+
+      // Advance past chip
+      currentX += chipW + gapAfterChip;
+
+      // Create description text and measure its actual width
       this.addText(currentX, yPos, descText, 0x8a8078, GAME_CONFIG.font.small, 'JetBrains Mono', 1);
-      currentX += descW + 10;
+      const descToken = this.texts[this.texts.length - 1];
+      const descW = descToken.width;
+
+      // Advance past description with gap before next chip
+      currentX += descW + gapAfterDesc;
     };
 
     // Line 1

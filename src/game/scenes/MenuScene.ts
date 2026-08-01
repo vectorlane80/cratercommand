@@ -54,6 +54,7 @@ export class MenuScene extends Phaser.Scene {
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
   private retroBackdrop!: Phaser.GameObjects.Image;
+  private hiresLogo!: Phaser.GameObjects.Image;
   private view: 'main' | 'settings' = 'main';
 
   private slotKeys: Phaser.Input.Keyboard.Key[] = [];
@@ -76,6 +77,9 @@ export class MenuScene extends Phaser.Scene {
     // Retro backdrop — created first so it layers under graphics/text
     this.retroBackdrop = this.add.image(GAME_CONFIG.width / 2, 0, 'retro-backdrop').setOrigin(0.5, 0);
     this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, 260);
+
+    // HiRes logo wordmark — visible only in hiRes
+    this.hiresLogo = this.add.image(GAME_CONFIG.width / 2, 6, 'hires-logo').setOrigin(0.5, 0).setScale(0.22);
 
     this.graphics = this.add.graphics();
 
@@ -394,7 +398,22 @@ export class MenuScene extends Phaser.Scene {
         settingsValue: c.desertGold
       };
     }
-    // hiRes uses classic palette for now
+    if (this.visualSystem === 'hiRes') {
+      return {
+        title: 0xffbe78,
+        subtitle: 0xffbe78,
+        hint: 0x8a8078,
+        startButton: 0xffb347,
+        settingsButton: 0xd8cfc4,
+        backButton: 0xd8cfc4,
+        visualsButton: 0xd8cfc4,
+        hostButton: 0x3f9dff,
+        joinButton: 0xff7a3c,
+        settingsLabel: 0xd8cfc4,
+        settingsValue: 0xffb347
+      };
+    }
+    // Classic mode palette
     return {
       title: c.magenta,
       subtitle: c.cyan,
@@ -460,9 +479,22 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private render(): void {
-    this.retroBackdrop.visible = this.visualSystem === 'retroPixel';
+    // Apply backdrop image based on visual mode
+    const showBackdrop = this.visualSystem !== 'classic';
+    this.retroBackdrop.visible = showBackdrop;
+    if (showBackdrop) {
+      if (this.visualSystem === 'retroPixel') {
+        this.retroBackdrop.setTexture('retro-backdrop');
+      } else if (this.visualSystem === 'hiRes') {
+        this.retroBackdrop.setTexture('hires-backdrop');
+      }
+      this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, 260);
+    }
+    // Show logo only in hiRes main view
+    this.hiresLogo.visible = this.visualSystem === 'hiRes' && this.view === 'main';
+
     this.graphics.clear();
-    if (this.visualSystem === 'retroPixel') {
+    if (this.visualSystem !== 'classic') {
       this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.45);
       this.graphics.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
     }
@@ -478,9 +510,11 @@ export class MenuScene extends Phaser.Scene {
     const colors = GAME_CONFIG.colors;
     const palette = this.menuPalette();
 
-    // Title
-    this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
-    this.addCenteredText(60, 'MATCH SETUP', palette.subtitle, GAME_CONFIG.font.large);
+    // Title (logo replaces text in hiRes)
+    if (this.visualSystem !== 'hiRes') {
+      this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
+      this.addCenteredText(60, 'MATCH SETUP', palette.subtitle, GAME_CONFIG.font.large);
+    }
 
     // Player rows (2-player only)
     const labels = ['PLAYER 1', 'PLAYER 2'];
@@ -562,9 +596,14 @@ export class MenuScene extends Phaser.Scene {
     const colors = GAME_CONFIG.colors;
     const palette = this.menuPalette();
 
-    // Title
-    this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
-    this.addCenteredText(60, 'SETTINGS', palette.subtitle, GAME_CONFIG.font.large);
+    // Title (logo replaces text in hiRes)
+    if (this.visualSystem !== 'hiRes') {
+      this.addCenteredText(20, 'CRATER COMMAND', palette.title, GAME_CONFIG.font.title);
+      this.addCenteredText(60, 'SETTINGS', palette.subtitle, GAME_CONFIG.font.large);
+    } else {
+      // hiRes settings: no title, but keep 'SETTINGS' at y=60 with hiRes styling
+      this.addCenteredText(60, 'SETTINGS', 0xffbe78, GAME_CONFIG.font.large, 'Barlow Condensed', 0);
+    }
 
     // Settings rows with labels and value buttons
     const settingRows = [
@@ -631,26 +670,47 @@ export class MenuScene extends Phaser.Scene {
     this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
   }
 
-  private addText(x: number, y: number, value: string, color: number, fontSize: string): void {
+  private addText(
+    x: number,
+    y: number,
+    value: string,
+    color: number,
+    fontSize: string,
+    fontFamily?: string,
+    letterSpacing?: number
+  ): void {
     const text = this.add.text(x, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
-      fontFamily: GAME_CONFIG.font.family,
+      fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
       fontStyle: 'bold'
     });
     text.setResolution(2);
+    if (letterSpacing !== undefined) {
+      text.setLetterSpacing(letterSpacing);
+    }
     this.texts.push(text);
   }
 
-  private addCenteredText(y: number, value: string, color: number, fontSize: string): void {
+  private addCenteredText(
+    y: number,
+    value: string,
+    color: number,
+    fontSize: string,
+    fontFamily?: string,
+    letterSpacing?: number
+  ): void {
     const text = this.add.text(GAME_CONFIG.width / 2, y, value, {
       color: Phaser.Display.Color.IntegerToColor(color).rgba,
-      fontFamily: GAME_CONFIG.font.family,
+      fontFamily: fontFamily ?? GAME_CONFIG.font.family,
       fontSize,
       fontStyle: 'bold'
     });
     text.setOrigin(0.5, 0);
     text.setResolution(2);
+    if (letterSpacing !== undefined) {
+      text.setLetterSpacing(letterSpacing);
+    }
     this.texts.push(text);
   }
 
