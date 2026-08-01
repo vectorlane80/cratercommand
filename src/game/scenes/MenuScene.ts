@@ -42,9 +42,12 @@ const SLOT_CYCLE_REQUIRED: ControllerKind[] = CONTROLLER_CYCLE; // human + CPU p
 export class MenuScene extends Phaser.Scene {
   private slots: Slot[] = ['human', 'cpu-tosser'];
   // Per-slot display names. null means "use default (PLAYER N)". Set via
-  // tap on the label to the left of the controller box, which fires
-  // window.prompt() for input.
+  // tap on the label to the left of the controller box, which opens an
+  // in-page text input overlaid on the row (no browser prompt).
   private names: Array<string | null> = [null, null];
+  private nameEditInput: HTMLInputElement | null = null;
+  private nameEditIdx = -1;
+  private captureCodes: number[] = [];
   private matchLengthIndex = 0; // index into MATCH_LENGTHS, default first
   private wallModeIndex = 0; // index into WALL_MODES, default first
   private gravityIndex = GRAVITY_STEPS.indexOf(PHYSICS_DEFAULTS.gravity);
@@ -103,7 +106,7 @@ export class MenuScene extends Phaser.Scene {
     this.gKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G);
     this.aKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.fKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
-    this.input.keyboard!.addCapture([
+    this.captureCodes = [
       ...keyCodes,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
       Phaser.Input.Keyboard.KeyCodes.ENTER,
@@ -113,9 +116,18 @@ export class MenuScene extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.G,
       Phaser.Input.Keyboard.KeyCodes.A,
       Phaser.Input.Keyboard.KeyCodes.F
-    ]);
+    ];
+    this.input.keyboard!.addCapture(this.captureCodes);
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
+
+    // The rename editor is a DOM element; make sure it never outlives the scene.
+    this.events.once('shutdown', () => {
+      if (this.nameEditInput) {
+        this.nameEditInput.remove();
+        this.nameEditInput = null;
+      }
+    });
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.worldX, p.worldY));
 
@@ -192,17 +204,93 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Open a browser prompt asking for a display name for slot `idx`.
-   * Empty / cancelled → revert to default. Names are trimmed and capped
-   * at MAX_NAME_LEN characters to keep them fitting in the HUD.
+   * Open an in-page text input over slot `idx`'s name label (same DOM-overlay
+   * idiom as LobbyScene — a window.prompt() here yanked focus out of the
+   * game). Enter/blur commits, ESC cancels; empty reverts to the default.
+   * Names are trimmed and capped at MAX_NAME_LEN to keep them fitting in
+   * the HUD. Phaser's keyboard is disabled while the editor is open: the
+   * menu's key captures preventDefault at the window level, which would
+   * otherwise swallow B/W/G/A/F/1/2/space while typing.
    */
-  private promptForName(idx: number): void {
-    const current = this.names[idx] ?? '';
-    const input = window.prompt(`Name for Player ${idx + 1} (leave blank for default):`, current);
-    if (input === null) return; // cancelled
-    const trimmed = input.trim().slice(0, MAX_NAME_LEN);
-    this.names[idx] = trimmed.length > 0 ? trimmed : null;
-    soundSystem.playUiClick();
+  private openNameEditor(idx: number): void {
+    if (this.nameEditInput) this.closeNameEditor(false);
+    this.nameEditIdx = idx;
+    this.input.keyboard!.enabled = false;
+    this.input.keyboard!.clearCaptures();
+    // Redraw with this row's name hidden so it doesn't poke out from
+    // beneath the editor.
+    this.render();
+
+    const accent = this.nameEditorAccent(idx);
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = this.names[idx] ?? '';
+    input.placeholder = `PLAYER ${idx + 1}`;
+    input.maxLength = MAX_NAME_LEN;
+    input.spellcheck = false;
+    input.autocomplete = 'off';
+    input.style.position = 'fixed';
+    input.style.padding = '2px 8px';
+    input.style.fontFamily = this.visualSystem === 'hiRes' ? '"Barlow Condensed", sans-serif' : GAME_CONFIG.font.family;
+    input.style.fontWeight = 'bold';
+    input.style.color = '#ffffff';
+    input.style.background = '#101014';
+    input.style.border = `2px solid ${accent}`;
+    input.style.outline = 'none';
+    input.style.boxSizing = 'border-box';
+    input.style.zIndex = '1000';
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.closeNameEditor(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeNameEditor(false);
+      }
+    });
+    input.addEventListener('blur', () => this.closeNameEditor(true));
+    document.body.appendChild(input);
+    this.nameEditInput = input;
+
+    // Place it over the name-label tap zone (world 100..238 across the row).
+    const rect = this.game.canvas.getBoundingClientRect();
+    const sx = rect.width / GAME_CONFIG.width;
+    const sy = rect.height / GAME_CONFIG.height;
+    const row = this.slotRowRects()[idx];
+    input.style.left = `${rect.left + 100 * sx}px`;
+    input.style.top = `${rect.top + (row.y + 6) * sy}px`;
+    input.style.width = `${138 * sx}px`;
+    input.style.height = `${(row.h - 12) * sy}px`;
+    input.style.fontSize = `${18 * sy}px`;
+
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+  }
+
+  private nameEditorAccent(idx: number): string {
+    if (this.visualSystem === 'retroPixel') return idx === 0 ? '#238cff' : '#ff4b16';
+    if (this.visualSystem === 'hiRes') return idx === 0 ? '#5aa9ff' : '#ff8a4c';
+    return idx === 0 ? '#00ffff' : '#ff00ff';
+  }
+
+  private closeNameEditor(commit: boolean): void {
+    const input = this.nameEditInput;
+    if (!input) return;
+    // Clear the field first: removing the element fires its blur listener.
+    this.nameEditInput = null;
+    if (commit) {
+      const trimmed = input.value.trim().slice(0, MAX_NAME_LEN);
+      this.names[this.nameEditIdx] = trimmed.length > 0 ? trimmed : null;
+      soundSystem.playUiClick();
+    }
+    input.remove();
+    this.nameEditIdx = -1;
+    this.input.keyboard!.enabled = true;
+    this.input.keyboard!.addCapture(this.captureCodes);
+    this.game.canvas.focus();
     this.render();
   }
 
@@ -223,7 +311,7 @@ export class MenuScene extends Phaser.Scene {
       const r = rows[i];
       const labelHit = x >= 100 && x < r.x && y >= r.y && y <= r.y + r.h;
       if (labelHit) {
-        this.promptForName(i);
+        this.openNameEditor(i);
         return;
       }
     }
@@ -843,7 +931,10 @@ export class MenuScene extends Phaser.Scene {
 
     const customName = this.names[idx];
     const displayName = customName ?? label;
-    this.addText(120, y, displayName, accent, GAME_CONFIG.font.large);
+    // While the DOM rename editor covers this label, don't draw under it.
+    if (this.nameEditIdx !== idx) {
+      this.addText(120, y, displayName, accent, GAME_CONFIG.font.large);
+    }
 
     this.addText(boxX + 16, y + 4, CONTROLLER_LABELS[slot], colors.white, GAME_CONFIG.font.medium);
   }
@@ -862,7 +953,9 @@ export class MenuScene extends Phaser.Scene {
     // Label on the left (outside the box in the design) — use custom name if available
     const customName = this.names[idx];
     const displayName = customName ?? label;
-    this.addText(120, y + 6, displayName, accent, '24px', 'Courier New');
+    if (this.nameEditIdx !== idx) {
+      this.addText(120, y + 6, displayName, accent, '24px', 'Courier New');
+    }
 
     // Value on the right inside the box
     this.addText(296, y + 8, CONTROLLER_LABELS[slot], 0xffffff, '18px', 'Courier New');
@@ -892,13 +985,15 @@ export class MenuScene extends Phaser.Scene {
     const displayName = customName ?? label;
     // Light tint: P1 light blue, P2 light orange
     const nameColor = idx === 0 ? 0x5aa9ff : 0xff8a4c;
-    this.addText(boxX + 70, boxY + 12, displayName, nameColor, '25px', 'Barlow Condensed', 1.25, { weight: '400' });
-    const nameObj = this.texts[this.texts.length - 1];
+    if (this.nameEditIdx !== idx) {
+      this.addText(boxX + 70, boxY + 12, displayName, nameColor, '25px', 'Barlow Condensed', 1.25, { weight: '400' });
+      const nameObj = this.texts[this.texts.length - 1];
 
-    // Helper text INLINE right of the name (drawing it below overlapped the
-    // name's descenders), vertically centered on the name.
-    const helperText = idx === 0 ? 'TAP NAME TO RENAME' : 'TAP BOX TO CYCLE';
-    this.addText(boxX + 70 + nameObj.width + 12, boxY + 12 + nameObj.height / 2, helperText, 0x8a8078, '8px', 'JetBrains Mono', 1.8, { alpha: 0.36, originY: 0.5, weight: '400' });
+      // Helper text INLINE right of the name (drawing it below overlapped the
+      // name's descenders), vertically centered on the name.
+      const helperText = idx === 0 ? 'TAP NAME TO RENAME' : 'TAP BOX TO CYCLE';
+      this.addText(boxX + 70 + nameObj.width + 12, boxY + 12 + nameObj.height / 2, helperText, 0x8a8078, '8px', 'JetBrains Mono', 1.8, { alpha: 0.36, originY: 0.5, weight: '400' });
+    }
 
     // Right-aligned value chip: size from text width WITH letterspacing, right edge at x=856
     const valueText = CONTROLLER_LABELS[slot];

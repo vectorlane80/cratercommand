@@ -571,7 +571,7 @@ export class HudSystem {
     this.addText(
       434,
       36,
-      `PLAYER ${turn.activePlayerId + 1}`,
+      match.profiles[turn.activePlayerId].displayName ?? `PLAYER ${turn.activePlayerId + 1}`,
       activePalette.primary,
       GAME_CONFIG.font.large
     );
@@ -624,7 +624,7 @@ export class HudSystem {
 
   private drawRetroPlayerPanel(x: number, y: number, tank: TankState, match: MatchState, color: number): void {
     const colors = GAME_CONFIG.colors;
-    this.addText(x, y, `PLAYER ${tank.id + 1}`, color, GAME_CONFIG.font.medium);
+    this.addText(x, y, match.profiles[tank.id].displayName ?? `PLAYER ${tank.id + 1}`, color, GAME_CONFIG.font.medium);
     this.drawMiniTank(x + 2, y + 30, color);
     this.addText(x + 56, y + 22, `${tank.health}`, colors.white, GAME_CONFIG.font.medium);
     this.graphics.fillStyle(colors.steelDark, 1);
@@ -1705,7 +1705,7 @@ export class HudSystem {
 
     // LEFT: Player 1 text column at x98
     // PLAYER label: 21px light tint #5aa9ff, ls .06em
-    this.addText(98, 12, `PLAYER ${tanks[0].id + 1}`, 0x5aa9ff, '21px', 'Barlow Condensed', 1.26, { weight: '400' });
+    this.addText(98, 12, match.profiles[tanks[0].id].displayName ?? `PLAYER ${tanks[0].id + 1}`, 0x5aa9ff, '21px', 'Barlow Condensed', 1.26, { weight: '400' });
     // HP numeral: 30px cream (not player-color)
     this.addText(98, 32, `${tanks[0].health}`, 0xf4ece2, '30px', 'Barlow Condensed');
     // HP suffix positioned off the numeral width
@@ -1723,7 +1723,7 @@ export class HudSystem {
     // RIGHT: Player 2 mirrored — text column right-aligned to x862, the
     // mirror of P1's x98 start, so it clears the mini-tank sprite at x874+.
     const p2Right = GAME_CONFIG.width - 98;
-    this.addText(p2Right, 12, `PLAYER ${tanks[1].id + 1}`, 0xff8a4c, '21px', 'Barlow Condensed', 1.26, { originX: 1, weight: '400' });
+    this.addText(p2Right, 12, match.profiles[tanks[1].id].displayName ?? `PLAYER ${tanks[1].id + 1}`, 0xff8a4c, '21px', 'Barlow Condensed', 1.26, { originX: 1, weight: '400' });
     // HP numeral: 30px cream, right-aligned
     this.addText(p2Right, 32, `${tanks[1].health}`, 0xf4ece2, '30px', 'Barlow Condensed', undefined, { originX: 1 });
     // HP suffix: positioned off the numeral width
@@ -1741,7 +1741,7 @@ export class HudSystem {
     // Kicker: 10px @.5, "ROUND 1 · FIRST TO 2"
     this.addText(480, 14, `ROUND ${match.round} · FIRST TO ${match.roundsToWin}`, 0xf4ece2, '10px', 'JetBrains Mono', 3, { alpha: 0.5, originX: 0.5, weight: '400' });
     // TO FIRE: 27px + blue glow, "PLAYER 1 TO FIRE"
-    this.addText(480, 40, `PLAYER ${turn.activePlayerId + 1} TO FIRE`, activePalette.primary, '27px', 'Barlow Condensed', 2, { originX: 0.5, weight: '600' });
+    this.addText(480, 40, `${match.profiles[turn.activePlayerId].displayName ?? `PLAYER ${turn.activePlayerId + 1}`} TO FIRE`, activePalette.primary, '27px', 'Barlow Condensed', 2, { originX: 0.5, weight: '600' });
     // Add glow effect to TO FIRE text (layered stroke idiom)
     if (activePalette.primary === 0x5aa9ff) {
       // Blue glow
