@@ -1,7 +1,53 @@
 import Phaser from 'phaser';
 import { GAME_CONFIG, type TerrainData, type VisualSystem } from '../types/GameTypes';
 
+/** Verbatim xorshift32 from the Bananas design preview — skyline layouts
+ * must reproduce the mock exactly for a given seed. */
+export function bananasRng(seed: number): () => number {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    s >>>= 0;
+    return s / 4294967296;
+  };
+}
+
+export interface BananasBuilding {
+  x: number;
+  w: number;
+  roof: number;
+  colorIndex: number; // 0 cyan #00AAAA, 1 red #AA0000, 2 lgray #AAAAAA
+  seed: number;
+}
+
+export function bananasBuildings(seed: number, sceneWidth: number): BananasBuilding[] {
+  const rand = bananasRng(seed);
+  const buildings: BananasBuilding[] = [];
+  let x = 0;
+  let i = 0;
+
+  while (x < sceneWidth) {
+    const w = Math.round(60 + rand() * 60);
+    const h = Math.round(120 + rand() * 150);
+    buildings.push({
+      x,
+      w: Math.min(w, sceneWidth - x),
+      roof: GAME_CONFIG.layout.battlefieldHeight - h,
+      colorIndex: i % 3,
+      seed: (x * 7919) | 0
+    });
+    x += w;
+    i += 1;
+  }
+
+  return buildings;
+}
+
 export class TerrainSystem {
+  private bananasBuildingList: BananasBuilding[] = [];
+
   generate(sceneWidth: number, battlefieldHeight: number): TerrainData {
     const { sampleCount, baseY, variation, minY, maxY } = GAME_CONFIG.terrain;
     const segmentWidth = sceneWidth / (sampleCount - 1);
@@ -43,6 +89,29 @@ export class TerrainSystem {
     };
   }
 
+  setBananasSkyline(seed: number, sceneWidth: number): void {
+    this.bananasBuildingList = bananasBuildings(seed, sceneWidth);
+  }
+
+  generateBananasSkyline(sceneWidth: number, battlefieldHeight: number, seed: number): TerrainData {
+    const { sampleCount } = GAME_CONFIG.terrain;
+    const segmentWidth = sceneWidth / (sampleCount - 1);
+
+    this.setBananasSkyline(seed, sceneWidth);
+    const heights = Array.from({ length: sampleCount }, (_, index) => {
+      const x = index * segmentWidth;
+      const building = this.bananasBuildingList.find((b) => x >= b.x && x < b.x + b.w) || this.bananasBuildingList[0];
+      return building.roof;
+    });
+
+    return {
+      heights,
+      width: sceneWidth,
+      height: battlefieldHeight,
+      segmentWidth
+    };
+  }
+
   draw(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData, visualSystem: VisualSystem = 'classic'): void {
     const { heights, width, height, segmentWidth } = terrainData;
 
@@ -53,6 +122,10 @@ export class TerrainSystem {
     }
     if (visualSystem === 'hiRes') {
       this.drawHiRes(graphics, terrainData);
+      return;
+    }
+    if (visualSystem === 'bananas') {
+      this.drawBananas(graphics, terrainData);
       return;
     }
 
@@ -86,6 +159,37 @@ export class TerrainSystem {
       const y = heights[index] + 12;
       graphics.fillRect(x, y, 2, Math.max(0, height - y));
     }
+  }
+
+  private drawBananas(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
+    const { heights, width, height, segmentWidth } = terrainData;
+    const buildingColors = [0x00aaaa, 0xaa0000, 0xaaaaaa];
+
+    graphics.fillStyle(0x0000aa, 1);
+    graphics.fillRect(0, 0, width, height);
+    if (this.bananasBuildingList.length === 0) return;
+
+    for (let x = 0; x < width; x += 2) {
+      const sampleIndex = Phaser.Math.Clamp(Math.round(x / segmentWidth), 0, heights.length - 1);
+      const surfaceY = heights[sampleIndex];
+      const building = this.bananasBuildingList.find((b) => x >= b.x && x < b.x + b.w)!;
+      graphics.fillStyle(buildingColors[building.colorIndex], 1);
+      graphics.fillRect(x, surfaceY, 2, height - surfaceY);
+    }
+
+    this.bananasBuildingList.forEach((building) => {
+      const rand = bananasRng(building.seed);
+      for (let wy = building.roof + 12; wy < GAME_CONFIG.layout.battlefieldHeight - 12; wy += 18) {
+        for (let wx = building.x + 8; wx < building.x + building.w - 12; wx += 12) {
+          const lit = rand() < 0.42;
+          const sampleIndex = Phaser.Math.Clamp(Math.round((wx + 3) / segmentWidth), 0, heights.length - 1);
+          const surfaceY = heights[sampleIndex];
+          if (surfaceY > wy) continue;
+          graphics.fillStyle(lit ? 0xffff55 : 0x555555, 1);
+          graphics.fillRect(wx, wy, 6, 9);
+        }
+      }
+    });
   }
 
   private drawRetroPixel(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {

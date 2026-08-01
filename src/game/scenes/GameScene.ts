@@ -77,6 +77,7 @@ export class GameScene extends Phaser.Scene {
   private statusMessage: string | null = null;
   private visualSystem: VisualSystem = GAME_CONFIG.visuals.defaultSystem;
   private bananasDisplay: BananasDisplay = '16color';
+  private bananasSkylineSeed = 0;
   private chuteFlashUntil: number[] = [0, 0];
 
   // AI turn state. When the active tank is CPU-controlled, the scene
@@ -650,7 +651,12 @@ export class GameScene extends Phaser.Scene {
     this.turnSystem.resolveWallMode(this.match);
     // GAME_CONFIG.width, not scale.width: the canvas backing store is
     // renderScale× the fixed 960×540 world.
-    this.terrainData = this.terrainSystem.generate(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
+    if (this.isBananas()) {
+      this.bananasSkylineSeed = Math.floor(Math.random() * 0x7fffffff);
+      this.terrainData = this.terrainSystem.generateBananasSkyline(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight, this.bananasSkylineSeed);
+    } else {
+      this.terrainData = this.terrainSystem.generate(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
+    }
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
     if (this.isBananas()) this.tanks.forEach((t) => { t.ammo['banana'] = -1; });
 
@@ -2121,7 +2127,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateRetroLayerVisibility(): void {
-    const retro = this.visualSystem !== 'classic';
+    const retro = this.visualSystem === 'retroPixel' || this.visualSystem === 'hiRes';
     const hiRes = this.visualSystem === 'hiRes';
     this.retroBackdrop.visible = retro;
     this.retroCacti.forEach((cactus) => (cactus.visible = retro));
@@ -2186,7 +2192,7 @@ export class GameScene extends Phaser.Scene {
    * updateRetroLayerVisibility left the body behind while the barrel moved.
    */
   private syncTankBodySprites(): void {
-    if (this.visualSystem === 'classic') return;
+    if (this.visualSystem !== 'retroPixel' && this.visualSystem !== 'hiRes') return;
     this.tanks.forEach((tank, idx) => {
       const tankImg = this.retroTankBodies[idx];
       if (!tankImg) return;

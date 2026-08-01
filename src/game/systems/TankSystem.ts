@@ -220,7 +220,9 @@ export class TankSystem {
       if (!tank.alive) return;
       const palette = getPlayerPalette(tank.id, visualSystem);
 
-      if (visualSystem !== 'classic') {
+      // Bananas interim: classic vector tanks until the ape figures land in
+      // slice C. retroPixel/hiRes draw sprite bodies + procedural barrels.
+      if (visualSystem === 'retroPixel' || visualSystem === 'hiRes') {
         this.drawRetroPixelTank(graphics, tank, tank.id === activePlayerId, palette, visualSystem);
         return;
       }
