@@ -15,6 +15,7 @@ import {
   GAME_CONFIG,
   PHYSICS_DEFAULTS,
   nextBananasDisplay,
+  setBananasDisplayInk,
   type BananasDisplay,
   type ControllerKind,
   type PlayerProfile,
@@ -2105,6 +2106,7 @@ export class GameScene extends Phaser.Scene {
   // -------- RENDERING --------
 
   private renderAll(): void {
+    if (this.isBananas()) setBananasDisplayInk(this.bananasDisplay);
     this.drawRetroBattlefieldBackground();
     this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
     this.updateRetroLayerVisibility();

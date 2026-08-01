@@ -12,6 +12,32 @@ export type BananasDisplay = '16color' | 'amber' | 'green' | 'white';
 
 export const BANANAS_DISPLAY_CYCLE: BananasDisplay[] = ['16color', 'amber', 'green', 'white'];
 
+export const BANANAS_PHOSPHORS: Record<Exclude<BananasDisplay, '16color'>, number> = {
+  amber: 0xffb000,
+  green: 0x33ff33,
+  white: 0xf0f0f0
+};
+
+// The mock resolves every EGA name to unlit-or-ink in phosphor displays.
+// Unlit set (by value): black, blue (sky + panel fills), dgray (unlit
+// windows). Everything else is lit.
+const BANANAS_UNLIT = new Set([0x000000, 0x0000aa, 0x555555]);
+
+let bananasActiveDisplay: BananasDisplay = '16color';
+
+export function setBananasDisplayInk(display: BananasDisplay): void {
+  bananasActiveDisplay = display;
+}
+
+export function bananasIs1Bit(): boolean {
+  return bananasActiveDisplay !== '16color';
+}
+
+export function bananasInk(color: number): number {
+  if (bananasActiveDisplay === '16color') return color;
+  return BANANAS_UNLIT.has(color) ? 0x000000 : BANANAS_PHOSPHORS[bananasActiveDisplay];
+}
+
 export function nextBananasDisplay(display: BananasDisplay): BananasDisplay {
   const idx = BANANAS_DISPLAY_CYCLE.indexOf(display);
   return BANANAS_DISPLAY_CYCLE[(idx + 1) % BANANAS_DISPLAY_CYCLE.length];

@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import {
+  bananasInk,
+  bananasIs1Bit,
   GAME_CONFIG,
   type FallEvent,
   type PlayerId,
@@ -33,8 +35,8 @@ export function drawGorilla(
       Math.ceil(h * s)
     );
   };
-  const brown = 0xaa5500;
-  const chest = 0xaa0000;
+  const brown = bananasInk(0xaa5500);
+  const chest = bananasIs1Bit() ? 0x000000 : bananasInk(0xaa0000);
 
   px(-9, -7, 6, 7, brown);
   px(3, -7, 6, 7, brown);
@@ -63,7 +65,7 @@ export function drawGorilla(
   px(-6, -33, 12, 2, 0x000000);
   px(-4, -31, 2, 2, 0x000000);
   px(2, -31, 2, 2, 0x000000);
-  px(-4, -28, 8, 3, 0xaaaaaa);
+  px(-4, -28, 8, 3, bananasIs1Bit() ? 0x000000 : bananasInk(0xaaaaaa));
   px(-2, -27, 4, 1, 0x000000);
 }
 

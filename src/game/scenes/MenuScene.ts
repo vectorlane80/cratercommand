@@ -4,6 +4,7 @@ import { bananasBox, bananasPixText, bananasPixTextCentered } from '../systems/H
 import { drawGorilla, getPlayerPalette } from '../systems/TankSystem';
 import {
   BANANAS_DISPLAY_CYCLE,
+  bananasInk,
   CONTROLLER_CYCLE,
   CONTROLLER_LABELS,
   GAME_CONFIG,
@@ -14,6 +15,7 @@ import {
   VISCOSITY_STEPS,
   WALL_LABELS,
   WALL_MODES,
+  setBananasDisplayInk,
   type BananasDisplay,
   type ControllerKind,
   type PhysicsSettings,
@@ -822,51 +824,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private renderMainBananas(): void {
-    this.graphics.fillStyle(0x0000aa, 1);
-    this.graphics.fillRect(0, 0, 960, 540);
-
-    const letters = 'BANANAS'.split('');
-    const cell = 7;
-    const glyphW = 6 * cell;
-    const gap = 10;
-    const totalW = letters.length * glyphW + (letters.length - 1) * gap;
-    let x = Math.round((960 - totalW) / 2);
-    letters.forEach((letter) => {
-      bananasPixText(this.graphics, letter, x + 3, 27, cell, 0x555555);
-      bananasPixText(this.graphics, letter, x, 24, cell, 0xffff55);
-      x += glyphW + gap;
-    });
-
-    drawGorilla(this.graphics, 150, 118, 2.1, 'both');
-    drawGorilla(this.graphics, 810, 118, 2.1, 'both');
-    bananasPixTextCentered(this.graphics, 'SELECT PLAYERS', 480, 96, 2, 0xffffff);
-
-    bananasBox(this.graphics, 280, 134, 400, 40, 0x000000, 0x55ffff);
-    if (this.nameEditIdx !== 0) {
-      bananasPixText(this.graphics, this.names[0] ?? 'PLAYER 1', 120, 142, 3, 0x55ffff);
-    }
-    bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[0]], 296, 146, 2, 0xffffff);
-    bananasBox(this.graphics, 280, 194, 400, 40, 0x000000, 0xff55ff);
-    if (this.nameEditIdx !== 1) {
-      bananasPixText(this.graphics, this.names[1] ?? 'PLAYER 2', 120, 202, 3, 0xff55ff);
-    }
-    bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[1]], 296, 206, 2, 0xffffff);
-
-    bananasPixTextCentered(
-      this.graphics,
-      'TAP NAME TO RENAME  ·  TAP BOX TO CYCLE',
-      480,
-      264,
-      2,
-      0xaaaaaa
-    );
-
-    const startColor = this.canStart() ? 0xffff55 : 0x555555;
-    bananasBox(this.graphics, 310, 300, 340, 46, 0x000000, startColor);
-    bananasPixTextCentered(this.graphics, 'START MATCH', 480, 312, 3, startColor);
-    bananasBox(this.graphics, 310, 366, 340, 36, 0x000000, 0x555555);
-    bananasPixTextCentered(this.graphics, 'SETTINGS', 480, 376, 2, 0x555555);
-
     let display: BananasDisplay = '16color';
     try {
       const storedDisplay = localStorage.getItem('cratercmd.bananas.display');
@@ -876,26 +833,73 @@ export class MenuScene extends Phaser.Scene {
     } catch {
       // localStorage is optional; the menu defaults to 16-color.
     }
+    setBananasDisplayInk(display);
+
+    this.graphics.fillStyle(bananasInk(0x0000aa), 1);
+    this.graphics.fillRect(0, 0, 960, 540);
+
+    const letters = 'BANANAS'.split('');
+    const cell = 7;
+    const glyphW = 6 * cell;
+    const gap = 10;
+    const totalW = letters.length * glyphW + (letters.length - 1) * gap;
+    let x = Math.round((960 - totalW) / 2);
+    letters.forEach((letter) => {
+      bananasPixText(this.graphics, letter, x + 3, 27, cell, bananasInk(0x555555));
+      bananasPixText(this.graphics, letter, x, 24, cell, bananasInk(0xffff55));
+      x += glyphW + gap;
+    });
+
+    drawGorilla(this.graphics, 150, 118, 2.1, 'both');
+    drawGorilla(this.graphics, 810, 118, 2.1, 'both');
+    bananasPixTextCentered(this.graphics, 'SELECT PLAYERS', 480, 96, 2, bananasInk(0xffffff));
+
+    bananasBox(this.graphics, 280, 134, 400, 40, bananasInk(0x000000), bananasInk(0x55ffff));
+    if (this.nameEditIdx !== 0) {
+      bananasPixText(this.graphics, this.names[0] ?? 'PLAYER 1', 120, 142, 3, bananasInk(0x55ffff));
+    }
+    bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[0]], 296, 146, 2, bananasInk(0xffffff));
+    bananasBox(this.graphics, 280, 194, 400, 40, bananasInk(0x000000), bananasInk(0xff55ff));
+    if (this.nameEditIdx !== 1) {
+      bananasPixText(this.graphics, this.names[1] ?? 'PLAYER 2', 120, 202, 3, bananasInk(0xff55ff));
+    }
+    bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[1]], 296, 206, 2, bananasInk(0xffffff));
+
+    bananasPixTextCentered(
+      this.graphics,
+      'TAP NAME TO RENAME  ·  TAP BOX TO CYCLE',
+      480,
+      264,
+      2,
+      bananasInk(0xaaaaaa)
+    );
+
+    const startColor = this.canStart() ? 0xffff55 : 0x555555;
+    bananasBox(this.graphics, 310, 300, 340, 46, bananasInk(0x000000), bananasInk(startColor));
+    bananasPixTextCentered(this.graphics, 'START MATCH', 480, 312, 3, bananasInk(startColor));
+    bananasBox(this.graphics, 310, 366, 340, 36, bananasInk(0x000000), bananasInk(0x555555));
+    bananasPixTextCentered(this.graphics, 'SETTINGS', 480, 376, 2, bananasInk(0x555555));
+
     const displayLabel: Record<BananasDisplay, string> = {
       '16color': '16-COLOR',
       amber: 'AMBER',
       green: 'GREEN',
       white: 'WHITE'
     };
-    bananasBox(this.graphics, 310, 410, 340, 28, 0x000000, 0xffffff);
+    bananasBox(this.graphics, 310, 410, 340, 28, bananasInk(0x000000), bananasInk(0xffffff));
     bananasPixTextCentered(
       this.graphics,
       `BANANAS  ·  ${displayLabel[display]}`,
       480,
       416,
       2,
-      0xffff55
+      bananasInk(0xffff55)
     );
 
-    bananasBox(this.graphics, 220, 452, 240, 32, 0x000000, 0x55ffff);
-    bananasPixTextCentered(this.graphics, 'HOST ONLINE', 340, 460, 2, 0x55ffff);
-    bananasBox(this.graphics, 500, 452, 240, 32, 0x000000, 0xff55ff);
-    bananasPixTextCentered(this.graphics, 'JOIN ONLINE', 620, 460, 2, 0xff55ff);
+    bananasBox(this.graphics, 220, 452, 240, 32, bananasInk(0x000000), bananasInk(0x55ffff));
+    bananasPixTextCentered(this.graphics, 'HOST ONLINE', 340, 460, 2, bananasInk(0x55ffff));
+    bananasBox(this.graphics, 500, 452, 240, 32, bananasInk(0x000000), bananasInk(0xff55ff));
+    bananasPixTextCentered(this.graphics, 'JOIN ONLINE', 620, 460, 2, bananasInk(0xff55ff));
   }
 
   private renderMainHiRes(): void {

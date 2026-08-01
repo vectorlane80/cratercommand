@@ -1,5 +1,11 @@
 import Phaser from 'phaser';
-import { GAME_CONFIG, type TerrainData, type VisualSystem } from '../types/GameTypes';
+import {
+  bananasInk,
+  bananasIs1Bit,
+  GAME_CONFIG,
+  type TerrainData,
+  type VisualSystem
+} from '../types/GameTypes';
 
 /** Verbatim xorshift32 from the Bananas design preview — skyline layouts
  * must reproduce the mock exactly for a given seed. */
@@ -163,18 +169,37 @@ export class TerrainSystem {
 
   private drawBananas(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
     const { heights, width, height, segmentWidth } = terrainData;
-    const buildingColors = [0x00aaaa, 0xaa0000, 0xaaaaaa];
+    const buildingColors = [bananasInk(0x00aaaa), bananasInk(0xaa0000), bananasInk(0xaaaaaa)];
+    const is1Bit = bananasIs1Bit();
 
-    graphics.fillStyle(0x0000aa, 1);
+    graphics.fillStyle(bananasInk(0x0000aa), 1);
     graphics.fillRect(0, 0, width, height);
     if (this.bananasBuildingList.length === 0) return;
 
+    if (is1Bit) graphics.fillStyle(bananasInk(0xffffff), 1);
     for (let x = 0; x < width; x += 2) {
       const sampleIndex = Phaser.Math.Clamp(Math.round(x / segmentWidth), 0, heights.length - 1);
       const surfaceY = heights[sampleIndex];
-      const building = this.bananasBuildingList.find((b) => x >= b.x && x < b.x + b.w)!;
-      graphics.fillStyle(buildingColors[building.colorIndex], 1);
-      graphics.fillRect(x, surfaceY, 2, height - surfaceY);
+      if (is1Bit) {
+        graphics.fillRect(x, surfaceY, 2, 2);
+      } else {
+        const building = this.bananasBuildingList.find((b) => x >= b.x && x < b.x + b.w)!;
+        graphics.fillStyle(buildingColors[building.colorIndex], 1);
+        graphics.fillRect(x, surfaceY, 2, height - surfaceY);
+      }
+    }
+
+    if (is1Bit) {
+      graphics.fillStyle(bananasInk(0xffffff), 1);
+      this.bananasBuildingList.forEach((building) => {
+        const leftSampleIndex = Phaser.Math.Clamp(Math.round(building.x / segmentWidth), 0, heights.length - 1);
+        const rightX = building.x + building.w - 2;
+        const rightSampleIndex = Phaser.Math.Clamp(Math.round(rightX / segmentWidth), 0, heights.length - 1);
+        const edgeTopLeft = heights[leftSampleIndex];
+        const edgeTopRight = heights[rightSampleIndex];
+        graphics.fillRect(building.x, edgeTopLeft, 2, height - edgeTopLeft);
+        graphics.fillRect(rightX, edgeTopRight, 2, height - edgeTopRight);
+      });
     }
 
     this.bananasBuildingList.forEach((building) => {
@@ -185,7 +210,8 @@ export class TerrainSystem {
           const sampleIndex = Phaser.Math.Clamp(Math.round((wx + 3) / segmentWidth), 0, heights.length - 1);
           const surfaceY = heights[sampleIndex];
           if (surfaceY > wy) continue;
-          graphics.fillStyle(lit ? 0xffff55 : 0x555555, 1);
+          if (is1Bit && !lit) continue;
+          graphics.fillStyle(bananasInk(lit ? 0xffff55 : 0x555555), 1);
           graphics.fillRect(wx, wy, 6, 9);
         }
       }

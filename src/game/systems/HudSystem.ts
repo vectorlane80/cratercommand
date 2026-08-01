@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import {
+  bananasInk,
+  bananasIs1Bit,
   CONTROLLER_LABELS,
   GAME_CONFIG,
   GRAVITY_LABELS,
@@ -639,14 +641,14 @@ export class HudSystem {
     const p2Name = match.profiles[1].displayName ?? 'PLAYER 2';
     const activeName = match.profiles[turn.activePlayerId].displayName ?? `PLAYER ${turn.activePlayerId + 1}`;
 
-    bananasPixText(this.graphics, p1Name, 24, 10, 2, 0x55ffff);
+    bananasPixText(this.graphics, p1Name, 24, 10, 2, bananasInk(0x55ffff));
     bananasPixTextCentered(
       this.graphics,
       `${match.profiles[0].wins} > SCORE < ${match.profiles[1].wins}`,
       480,
       10,
       2,
-      0xffffff
+      bananasInk(0xffffff)
     );
     bananasPixText(
       this.graphics,
@@ -654,64 +656,66 @@ export class HudSystem {
       936 - bananasTextMask(p2Name.toUpperCase()).w * 2,
       10,
       2,
-      0xff55ff
+      bananasInk(0xff55ff)
     );
 
-    this.graphics.fillStyle(0x0000aa, 1);
+    this.graphics.fillStyle(bananasInk(0x0000aa), 1);
     this.graphics.fillRect(0, top, 960, 134);
-    this.graphics.fillStyle(0xffffff, 1);
+    this.graphics.fillStyle(bananasInk(0xffffff), 1);
     this.graphics.fillRect(0, top, 960, 2);
 
-    bananasBox(this.graphics, 8, 366, 208, 122, 0x000000, 0xffffff);
-    bananasPixText(this.graphics, 'SCORE', 88, 374, 2, 0xffffff);
-    bananasPixText(this.graphics, p1Name, 20, 398, 2, 0x55ffff);
-    bananasPixText(this.graphics, `${match.profiles[0].wins}`, 180, 398, 2, 0xffff55);
-    bananasPixText(this.graphics, p2Name, 20, 420, 2, 0xff55ff);
-    bananasPixText(this.graphics, `${match.profiles[1].wins}`, 180, 420, 2, 0xffff55);
-    bananasPixText(this.graphics, `BEST OF ${match.roundsToWin * 2 - 1}`, 20, 448, 2, 0xaaaaaa);
-    bananasPixText(this.graphics, 'BANANA', 20, 466, 2, 0xffff55);
+    bananasBox(this.graphics, 8, 366, 208, 122, bananasInk(0x000000), bananasInk(0xffffff));
+    bananasPixText(this.graphics, 'SCORE', 88, 374, 2, bananasInk(0xffffff));
+    bananasPixText(this.graphics, p1Name, 20, 398, 2, bananasInk(0x55ffff));
+    bananasPixText(this.graphics, `${match.profiles[0].wins}`, 180, 398, 2, bananasInk(0xffff55));
+    bananasPixText(this.graphics, p2Name, 20, 420, 2, bananasInk(0xff55ff));
+    bananasPixText(this.graphics, `${match.profiles[1].wins}`, 180, 420, 2, bananasInk(0xffff55));
+    bananasPixText(this.graphics, `BEST OF ${match.roundsToWin * 2 - 1}`, 20, 448, 2, bananasInk(0xaaaaaa));
+    bananasPixText(this.graphics, 'BANANA', 20, 466, 2, bananasInk(0xffff55));
 
-    bananasBox(this.graphics, 220, 366, 176, 122, 0x000000, 0xffffff);
-    bananasPixText(this.graphics, 'ANGLE', 274, 374, 2, 0xffffff);
-    bananasPixTextCentered(this.graphics, `${Math.round(tank.angle)}`, 308, 402, 5, 0xffff55);
-    this.graphics.fillStyle(0xffffff, 1);
+    bananasBox(this.graphics, 220, 366, 176, 122, bananasInk(0x000000), bananasInk(0xffffff));
+    bananasPixText(this.graphics, 'ANGLE', 274, 374, 2, bananasInk(0xffffff));
+    bananasPixTextCentered(this.graphics, `${Math.round(tank.angle)}`, 308, 402, 5, bananasInk(0xffff55));
+    this.graphics.fillStyle(bananasInk(0xffffff), 1);
     this.graphics.fillRect(238, 466, 140, 2);
     const angleRadians = (tank.angle * Math.PI) / 180;
-    this.graphics.lineStyle(3, 0x55ff55, 1);
+    this.graphics.lineStyle(3, bananasInk(0x55ff55), 1);
     this.graphics.beginPath();
     this.graphics.moveTo(250, 466);
     this.graphics.lineTo(250 + Math.cos(angleRadians) * 60, 466 - Math.sin(angleRadians) * 60);
     this.graphics.strokePath();
-    bananasPixText(this.graphics, '<<', 230, 448, 2, 0x555555);
-    bananasPixText(this.graphics, '>>', 356, 448, 2, 0x555555);
+    bananasPixText(this.graphics, '<<', 230, 448, 2, bananasInk(0x555555));
+    bananasPixText(this.graphics, '>>', 356, 448, 2, bananasInk(0x555555));
 
-    bananasBox(this.graphics, 400, 366, 204, 122, 0x000000, 0xffffff);
-    bananasPixText(this.graphics, 'VELOCITY', 462, 374, 2, 0xffffff);
-    bananasPixTextCentered(this.graphics, `${Math.round(tank.power)}`, 502, 402, 5, 0xffff55);
-    bananasBox(this.graphics, 418, 452, 168, 22, 0x000000, 0xffffff);
+    bananasBox(this.graphics, 400, 366, 204, 122, bananasInk(0x000000), bananasInk(0xffffff));
+    bananasPixText(this.graphics, 'VELOCITY', 462, 374, 2, bananasInk(0xffffff));
+    bananasPixTextCentered(this.graphics, `${Math.round(tank.power)}`, 502, 402, 5, bananasInk(0xffff55));
+    bananasBox(this.graphics, 418, 452, 168, 22, bananasInk(0x000000), bananasInk(0xffffff));
     const filledSegments = Math.floor(tank.power / 10);
     for (let i = 0; i < 10; i += 1) {
-      this.graphics.fillStyle(i < filledSegments ? 0x55ff55 : 0x555555, 1);
+      this.graphics.fillStyle(bananasInk(i < filledSegments ? 0x55ff55 : 0x555555), 1);
       this.graphics.fillRect(423 + i * 16, 457, 12, 12);
     }
-    bananasPixText(this.graphics, '<<', 410, 448, 2, 0x555555);
-    bananasPixText(this.graphics, '>>', 578, 448, 2, 0x555555);
+    bananasPixText(this.graphics, '<<', 410, 448, 2, bananasInk(0x555555));
+    bananasPixText(this.graphics, '>>', 578, 448, 2, bananasInk(0x555555));
 
-    bananasBox(this.graphics, 610, 366, 140, 122, 0x000000, 0xffffff);
+    bananasBox(this.graphics, 610, 366, 140, 122, bananasInk(0x000000), bananasInk(0xffffff));
     bananasBox(
       this.graphics,
       632,
       394,
       94,
       58,
-      turn.phase === 'aiming' ? 0xaa0000 : 0x555555,
-      0xffffff
+      bananasIs1Bit()
+        ? 0x000000
+        : bananasInk(turn.phase === 'aiming' ? 0xaa0000 : 0x555555),
+      bananasInk(0xffffff)
     );
-    bananasPixTextCentered(this.graphics, 'FIRE', 679, 412, 4, 0xffff55);
-    bananasPixTextCentered(this.graphics, 'SPACE', 679, 462, 2, 0xaaaaaa);
+    bananasPixTextCentered(this.graphics, 'FIRE', 679, 412, 4, bananasInk(0xffff55));
+    bananasPixTextCentered(this.graphics, 'SPACE', 679, 462, 2, bananasInk(0xaaaaaa));
 
-    bananasBox(this.graphics, 756, 366, 196, 122, 0x000000, 0xffffff);
-    bananasPixText(this.graphics, 'WIND', 838, 374, 2, 0xffffff);
+    bananasBox(this.graphics, 756, 366, 196, 122, bananasInk(0x000000), bananasInk(0xffffff));
+    bananasPixText(this.graphics, 'WIND', 838, 374, 2, bananasInk(0xffffff));
     this.drawBananasWindArrow(854, 412, turn.wind.magnitude, turn.wind.direction);
     bananasPixText(
       this.graphics,
@@ -719,21 +723,21 @@ export class HudSystem {
       772,
       430,
       2,
-      0xff5555
+      bananasInk(0xff5555)
     );
-    bananasPixText(this.graphics, `ROUND   ${match.round}`, 772, 450, 2, 0xffffff);
-    bananasPixText(this.graphics, 'GRAVITY 9.8', 772, 468, 2, 0xaaaaaa);
+    bananasPixText(this.graphics, `ROUND   ${match.round}`, 772, 450, 2, bananasInk(0xffffff));
+    bananasPixText(this.graphics, 'GRAVITY 9.8', 772, 468, 2, bananasInk(0xaaaaaa));
 
-    this.graphics.fillStyle(0x000000, 1);
+    this.graphics.fillStyle(bananasInk(0x000000), 1);
     this.graphics.fillRect(0, 494, 960, 46);
-    this.graphics.fillStyle(0xffffff, 1);
+    this.graphics.fillStyle(bananasInk(0xffffff), 1);
     this.graphics.fillRect(0, 494, 960, 2);
-    bananasPixText(this.graphics, '<- -> ANGLE   UP DN VELOCITY   SPACE THROW', 16, 504, 2, 0x55ffff);
-    bananasPixText(this.graphics, 'V CYCLE DISPLAY   ENTER NEXT   ESC MENU', 16, 522, 2, 0x55ffff);
+    bananasPixText(this.graphics, '<- -> ANGLE   UP DN VELOCITY   SPACE THROW', 16, 504, 2, bananasInk(0x55ffff));
+    bananasPixText(this.graphics, 'V CYCLE DISPLAY   ENTER NEXT   ESC MENU', 16, 522, 2, bananasInk(0x55ffff));
 
     const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
-    bananasBox(this.graphics, 820, stripY + 2, 130, 22, 0x000000, 0x555555);
-    bananasPixTextCentered(this.graphics, 'ESC', 885, stripY + 8, 2, 0xaaaaaa);
+    bananasBox(this.graphics, 820, stripY + 2, 130, 22, bananasInk(0x000000), bananasInk(0x555555));
+    bananasPixTextCentered(this.graphics, 'ESC', 885, stripY + 8, 2, bananasInk(0xaaaaaa));
     const throwText = `${activeName} THROWS`;
     bananasPixText(
       this.graphics,
@@ -741,7 +745,7 @@ export class HudSystem {
       812 - bananasTextMask(throwText.toUpperCase()).w * 2,
       504,
       2,
-      0xffff55
+      bananasInk(0xffff55)
     );
     if (turn.phase === 'projectileInFlight') {
       const flightText = 'BANANA IN FLIGHT';
@@ -751,14 +755,14 @@ export class HudSystem {
         812 - bananasTextMask(flightText).w * 2,
         522,
         2,
-        0xffffff
+        bananasInk(0xffffff)
       );
     }
   }
 
   private drawBananasWindArrow(cx: number, y: number, magnitude: number, direction: -1 | 1): void {
     const len = magnitude * 7 * direction;
-    this.graphics.fillStyle(0xff5555, 1);
+    this.graphics.fillStyle(bananasInk(0xff5555), 1);
     this.graphics.fillRect(Math.min(cx, cx + len), y, Math.abs(len), 3);
     const tipX = cx + len;
     for (let i = 0; i < 7; i += 1) {
@@ -1177,9 +1181,9 @@ export class HudSystem {
       // Sub-line in mono
       this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px', 'JetBrains Mono', undefined, { weight: '400' });
     } else if (visualSystem === 'bananas') {
-      bananasBox(this.graphics, x, y, w, h, 0x000000, 0xffffff);
-      bananasPixTextCentered(this.graphics, line1, x + w / 2, y + 22, 3, 0xffff55);
-      bananasPixTextCentered(this.graphics, line2, x + w / 2, y + 68, 2, 0xffffff);
+      bananasBox(this.graphics, x, y, w, h, bananasInk(0x000000), bananasInk(0xffffff));
+      bananasPixTextCentered(this.graphics, line1, x + w / 2, y + 22, 3, bananasInk(0xffff55));
+      bananasPixTextCentered(this.graphics, line2, x + w / 2, y + 68, 2, bananasInk(0xffffff));
     } else if (visualSystem === 'retroPixel') {
       // Retro: boxy 2px steel + desertGold
       this.graphics.fillStyle(GAME_CONFIG.colors.steelMid, 1);

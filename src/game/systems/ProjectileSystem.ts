@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  bananasInk,
   GAME_CONFIG,
   PHYSICS_DEFAULTS,
   type ImpactResult,
@@ -568,8 +569,8 @@ export class ProjectileSystem {
       const sunX = 480;
       const sunY = 62;
       const sunRadius = 22;
-      const yellow = 0xffff55;
-      const blue = 0x0000aa;
+      const yellow = bananasInk(0xffff55);
+      const blue = bananasInk(0x0000aa);
       const shocked = projectiles.some((projectile) => Math.hypot(projectile.x - sunX, projectile.y - sunY) < 40);
 
       graphics.lineStyle(2, yellow, 1);
