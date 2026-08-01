@@ -203,7 +203,6 @@ export class HudSystem {
    */
   private drawQuitConfirmModal(visualSystem: VisualSystem = 'classic'): void {
     const colors = GAME_CONFIG.colors;
-    const palette = this.uiPalette(visualSystem);
     const W = GAME_CONFIG.width;
     const H = GAME_CONFIG.height;
     const cx = W / 2;
@@ -217,49 +216,127 @@ export class HudSystem {
     const cardH = 240;
     const cardX = (W - cardW) / 2;
     const cardY = (H - cardH) / 2;
-    this.graphics.fillStyle(colors.panelGray, 1);
-    this.graphics.fillRect(cardX, cardY, cardW, cardH);
-    this.graphics.lineStyle(4, palette.frame, 1);
-    this.graphics.strokeRect(cardX, cardY, cardW, cardH);
 
-    // Heading
-    this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', colors.red, GAME_CONFIG.font.title);
+    if (visualSystem === 'hiRes') {
+      // Glass panel treatment: gradient fill + subtle border + inset highlight
+      this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.95);
+      this.graphics.fillRoundedRect(cardX, cardY, cardW, cardH, 6);
+      this.graphics.lineStyle(1, 0xffbe78, 0.2);
+      this.graphics.strokeRoundedRect(cardX, cardY, cardW, cardH, 6);
+      // Inset highlight (top edge)
+      this.graphics.lineStyle(1, 0xffbe78, 0.15);
+      this.graphics.beginPath();
+      this.graphics.moveTo(cardX + 2, cardY + 2);
+      this.graphics.lineTo(cardX + cardW - 2, cardY + 2);
+      this.graphics.strokePath();
 
-    // Body
-    this.addTextCentered(
-      cx,
-      cardY + 80,
-      'Return to the menu?',
-      colors.white,
-      GAME_CONFIG.font.medium
-    );
-    this.addTextCentered(
-      cx,
-      cardY + 108,
-      'This counts as a forfeit.',
-      colors.yellow,
-      GAME_CONFIG.font.medium
-    );
+      // Heading in orange/coral
+      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', 0xff8a6c, 'bold 22px Barlow Condensed');
 
-    // Buttons (must match handleQuitConfirmPointer geometry)
-    const btnH = 44;
-    const btnW = 140;
-    const btnY = cardY + cardH - btnH - 20;
-    const gap = 24;
-    const yesX = cx - btnW - gap / 2;
-    const noX = cx + gap / 2;
+      // Body in mono
+      this.addTextCenteredMono(cx, cardY + 80, 'Return to the menu?', 0xffffff, '10px');
+      this.addTextCenteredMono(cx, cardY + 108, 'This counts as a forfeit.', 0xffbe78, '10px');
 
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(yesX, btnY, btnW, btnH);
-    this.graphics.lineStyle(3, palette.frame, 1);
-    this.graphics.strokeRect(yesX, btnY, btnW, btnH);
-    this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, GAME_CONFIG.font.large);
+      // YES button: red gradient
+      const btnH = 44;
+      const btnW = 140;
+      const btnY = cardY + cardH - btnH - 20;
+      const gap = 24;
+      const yesX = cx - btnW - gap / 2;
+      const noX = cx + gap / 2;
 
-    this.graphics.fillStyle(colors.panelDark, 1);
-    this.graphics.fillRect(noX, btnY, btnW, btnH);
-    this.graphics.lineStyle(3, palette.frame, 1);
-    this.graphics.strokeRect(noX, btnY, btnW, btnH);
-    this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, GAME_CONFIG.font.large);
+      this.graphics.fillGradientStyle(0xff7043, 0xff7043, 0xc22c0c, 0xc22c0c, 1);
+      this.graphics.fillRoundedRect(yesX, btnY, btnW, btnH, 4);
+      this.graphics.lineStyle(1, 0xffb48c, 0.5);
+      this.graphics.strokeRoundedRect(yesX, btnY, btnW, btnH, 4);
+      this.addTextCenteredBarlow(yesX + btnW / 2, btnY + btnH / 2 - 6, 'YES (Y)', 0xfff5ec, 'bold 18px');
+
+      // NO button: dark ghost with green text
+      this.graphics.fillStyle(0x0c0a08, 1);
+      this.graphics.fillRoundedRect(noX, btnY, btnW, btnH, 4);
+      this.graphics.lineStyle(1, 0x58d98b, 0.4);
+      this.graphics.strokeRoundedRect(noX, btnY, btnW, btnH, 4);
+      this.addTextCenteredMono(noX + btnW / 2, btnY + btnH / 2 - 6, 'NO (N)', 0x58d98b, 'bold 18px');
+
+    } else if (visualSystem === 'retroPixel') {
+      // Steel/boxy treatment with desertGold title
+      this.graphics.fillStyle(colors.steelMid, 1);
+      this.graphics.fillRect(cardX, cardY, cardW, cardH);
+      this.graphics.lineStyle(2, colors.desertGold, 1);
+      this.graphics.strokeRect(cardX, cardY, cardW, cardH);
+
+      // Title in desertGold
+      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', colors.desertGold, '24px Courier New');
+
+      // Body in white/yellow
+      this.addTextCentered(cx, cardY + 80, 'Return to the menu?', colors.white, '18px Courier New');
+      this.addTextCentered(cx, cardY + 108, 'This counts as a forfeit.', colors.yellow, '18px Courier New');
+
+      // YES button: red border
+      const btnH = 44;
+      const btnW = 140;
+      const btnY = cardY + cardH - btnH - 20;
+      const gap = 24;
+      const yesX = cx - btnW - gap / 2;
+      const noX = cx + gap / 2;
+
+      this.graphics.fillStyle(0x050505, 1);
+      this.graphics.fillRect(yesX, btnY, btnW, btnH);
+      this.graphics.lineStyle(2, colors.red, 1);
+      this.graphics.strokeRect(yesX, btnY, btnW, btnH);
+      this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, '18px Courier New');
+
+      // NO button: green border
+      this.graphics.fillStyle(0x050505, 1);
+      this.graphics.fillRect(noX, btnY, btnW, btnH);
+      this.graphics.lineStyle(2, colors.green, 1);
+      this.graphics.strokeRect(noX, btnY, btnW, btnH);
+      this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, '18px Courier New');
+
+    } else {
+      // Classic: byte-identical
+      const palette = this.uiPalette(visualSystem);
+      this.graphics.fillStyle(colors.panelGray, 1);
+      this.graphics.fillRect(cardX, cardY, cardW, cardH);
+      this.graphics.lineStyle(4, palette.frame, 1);
+      this.graphics.strokeRect(cardX, cardY, cardW, cardH);
+
+      this.addTextCentered(cx, cardY + 24, 'FORFEIT MATCH?', colors.red, GAME_CONFIG.font.title);
+
+      this.addTextCentered(
+        cx,
+        cardY + 80,
+        'Return to the menu?',
+        colors.white,
+        GAME_CONFIG.font.medium
+      );
+      this.addTextCentered(
+        cx,
+        cardY + 108,
+        'This counts as a forfeit.',
+        colors.yellow,
+        GAME_CONFIG.font.medium
+      );
+
+      const btnH = 44;
+      const btnW = 140;
+      const btnY = cardY + cardH - btnH - 20;
+      const gap = 24;
+      const yesX = cx - btnW - gap / 2;
+      const noX = cx + gap / 2;
+
+      this.graphics.fillStyle(colors.panelDark, 1);
+      this.graphics.fillRect(yesX, btnY, btnW, btnH);
+      this.graphics.lineStyle(3, palette.frame, 1);
+      this.graphics.strokeRect(yesX, btnY, btnW, btnH);
+      this.addTextCentered(yesX + btnW / 2, btnY + btnH / 2 - 12, 'YES (Y)', colors.red, GAME_CONFIG.font.large);
+
+      this.graphics.fillStyle(colors.panelDark, 1);
+      this.graphics.fillRect(noX, btnY, btnW, btnH);
+      this.graphics.lineStyle(3, palette.frame, 1);
+      this.graphics.strokeRect(noX, btnY, btnW, btnH);
+      this.addTextCentered(noX + btnW / 2, btnY + btnH / 2 - 12, 'NO (N)', colors.green, GAME_CONFIG.font.large);
+    }
   }
 
   private addTextCentered(cx: number, y: number, value: string, color: number, fontSize: string): void {
@@ -268,6 +345,28 @@ export class HudSystem {
       fontFamily: GAME_CONFIG.font.family,
       fontSize,
       fontStyle: 'bold'
+    });
+    text.setOrigin(0.5, 0);
+    text.setResolution(2);
+    this.texts.push(text);
+  }
+
+  private addTextCenteredMono(cx: number, y: number, value: string, color: number, fontSize: string): void {
+    const text = this.scene.add.text(cx, y, value, {
+      color: Phaser.Display.Color.IntegerToColor(color).rgba,
+      fontFamily: 'JetBrains Mono',
+      fontSize
+    });
+    text.setOrigin(0.5, 0);
+    text.setResolution(2);
+    this.texts.push(text);
+  }
+
+  private addTextCenteredBarlow(cx: number, y: number, value: string, color: number, fontSize: string): void {
+    const text = this.scene.add.text(cx, y, value, {
+      color: Phaser.Display.Color.IntegerToColor(color).rgba,
+      fontFamily: 'Barlow Condensed',
+      fontSize
     });
     text.setOrigin(0.5, 0);
     text.setResolution(2);
@@ -787,12 +886,33 @@ export class HudSystem {
     const h = 110;
     const x = (GAME_CONFIG.width - w) / 2;
     const y = 130;
-    this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.82);
-    this.graphics.fillRect(x, y, w, h);
-    this.graphics.lineStyle(3, palette.frame, 1);
-    this.graphics.strokeRect(x, y, w, h);
-    this.addText(x + 24, y + 22, line1, palette.title, GAME_CONFIG.font.title);
-    this.addText(x + 24, y + 68, line2, GAME_CONFIG.colors.white, GAME_CONFIG.font.medium);
+
+    if (visualSystem === 'hiRes') {
+      // Glass panel treatment for hi-res
+      this.graphics.fillGradientStyle(0x261e18, 0x261e18, 0x0c0907, 0x0c0907, 0.95);
+      this.graphics.fillRoundedRect(x, y, w, h, 6);
+      this.graphics.lineStyle(1, 0xffbe78, 0.2);
+      this.graphics.strokeRoundedRect(x, y, w, h, 6);
+      // Inset highlight
+      this.graphics.lineStyle(1, 0xffbe78, 0.15);
+      this.graphics.beginPath();
+      this.graphics.moveTo(x + 2, y + 2);
+      this.graphics.lineTo(x + w - 2, y + 2);
+      this.graphics.strokePath();
+
+      // Headline in Barlow700
+      this.addText(x + 24, y + 20, line1, 0xffbe78, 'bold 24px Barlow Condensed');
+      // Sub-line in mono
+      this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px JetBrains Mono');
+    } else {
+      // Classic and retro-pixel: original treatment
+      this.graphics.fillStyle(GAME_CONFIG.colors.black, 0.82);
+      this.graphics.fillRect(x, y, w, h);
+      this.graphics.lineStyle(3, palette.frame, 1);
+      this.graphics.strokeRect(x, y, w, h);
+      this.addText(x + 24, y + 22, line1, palette.title, GAME_CONFIG.font.title);
+      this.addText(x + 24, y + 68, line2, GAME_CONFIG.colors.white, GAME_CONFIG.font.medium);
+    }
   }
 
   private drawShopOverlay(match: MatchState, visualSystem: VisualSystem = 'classic'): void {

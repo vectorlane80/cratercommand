@@ -162,13 +162,16 @@ export class TerrainSystem {
   private drawHiRes(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
     const { heights, width, height, segmentWidth } = terrainData;
 
+    // Resample heights with Catmull-Rom at 2px steps for smooth curves
+    const fineHeights = this.resampleHeightsCatmullRom(heights, segmentWidth);
+
     // Pass A: Full terrain with gradient from top-mid brown to lower-mid dark
     graphics.fillGradientStyle(0x9a5f26, 0x9a5f26, 0x2c180a, 0x2c180a, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
-    heights.forEach((sampleHeight, index) => {
-      graphics.lineTo(index * segmentWidth, sampleHeight);
-    });
+    for (let i = 0; i < fineHeights.length; i += 1) {
+      graphics.lineTo(i * 2, fineHeights[i]);
+    }
     graphics.lineTo(width, height);
     graphics.closePath();
     graphics.fillPath();
@@ -177,10 +180,11 @@ export class TerrainSystem {
     graphics.fillGradientStyle(0x2c180a, 0x2c180a, 0x0d0702, 0x0d0702, 0.9);
     graphics.beginPath();
     graphics.moveTo(0, height);
-    heights.forEach((sampleHeight, index) => {
+    for (let i = 0; i < fineHeights.length; i += 1) {
+      const sampleHeight = fineHeights[i];
       const lowerY = sampleHeight + (height - sampleHeight) * 0.45;
-      graphics.lineTo(index * segmentWidth, lowerY);
-    });
+      graphics.lineTo(i * 2, lowerY);
+    }
     graphics.lineTo(width, height);
     graphics.closePath();
     graphics.fillPath();
@@ -203,45 +207,79 @@ export class TerrainSystem {
       }
     }
 
-    // Ridge: layered strokes along surface polyline
+    // Ridge: layered strokes along fine-resampled surface polyline
     // Layer 1: 7px warm glow
     graphics.lineStyle(7, 0xffb347, 0.22);
     graphics.beginPath();
-    heights.forEach((sampleHeight, index) => {
-      const x = index * segmentWidth;
-      if (index === 0) {
-        graphics.moveTo(x, sampleHeight);
+    for (let i = 0; i < fineHeights.length; i += 1) {
+      const x = i * 2;
+      if (i === 0) {
+        graphics.moveTo(x, fineHeights[i]);
       } else {
-        graphics.lineTo(x, sampleHeight);
+        graphics.lineTo(x, fineHeights[i]);
       }
-    });
+    }
     graphics.strokePath();
 
     // Layer 2: 4px mid-tone
     graphics.lineStyle(4, 0xffb347, 0.3);
     graphics.beginPath();
-    heights.forEach((sampleHeight, index) => {
-      const x = index * segmentWidth;
-      if (index === 0) {
-        graphics.moveTo(x, sampleHeight);
+    for (let i = 0; i < fineHeights.length; i += 1) {
+      const x = i * 2;
+      if (i === 0) {
+        graphics.moveTo(x, fineHeights[i]);
       } else {
-        graphics.lineTo(x, sampleHeight);
+        graphics.lineTo(x, fineHeights[i]);
       }
-    });
+    }
     graphics.strokePath();
 
     // Layer 3: 2px specular highlight
     graphics.lineStyle(2, 0xffd68c, 0.55);
     graphics.beginPath();
-    heights.forEach((sampleHeight, index) => {
-      const x = index * segmentWidth;
-      if (index === 0) {
-        graphics.moveTo(x, sampleHeight);
+    for (let i = 0; i < fineHeights.length; i += 1) {
+      const x = i * 2;
+      if (i === 0) {
+        graphics.moveTo(x, fineHeights[i]);
       } else {
-        graphics.lineTo(x, sampleHeight);
+        graphics.lineTo(x, fineHeights[i]);
       }
-    });
+    }
     graphics.strokePath();
+  }
+
+  private resampleHeightsCatmullRom(heights: number[], segmentWidth: number): number[] {
+    // Resample at 2px steps using Catmull-Rom interpolation
+    const worldWidth = heights.length * segmentWidth;
+    const fineHeights: number[] = [];
+
+    for (let x = 0; x < worldWidth; x += 2) {
+      fineHeights.push(this.catmullSample(heights, x / segmentWidth));
+    }
+
+    return fineHeights;
+  }
+
+  private catmullSample(heights: number[], t: number): number {
+    // Catmull-Rom interpolation: t is position in sample space (0..heights.length-1)
+    const i = Math.floor(t);
+    const u = t - i;
+
+    // Get the 4 neighboring samples (with clamping at boundaries)
+    const p0 = heights[Math.max(0, i - 1)];
+    const p1 = heights[i];
+    const p2 = heights[Math.min(heights.length - 1, i + 1)];
+    const p3 = heights[Math.min(heights.length - 1, i + 2)];
+
+    // Catmull-Rom basis functions
+    const q = 0.5 * (
+      (2 * p1) +
+      (-p0 + p2) * u +
+      (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u +
+      (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u
+    );
+
+    return q;
   }
 
   applyMound(terrainData: TerrainData, x: number, y: number, radius: number): void {

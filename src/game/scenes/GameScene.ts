@@ -1440,6 +1440,13 @@ export class GameScene extends Phaser.Scene {
     const top = GAME_CONFIG.layout.consoleTop;
     const activeTank = this.tanks[this.turn.activePlayerId];
 
+    // ESC: MENU button in bottom strip (820..950, stripY+2..+24)
+    const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+    if (x >= 820 && x <= 950 && y >= stripY + 2 && y <= stripY + 24) {
+      this.returnToMenu();
+      return;
+    }
+
     // FIRE button: (632, top+36, 94, 58)
     if (x >= 632 && x <= 726 && y >= top + 36 && y <= top + 94) {
       this.fireActiveWeapon();
