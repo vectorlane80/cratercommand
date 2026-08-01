@@ -86,7 +86,7 @@ physics settings carry over from the host's menu selections.
 | B | Use battery (heal) |
 | X | Arm a shield |
 | C | Cycle guidance system |
-| V | Toggle visual mode (classic / retro pixel) |
+| V | Cycle visual mode (classic / retro pixel / hi-res) |
 | F10 | Sound on/off |
 | ESC | Forfeit / menu |
 

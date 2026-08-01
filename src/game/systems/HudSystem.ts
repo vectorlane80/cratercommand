@@ -359,7 +359,7 @@ export class HudSystem {
       fontStyle
     });
     text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
-    text.setResolution(2);
+    text.setResolution(GAME_CONFIG.renderScale);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
     }
@@ -384,7 +384,7 @@ export class HudSystem {
       fontStyle
     });
     text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
-    text.setResolution(2);
+    text.setResolution(GAME_CONFIG.renderScale);
     if (opts?.alpha !== undefined) {
       text.setAlpha(opts.alpha);
     }
@@ -406,7 +406,7 @@ export class HudSystem {
       fontStyle
     });
     text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
-    text.setResolution(2);
+    text.setResolution(GAME_CONFIG.renderScale);
     if (opts?.alpha !== undefined) {
       text.setAlpha(opts.alpha);
     }
@@ -672,7 +672,7 @@ export class HudSystem {
         fontStyle: 'bold'
       });
       titleText.setOrigin(0.5, 0);
-      titleText.setResolution(2);
+      titleText.setResolution(GAME_CONFIG.renderScale);
       this.texts.push(titleText);
     }
   }
@@ -1599,8 +1599,9 @@ export class HudSystem {
       fontSize,
       fontStyle
     });
-    // Higher resolution makes text crisp under Phaser scale.zoom + CSS scale.
-    text.setResolution(2);
+    // Match the texture density to the renderScale-zoomed camera so glyph
+    // pixels map 1:1 onto the canvas backing store.
+    text.setResolution(GAME_CONFIG.renderScale);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
     }
@@ -1629,6 +1630,20 @@ export class HudSystem {
     // Title
     if (title) {
       this.addText(x + (w - title.length * 6) / 2, y + 8, title, 0xffbe78, '10px', 'JetBrains Mono', 2);
+    }
+  }
+
+  /**
+   * Soft glow behind a big numeral: concentric low-alpha fills approximate a
+   * radial falloff, since Graphics has no gradient-filled circles.
+   */
+  private drawNumeralGlow(cx: number, cy: number, color: number): void {
+    const layers: Array<[number, number]> = [[30, 0.04], [21, 0.05], [13, 0.06]];
+    for (const [radius, alpha] of layers) {
+      this.graphics.fillStyle(color, alpha);
+      this.graphics.beginPath();
+      this.graphics.arc(cx, cy, radius, 0, Math.PI * 2);
+      this.graphics.fillPath();
     }
   }
 
@@ -1705,21 +1720,22 @@ export class HudSystem {
     const cashStr1 = `$${match.profiles[0].cash.toLocaleString()}`;
     this.addText(98, 78, cashStr1, 0xf4ece2, '10px', 'JetBrains Mono', 0.8, { alpha: 0.55, weight: '400' });
 
-    // RIGHT: Player 2 mirrored (right-aligned)
-    // PLAYER label: 21px light tint #ff8a4c, ls .06em, right-aligned to x942
-    this.addText(942, 12, `PLAYER ${tanks[1].id + 1}`, 0xff8a4c, '21px', 'Barlow Condensed', 1.26, { originX: 1, weight: '400' });
+    // RIGHT: Player 2 mirrored — text column right-aligned to x862, the
+    // mirror of P1's x98 start, so it clears the mini-tank sprite at x874+.
+    const p2Right = GAME_CONFIG.width - 98;
+    this.addText(p2Right, 12, `PLAYER ${tanks[1].id + 1}`, 0xff8a4c, '21px', 'Barlow Condensed', 1.26, { originX: 1, weight: '400' });
     // HP numeral: 30px cream, right-aligned
-    this.addText(942, 32, `${tanks[1].health}`, 0xf4ece2, '30px', 'Barlow Condensed', undefined, { originX: 1 });
+    this.addText(p2Right, 32, `${tanks[1].health}`, 0xf4ece2, '30px', 'Barlow Condensed', undefined, { originX: 1 });
     // HP suffix: positioned off the numeral width
     const hpNum2Idx = this.texts.length - 1;
     const hpNum2 = this.texts[hpNum2Idx];
     const hpNumW2 = hpNum2.width;
-    this.addText(942 - hpNumW2 - 4, 42, maxHealthStr, 0xf4ece2, '10px', 'JetBrains Mono', undefined, { alpha: 0.45, weight: '400', originX: 1 });
+    this.addText(p2Right - hpNumW2 - 4, 42, maxHealthStr, 0xf4ece2, '10px', 'JetBrains Mono', undefined, { alpha: 0.45, weight: '400', originX: 1 });
     // HP bar: 150×5 r3, P2 right-anchored with glow
-    this.drawHpBarWithGlow(942 - 150, 66, 150, 5, tanks[1].health, 0xff7a3c, 0xffc08a);
+    this.drawHpBarWithGlow(p2Right - 150, 66, 150, 5, tanks[1].health, 0xff7a3c, 0xffc08a);
     // Cash: 10px @.55 alpha, ls .08em, right-aligned
     const cashStr2 = `$${match.profiles[1].cash.toLocaleString()}`;
-    this.addText(942, 78, cashStr2, 0xf4ece2, '10px', 'JetBrains Mono', 0.8, { alpha: 0.55, weight: '400', originX: 1 });
+    this.addText(p2Right, 78, cashStr2, 0xf4ece2, '10px', 'JetBrains Mono', 0.8, { alpha: 0.55, weight: '400', originX: 1 });
 
     // CENTER CLUSTER: truly centered (origin)
     // Kicker: 10px @.5, "ROUND 1 · FIRST TO 2"
@@ -1768,15 +1784,12 @@ export class HudSystem {
     this.addText(356, top + 14, '15–165', 0xf4ece2, '9px', 'JetBrains Mono', undefined, { alpha: 0.3, originX: 1, weight: '400' });
     // 44px numeral + glow effect
     this.addText(231, top + 42, `${Math.round(activeTank.angle)}`, activePalette.primary, '44px', 'Barlow Condensed', undefined, { weight: '600' });
-    // Add glow to angle numeral
-    this.graphics.fillStyle(activePalette.primary, 0.1);
-    this.graphics.beginPath();
-    this.graphics.arc(231, top + 42, 28, 0, Math.PI * 2);
-    this.graphics.fillPath();
-    // ° glyph 20px @.5
-    const angleNumIdx = this.texts.length - 1;
-    const angleNum = this.texts[angleNumIdx];
+    const angleNum = this.texts[this.texts.length - 1];
     const angleNumW = angleNum.width;
+    // Soft glow centered on the numeral (concentric low-alpha fills; a single
+    // flat disc at the text's top-left corner reads as a gray smudge).
+    this.drawNumeralGlow(231 + angleNumW / 2, top + 42 + angleNum.height / 2, activePalette.primary);
+    // ° glyph 20px @.5
     this.addText(231 + angleNumW + 2, top + 38, '°', 0xf4ece2, '20px', 'JetBrains Mono', undefined, { alpha: 0.5, weight: '400' });
     // Dial with arc and ticks at top+116
     this.drawHiResAngleDial(308, top + 116, activeTank, activePalette.primary);
@@ -1787,13 +1800,13 @@ export class HudSystem {
     this.addText(588, top + 14, '15–100', 0xf4ece2, '9px', 'JetBrains Mono', undefined, { alpha: 0.3, originX: 1, weight: '400' });
     // 44px numeral + glow at x411
     this.addText(411, top + 42, `${Math.round(activeTank.power)}`, activePalette.primary, '44px', 'Barlow Condensed', undefined, { weight: '600' });
-    // Add glow to power numeral
-    this.graphics.fillStyle(activePalette.primary, 0.1);
-    this.graphics.beginPath();
-    this.graphics.arc(411, top + 42, 28, 0, Math.PI * 2);
-    this.graphics.fillPath();
-    // ↑↓ ADJUST hint: 9px @.4, ls .14em, baseline-tracked to numeral
-    this.addText(411, top + 62, '↑↓ ADJUST', 0xf4ece2, '9px', 'JetBrains Mono', 1.26, { alpha: 0.4, originX: 0.5, weight: '400' });
+    const powerNum = this.texts[this.texts.length - 1];
+    this.drawNumeralGlow(411 + powerNum.width / 2, top + 42 + powerNum.height / 2, activePalette.primary);
+    // ↑↓ ADJUST hint: 9px @.4, ls .14em — to the RIGHT of the numeral,
+    // bottom-anchored near the digits' visual baseline. Fixed y: the text
+    // object's height includes leading, which would land it on the segment
+    // row at top+82.
+    this.addText(411 + powerNum.width + 8, top + 79, '↑↓ ADJUST', 0xf4ece2, '9px', 'JetBrains Mono', 1.26, { alpha: 0.4, originY: 1, weight: '400' });
     // Power segments at top+82 with glow
     this.drawHiResPowerSegments(416, top + 82, activeTank);
 
@@ -1848,18 +1861,20 @@ export class HudSystem {
     // Center: ONE row of 5 keycaps (AIM/POWER/MOVE/WEAPON/VISUAL) with en-dash labels
     this.drawHiResKeycapChips(top);
 
-    // Right group: all on ONE line right-aligned ending x942
-    // READY TO FIRE (10px ls .16em)
+    // Right group: ONE line, vertically centered on the ESC chip, ending at
+    // x812 so it stays clear of the chip's frozen hit rect (x820..950).
+    const chipStripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+    const rightLineY = chipStripY + 13;
     const statusText = turn.phase === 'aiming' ? 'READY TO FIRE' : 'SHOT IN FLIGHT';
     const statusColor = turn.phase === 'aiming' ? 0x58d98b : 0xffd15c;
-    this.addText(858, stripY + 18, statusText, statusColor, '10px', 'JetBrains Mono', 1.6, { weight: '400' });
 
-    // weapon name (9px ls .14em @.45)
-    this.addText(858, stripY + 32, weapon.name.toUpperCase(), 0xf4ece2, '9px', 'JetBrains Mono', 1.26, { alpha: 0.45, weight: '400' });
+    // weapon name (9px ls .14em @.45), right-aligned to x812
+    this.addText(812, rightLineY, weapon.name.toUpperCase(), 0xf4ece2, '9px', 'JetBrains Mono', 1.26, { alpha: 0.45, originX: 1, originY: 0.5, weight: '400' });
+    const weaponNameObj = this.texts[this.texts.length - 1];
 
-    // ESC chip: border-only rgba(255,122,60,.45), text #ff7a3c, drawn exactly over hit zone per S5
-    // ESC hit rect: (820..950, stripY+2..stripY+24) from GameScene
-    const chipStripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+    // READY TO FIRE (10px ls .16em) to the left of the weapon name
+    this.addText(812 - weaponNameObj.width - 14, rightLineY, statusText, statusColor, '10px', 'JetBrains Mono', 1.6, { originX: 1, originY: 0.5, weight: '400' });
+
     // ESC chip border-only (no fill), drawn at hit rect (820..950, chipStripY+2..chipStripY+24)
     this.graphics.lineStyle(1, 0xff7a3c, 0.45);
     this.graphics.strokeRoundedRect(820, chipStripY + 2, 130, 22, 3);

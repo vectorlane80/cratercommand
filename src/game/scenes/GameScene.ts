@@ -178,6 +178,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
+    this.cameras.main.setZoom(GAME_CONFIG.renderScale).centerOn(GAME_CONFIG.width / 2, GAME_CONFIG.height / 2);
 
     // Load visual system from storage first, before layer textures are applied.
     this.loadVisualSystemFromStorage();
@@ -335,7 +336,7 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.focus();
 
     // Mouse/touch routing.
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.worldX, p.worldY));
 
     // HiRes blast animation.
     if (!this.anims.exists('hires-blast-anim')) {
@@ -631,7 +632,9 @@ export class GameScene extends Phaser.Scene {
     this.laserResolving = false;
     this.aiSystem.resetRound();
     this.turnSystem.resolveWallMode(this.match);
-    this.terrainData = this.terrainSystem.generate(this.scale.width, GAME_CONFIG.layout.battlefieldHeight);
+    // GAME_CONFIG.width, not scale.width: the canvas backing store is
+    // renderScale× the fixed 960×540 world.
+    this.terrainData = this.terrainSystem.generate(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
     this.tanks = this.tankSystem.createTanks(this.terrainSystem, this.terrainData, this.match.profiles);
 
     // Auto-arm shields for players with autoDefense or AI
@@ -885,9 +888,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.terrainData) {
       // Joiner hasn't run beginRound — fake one up from the snapshot.
       this.terrainData = {
-        width: this.scale.width,
+        width: GAME_CONFIG.width,
         height: GAME_CONFIG.layout.battlefieldHeight,
-        segmentWidth: this.scale.width / (snap.terrainHeights.length - 1),
+        segmentWidth: GAME_CONFIG.width / (snap.terrainHeights.length - 1),
         heights: snap.terrainHeights.slice()
       };
     } else {
@@ -1292,9 +1295,9 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Single pointerdown handler that routes to whichever interaction the
-   * pointer landed on. All coordinates are in 960x540 game space (Phaser's
-   * Scale.FIT keeps pointer events in this coordinate system regardless of
-   * the canvas's actual screen size).
+   * pointer landed on. All coordinates are in 960x540 game space — callers
+   * pass pointer.worldX/worldY, which the renderScale-zoomed camera maps
+   * back to world space regardless of canvas size.
    */
   private handlePointerDown(x: number, y: number): void {
     // Forfeit-confirm modal owns the pointer when open.
@@ -1640,8 +1643,11 @@ export class GameScene extends Phaser.Scene {
   private tickPointerMovement(delta: number): boolean {
     const pointer = this.input.activePointer;
     if (!pointer.isDown) return false;
-    if (pointer.y >= GAME_CONFIG.layout.consoleTop) return false;
-    return this.tryPointerMove(pointer.x, delta);
+    // Poll path: worldX/worldY are only refreshed on pointer events, so
+    // convert the canvas position through the zoomed camera explicitly.
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    if (world.y >= GAME_CONFIG.layout.consoleTop) return false;
+    return this.tryPointerMove(world.x, delta);
   }
 
   private tryPointerMove(targetX: number, delta: number): boolean {
@@ -2117,8 +2123,16 @@ export class GameScene extends Phaser.Scene {
           const rock = this.hiresRocks[idx];
           if (!rock) return;
           const x = t * GAME_CONFIG.width;
-          const y = this.terrainSystem.getHeightAtX(this.terrainData, x);
-          rock.setPosition(Math.round(x), Math.round(y) + 2);
+          // Sample terrain across the rock's ~48px footprint and sit its base
+          // on the LOWEST ground under it — center-only sampling left rocks
+          // overhanging on slopes.
+          const halfW = 24;
+          let baseY = 0;
+          for (let dx = -halfW; dx <= halfW; dx += 8) {
+            const sampleX = Math.min(Math.max(x + dx, 0), GAME_CONFIG.width - 1);
+            baseY = Math.max(baseY, this.terrainSystem.getHeightAtX(this.terrainData, sampleX));
+          }
+          rock.setPosition(Math.round(x), Math.round(baseY) + 2);
           rock.visible = true;
         });
 

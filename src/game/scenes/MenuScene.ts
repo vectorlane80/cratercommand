@@ -75,6 +75,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
+    this.cameras.main.setZoom(GAME_CONFIG.renderScale).centerOn(GAME_CONFIG.width / 2, GAME_CONFIG.height / 2);
 
     // Retro backdrop — created first so it layers under graphics/text
     this.retroBackdrop = this.add.image(GAME_CONFIG.width / 2, 0, 'retro-backdrop').setOrigin(0.5, 0);
@@ -116,7 +117,7 @@ export class MenuScene extends Phaser.Scene {
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.worldX, p.worldY));
 
     this.loadPhysicsFromStorage();
     this.loadVisualSystemFromStorage();
@@ -805,7 +806,7 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: 'JetBrains Mono',
       fontSize: '11px'
     });
-    visualsValueObj.setResolution(2);
+    visualsValueObj.setResolution(GAME_CONFIG.renderScale);
     // Measure width WITH letterspacing
     visualsValueObj.setLetterSpacing(1.8);
     const vw = visualsValueObj.width;
@@ -892,10 +893,12 @@ export class MenuScene extends Phaser.Scene {
     // Light tint: P1 light blue, P2 light orange
     const nameColor = idx === 0 ? 0x5aa9ff : 0xff8a4c;
     this.addText(boxX + 70, boxY + 12, displayName, nameColor, '25px', 'Barlow Condensed', 1.25, { weight: '400' });
+    const nameObj = this.texts[this.texts.length - 1];
 
-    // Helper text INLINE right of name: 8px @.36
+    // Helper text INLINE right of the name (drawing it below overlapped the
+    // name's descenders), vertically centered on the name.
     const helperText = idx === 0 ? 'TAP NAME TO RENAME' : 'TAP BOX TO CYCLE';
-    this.addText(boxX + 70, boxY + 28, helperText, 0x8a8078, '8px', 'JetBrains Mono', 1.8, { alpha: 0.36, weight: '400' });
+    this.addText(boxX + 70 + nameObj.width + 12, boxY + 12 + nameObj.height / 2, helperText, 0x8a8078, '8px', 'JetBrains Mono', 1.8, { alpha: 0.36, originY: 0.5, weight: '400' });
 
     // Right-aligned value chip: size from text width WITH letterspacing, right edge at x=856
     const valueText = CONTROLLER_LABELS[slot];
@@ -904,19 +907,20 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: 'JetBrains Mono',
       fontSize: '10px'
     });
-    valueTextObj.setResolution(2);
+    valueTextObj.setResolution(GAME_CONFIG.renderScale);
     // Include letterspacing in width measurement
     valueTextObj.setLetterSpacing(1.6);
     const textW = valueTextObj.width;
     valueTextObj.destroy();
     const chipW = textW + 20;
     const chipX = 856 - chipW;
-    this.graphics.fillStyle(0x1a1408, 1);
-    this.graphics.fillRect(chipX, boxY + 6, chipW, 28);
+    // Player-tinted rounded chip per the design (was a square untinted box).
+    this.graphics.fillStyle(accent, 0.18);
+    this.graphics.fillRoundedRect(chipX, boxY + 6, chipW, 28, 3);
     this.graphics.lineStyle(1, accent, 0.5);
-    this.graphics.strokeRect(chipX, boxY + 6, chipW, 28);
-    // Center text via origin
-    this.addText(chipX + chipW / 2, boxY + 22, valueText, accent, '10px', 'JetBrains Mono', 1.6, { originX: 0.5, originY: 0.5 });
+    this.graphics.strokeRoundedRect(chipX, boxY + 6, chipW, 28, 3);
+    // Near-white text, centered via origin
+    this.addText(chipX + chipW / 2, boxY + 20, valueText, 0xf4ece2, '10px', 'JetBrains Mono', 1.6, { originX: 0.5, originY: 0.5, weight: '400' });
   }
 
   private renderSettings(): void {
@@ -1111,7 +1115,7 @@ export class MenuScene extends Phaser.Scene {
       fontSize,
       fontStyle
     });
-    text.setResolution(2);
+    text.setResolution(GAME_CONFIG.renderScale);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
     }
@@ -1147,7 +1151,7 @@ export class MenuScene extends Phaser.Scene {
       fontStyle
     });
     text.setOrigin(opts?.originX ?? 0.5, opts?.originY ?? 0);
-    text.setResolution(2);
+    text.setResolution(GAME_CONFIG.renderScale);
     if (letterSpacing !== undefined) {
       text.setLetterSpacing(letterSpacing);
     }

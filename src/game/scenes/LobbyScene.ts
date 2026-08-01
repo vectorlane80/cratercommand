@@ -61,6 +61,7 @@ export class LobbyScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
+    this.cameras.main.setZoom(GAME_CONFIG.renderScale).centerOn(GAME_CONFIG.width / 2, GAME_CONFIG.height / 2);
     this.graphics = this.add.graphics();
 
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
@@ -73,7 +74,7 @@ export class LobbyScene extends Phaser.Scene {
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.x, p.y));
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.worldX, p.worldY));
 
     networkSystem.setEvents({
       onStateChange: () => this.render(),
@@ -479,7 +480,7 @@ export class LobbyScene extends Phaser.Scene {
       fontSize,
       fontStyle: 'bold'
     });
-    text.setResolution(2);
+    text.setResolution(GAME_CONFIG.renderScale);
     this.texts.push(text);
   }
 

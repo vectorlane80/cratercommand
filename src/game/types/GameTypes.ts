@@ -247,6 +247,11 @@ export interface FallEvent {
 export const GAME_CONFIG = {
   width: 960,
   height: 540,
+  // Canvas backing-store multiplier. The world stays 960×540; every scene's
+  // camera zooms by this factor so vector graphics and text rasterize at the
+  // higher density instead of being CSS-upscaled (which pixelates on hi-DPI
+  // displays). Pointer handlers must use world coordinates, not canvas ones.
+  renderScale: 2,
   layout: {
     battlefieldTop: 0,
     battlefieldHeight: 356,
