@@ -68,15 +68,7 @@ export class MenuScene extends Phaser.Scene {
   private miniTankRed!: Phaser.GameObjects.Image;
   private view: 'main' | 'settings' = 'main';
 
-  private slotKeys: Phaser.Input.Keyboard.Key[] = [];
-  private spaceKey!: Phaser.Input.Keyboard.Key;
-  private enterKey!: Phaser.Input.Keyboard.Key;
   private escapeKey!: Phaser.Input.Keyboard.Key;
-  private bKey!: Phaser.Input.Keyboard.Key;
-  private wKey!: Phaser.Input.Keyboard.Key;
-  private gKey!: Phaser.Input.Keyboard.Key;
-  private aKey!: Phaser.Input.Keyboard.Key;
-  private fKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('MenuScene');
@@ -99,30 +91,8 @@ export class MenuScene extends Phaser.Scene {
     this.miniTankBlue = this.add.image(0, 0, 'hires-mini-tank-blue').setOrigin(0.5, 0.5).setScale(0.2).setVisible(false);
     this.miniTankRed = this.add.image(0, 0, 'hires-mini-tank-red').setOrigin(0.5, 0.5).setScale(0.2).setVisible(false);
 
-    const keyCodes = [
-      Phaser.Input.Keyboard.KeyCodes.ONE,
-      Phaser.Input.Keyboard.KeyCodes.TWO
-    ];
-    this.slotKeys = keyCodes.map((c) => this.input.keyboard!.addKey(c));
-    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-    this.bKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
-    this.wKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.gKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G);
-    this.aKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.fKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
-    this.captureCodes = [
-      ...keyCodes,
-      Phaser.Input.Keyboard.KeyCodes.SPACE,
-      Phaser.Input.Keyboard.KeyCodes.ENTER,
-      Phaser.Input.Keyboard.KeyCodes.ESC,
-      Phaser.Input.Keyboard.KeyCodes.B,
-      Phaser.Input.Keyboard.KeyCodes.W,
-      Phaser.Input.Keyboard.KeyCodes.G,
-      Phaser.Input.Keyboard.KeyCodes.A,
-      Phaser.Input.Keyboard.KeyCodes.F
-    ];
+    this.captureCodes = [Phaser.Input.Keyboard.KeyCodes.ESC];
     this.input.keyboard!.addCapture(this.captureCodes);
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
@@ -149,43 +119,6 @@ export class MenuScene extends Phaser.Scene {
       soundSystem.playUiClick();
       this.render();
       return;
-    }
-
-    for (let i = 0; i < this.slotKeys.length; i += 1) {
-      if (Phaser.Input.Keyboard.JustDown(this.slotKeys[i])) {
-        this.cycleSlot(i);
-        soundSystem.playUiClick();
-        this.render();
-      }
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.bKey)) {
-      this.cycleMatchLength();
-      soundSystem.playUiClick();
-      this.render();
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.wKey)) {
-      this.cycleWallMode();
-      soundSystem.playUiClick();
-      this.render();
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.gKey)) {
-      this.cycleGravity();
-      soundSystem.playUiClick();
-      this.render();
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.aKey)) {
-      this.cycleViscosity();
-      soundSystem.playUiClick();
-      this.render();
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.fKey)) {
-      this.cycleTanksFall();
-      soundSystem.playUiClick();
-      this.render();
-    }
-    if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) && this.view === 'main' && this.canStart()) {
-      soundSystem.playUiSelect();
-      this.startMatch();
     }
   }
 
@@ -215,8 +148,8 @@ export class MenuScene extends Phaser.Scene {
    * game). Enter/blur commits, ESC cancels; empty reverts to the default.
    * Names are trimmed and capped at MAX_NAME_LEN to keep them fitting in
    * the HUD. Phaser's keyboard is disabled while the editor is open: the
-   * menu's key captures preventDefault at the window level, which would
-   * otherwise swallow B/W/G/A/F/1/2/space while typing.
+   * menu's ESC capture prevents default at the window level, so the editor
+   * temporarily clears it while typing.
    */
   private openNameEditor(idx: number): void {
     if (this.nameEditInput) this.closeNameEditor(false);
@@ -874,37 +807,37 @@ export class MenuScene extends Phaser.Scene {
 
     drawGorilla(this.graphics, 150, 118, 2.1, 'both');
     drawGorilla(this.graphics, 810, 118, 2.1, 'both');
-    bananasPixTextCentered(this.graphics, 'SELECT PLAYERS', 480, 96, 2, bananasInk(0xffffff));
+    this.addText(480, 96, 'SELECT PLAYERS', bananasInk(0xffffff), '14px', 'Courier New', undefined, { originX: 0.5 });
 
     bananasBox(this.graphics, 280, 134, 400, 40, bananasInk(0x000000), bananasInk(0x55ffff));
     if (this.nameEditIdx !== 0) {
       const name = this.names[0] ?? 'PLAYER 1';
-      const cell = name.length > 8 ? 2 : 3;
-      bananasPixText(this.graphics, name, 120, 142 + (cell === 2 ? 4 : 0), cell, bananasInk(0x55ffff));
+      this.addText(120, 142, name, bananasInk(0x55ffff), '18px', 'Courier New');
     }
-    bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[0]], 296, 146, 2, bananasInk(0xffffff));
+    this.addText(296, 146, CONTROLLER_LABELS[this.slots[0]], bananasInk(0xffffff), '14px', 'Courier New');
     bananasBox(this.graphics, 280, 194, 400, 40, bananasInk(0x000000), bananasInk(0xff55ff));
     if (this.nameEditIdx !== 1) {
       const name = this.names[1] ?? 'PLAYER 2';
-      const cell = name.length > 8 ? 2 : 3;
-      bananasPixText(this.graphics, name, 120, 202 + (cell === 2 ? 4 : 0), cell, bananasInk(0xff55ff));
+      this.addText(120, 202, name, bananasInk(0xff55ff), '18px', 'Courier New');
     }
-    bananasPixText(this.graphics, CONTROLLER_LABELS[this.slots[1]], 296, 206, 2, bananasInk(0xffffff));
+    this.addText(296, 206, CONTROLLER_LABELS[this.slots[1]], bananasInk(0xffffff), '14px', 'Courier New');
 
-    bananasPixTextCentered(
-      this.graphics,
-      'TAP NAME TO RENAME  ·  TAP BOX TO CYCLE',
+    this.addText(
       480,
       264,
-      2,
-      bananasInk(0xaaaaaa)
+      'TAP NAME TO RENAME  ·  TAP BOX TO CYCLE',
+      bananasInk(0xaaaaaa),
+      '14px',
+      'Courier New',
+      undefined,
+      { originX: 0.5 }
     );
 
     const startColor = this.canStart() ? 0xffff55 : 0x555555;
     bananasBox(this.graphics, 310, 300, 340, 46, bananasInk(0x000000), bananasInk(startColor));
     bananasPixTextCentered(this.graphics, 'START MATCH', 480, 312, 3, bananasInk(startColor));
     bananasBox(this.graphics, 310, 366, 340, 36, bananasInk(0x000000), bananasInk(0x555555));
-    bananasPixTextCentered(this.graphics, 'SETTINGS', 480, 376, 2, bananasInk(0x555555));
+    this.addText(480, 376, 'SETTINGS', bananasInk(0x555555), '14px', 'Courier New', undefined, { originX: 0.5 });
 
     const displayLabel: Record<BananasDisplay, string> = {
       '16color': '16-COLOR',
@@ -913,19 +846,21 @@ export class MenuScene extends Phaser.Scene {
       white: 'WHITE'
     };
     bananasBox(this.graphics, 310, 410, 340, 28, bananasInk(0x000000), bananasInk(0xffffff));
-    bananasPixTextCentered(
-      this.graphics,
-      `BANANAS  ·  ${displayLabel[display]}`,
+    this.addText(
       480,
       416,
-      2,
-      bananasInk(0xffff55)
+      `BANANAS  ·  ${displayLabel[display]}`,
+      bananasInk(0xffff55),
+      '14px',
+      'Courier New',
+      undefined,
+      { originX: 0.5 }
     );
 
     bananasBox(this.graphics, 220, 452, 240, 32, bananasInk(0x000000), bananasInk(0x55ffff));
-    bananasPixTextCentered(this.graphics, 'HOST ONLINE', 340, 460, 2, bananasInk(0x55ffff));
+    this.addText(340, 460, 'HOST ONLINE', bananasInk(0x55ffff), '14px', 'Courier New', undefined, { originX: 0.5 });
     bananasBox(this.graphics, 500, 452, 240, 32, bananasInk(0x000000), bananasInk(0xff55ff));
-    bananasPixTextCentered(this.graphics, 'JOIN ONLINE', 620, 460, 2, bananasInk(0xff55ff));
+    this.addText(620, 460, 'JOIN ONLINE', bananasInk(0xff55ff), '14px', 'Courier New', undefined, { originX: 0.5 });
   }
 
   private renderMainHiRes(): void {
@@ -941,7 +876,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawSlotRowHiRes(1, 194, 'PLAYER 2', this.slots[1], getPlayerPalette(1, 'hiRes').primary);
 
     // Hint line at y250
-    this.addText(GAME_CONFIG.width / 2, 250, '1 / 2 CYCLES CONTROLLER · ENTER STARTS', 0x8a8078, '10px', 'JetBrains Mono', 1.6, { alpha: 0.4, originX: 0.5, weight: '400' });
+    this.addText(GAME_CONFIG.width / 2, 250, 'TAP A PLAYER ROW TO CYCLE ITS CONTROLLER', 0x8a8078, '10px', 'JetBrains Mono', 1.6, { alpha: 0.4, originX: 0.5, weight: '400' });
 
     // Start button — warm gradient fill (#ffcf7a → #e08a1c 58% → #a85f10)
     const startX = GAME_CONFIG.width / 2 - 170;
@@ -970,16 +905,6 @@ export class MenuScene extends Phaser.Scene {
       // START MATCH label: 29px dark centered
       this.addText(startX + startW / 2, startY + startH / 2, 'START MATCH', 0x241505, '29px', 'Barlow Condensed', 4.64, { originX: 0.5, originY: 0.5, weight: '600' });
 
-      // ENTER keycap chip: 9px mono, bordered, 12px right of label
-      const chipX = startX + startW / 2 + 100;
-      const chipY = startY + startH / 2 - 6;
-      const chipW = 32;
-      const chipH = 20;
-      this.graphics.fillStyle(0x241505, 0.35);
-      this.graphics.fillRoundedRect(chipX, chipY, chipW, chipH, 2);
-      this.graphics.lineStyle(1, 0x241505, 0.35);
-      this.graphics.strokeRoundedRect(chipX, chipY, chipW, chipH, 2);
-      this.addText(chipX + chipW / 2, chipY + chipH / 2, 'ENTER', 0xf0dcc2, '9px', 'JetBrains Mono', undefined, { originX: 0.5, originY: 0.5, weight: '400' });
     } else {
       // Disabled button styling
       this.graphics.fillStyle(0x050505, 1);
@@ -1166,11 +1091,11 @@ export class MenuScene extends Phaser.Scene {
     this.addCenteredText(60, 'SETTINGS', palette.subtitle, GAME_CONFIG.font.large);
 
     const settingRows = [
-      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: palette.settingsValue },
-      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: palette.settingsValue },
-      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
-      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
-      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
+      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: palette.settingsValue },
+      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: palette.settingsValue },
+      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
+      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
+      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
     ];
 
     for (const row of settingRows) {
@@ -1204,11 +1129,11 @@ export class MenuScene extends Phaser.Scene {
     this.addText(400, 60, 'SETTINGS', 0xffffff, '24px', 'Courier New');
 
     const settingRows = [
-      { label: 'MATCH LENGTH (B)', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label },
-      { label: 'WALLS (W)', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]] },
-      { label: 'GRAVITY (G)', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]] },
-      { label: 'AIR VISCOSITY (A)', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]] },
-      { label: 'TANKS FALL (F)', y: 330, value: this.tanksFall ? 'ON' : 'OFF' }
+      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label },
+      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]] },
+      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]] },
+      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]] },
+      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF' }
     ];
 
     for (const row of settingRows) {
@@ -1245,19 +1170,16 @@ export class MenuScene extends Phaser.Scene {
     this.addText(90, 84, 'SETTINGS', 0xd8cfc4, '10px', 'JetBrains Mono', 3, { alpha: 0.5, weight: '400' });
 
     const settingRows = [
-      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, hint: 'KEY B', isTanksFall: false },
-      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], hint: 'KEY W', isTanksFall: false },
-      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], hint: 'KEY G', isTanksFall: false },
-      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], hint: 'KEY A', isTanksFall: false },
-      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', hint: 'KEY F', isTanksFall: true }
+      { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, isTanksFall: false },
+      { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], isTanksFall: false },
+      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], isTanksFall: false },
+      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], isTanksFall: false },
+      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', isTanksFall: true }
     ];
 
     for (const row of settingRows) {
       // Label: x220 Barlow 600 21px ls .1em 0xf0dcc2
       this.addText(220, row.y + 8, row.label, 0xf0dcc2, '21px', 'Barlow Condensed', 2.1, { weight: '600' });
-
-      // KEY hint: 'KEY B' mono 8px ls .2em @.34 inline 12px after label
-      this.addText(220 + 180, row.y + 8, row.hint, 0xf0dcc2, '8px', 'JetBrains Mono', 1.6, { alpha: 0.34, weight: '400' });
 
       const btn = this.settingsButtonForRow(row.y);
 

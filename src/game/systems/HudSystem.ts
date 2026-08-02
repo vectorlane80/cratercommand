@@ -223,7 +223,8 @@ export class HudSystem {
     weaponWindowStart = 0,
     topToast: { text: string; color: number } | null = null,
     quitConfirm = false,
-    isOnline = false
+    isOnline = false,
+    localShopper = true
   ): void {
     this.currentPendingShop = pendingShop;
     this.clearTexts();
@@ -255,7 +256,16 @@ export class HudSystem {
     }
 
     if (inShop) {
-      this.drawShopOverlay(match, visualSystem);
+      if (localShopper) {
+        this.drawShopOverlay(match, visualSystem);
+      } else {
+        this.drawFullScreenBackdrop();
+        const shoppingPlayerId = match.shoppingPlayerId;
+        if (shoppingPlayerId !== null) {
+          const shopperName = match.profiles[shoppingPlayerId].displayName ?? `PLAYER ${shoppingPlayerId + 1}`;
+          this.drawCenterBanner(`${shopperName} IS SHOPPING`, 'PLEASE WAIT', visualSystem);
+        }
+      }
     } else if (turn.phase === 'roundOver' && statusMessage) {
       this.drawCenterBanner(
         statusMessage,
@@ -267,7 +277,7 @@ export class HudSystem {
     } else if (turn.phase === 'aiming' && statusMessage) {
       // AI is thinking — small banner that doesn't block visibility.
       if (visualSystem === 'bananas') {
-        bananasPixTextCentered(this.graphics, statusMessage, GAME_CONFIG.width / 2, 140, 2, bananasInk(0xffff55));
+        this.addText(GAME_CONFIG.width / 2, 140, statusMessage, bananasInk(0xffff55), '14px', 'Courier New', undefined, { originX: 0.5 });
       } else {
         this.addText(
           (GAME_CONFIG.width - statusMessage.length * 11) / 2,
@@ -304,7 +314,7 @@ export class HudSystem {
       this.graphics.lineStyle(2, toastColor, 1);
       this.graphics.strokeRect(x - 10, y - 4, labelW + 20, 26);
       if (visualSystem === 'bananas') {
-        bananasPixTextCentered(this.graphics, topToast.text, GAME_CONFIG.width / 2, y, 2, toastColor);
+        this.addText(GAME_CONFIG.width / 2, y, topToast.text, toastColor, '14px', 'Courier New', undefined, { originX: 0.5 });
       } else {
         this.addText(x, y, topToast.text, topToast.color, GAME_CONFIG.font.medium);
       }
@@ -387,9 +397,9 @@ export class HudSystem {
       const noX = cx + gap / 2;
 
       bananasBox(this.graphics, yesX, btnY, btnW, btnH, bananasInk(0x000000), bananasInk(0xffffff));
-      bananasPixTextCentered(this.graphics, 'YES (Y)', yesX + btnW / 2, btnY + 13, 2, bananasInk(0xffffff));
+      this.addText(yesX + btnW / 2, btnY + 13, 'YES (Y)', bananasInk(0xffffff), '14px', 'Courier New', undefined, { originX: 0.5 });
       bananasBox(this.graphics, noX, btnY, btnW, btnH, bananasInk(0x000000), bananasInk(0xffffff));
-      bananasPixTextCentered(this.graphics, 'NO (N)', noX + btnW / 2, btnY + 13, 2, bananasInk(0xffffff));
+      this.addText(noX + btnW / 2, btnY + 13, 'NO (N)', bananasInk(0xffffff), '14px', 'Courier New', undefined, { originX: 0.5 });
 
     } else if (visualSystem === 'retroPixel') {
       // Steel/boxy treatment with desertGold title
@@ -684,23 +694,18 @@ export class HudSystem {
     const p2Name = match.profiles[1].displayName ?? 'PLAYER 2';
     const activeName = match.profiles[turn.activePlayerId].displayName ?? `PLAYER ${turn.activePlayerId + 1}`;
 
-    bananasPixText(this.graphics, p1Name, 24, 10, 2, bananasInk(0x55ffff));
-    bananasPixTextCentered(
-      this.graphics,
-      `${match.profiles[0].wins} > SCORE < ${match.profiles[1].wins}`,
+    this.addText(24, 10, p1Name, bananasInk(0x55ffff), '14px', 'Courier New');
+    this.addText(
       480,
       10,
-      2,
-      bananasInk(0xffffff)
+      `${match.profiles[0].wins} > SCORE < ${match.profiles[1].wins}`,
+      bananasInk(0xffffff),
+      '14px',
+      'Courier New',
+      undefined,
+      { originX: 0.5 }
     );
-    bananasPixText(
-      this.graphics,
-      p2Name,
-      936 - bananasTextMask(p2Name.toUpperCase()).w * 2,
-      10,
-      2,
-      bananasInk(0xff55ff)
-    );
+    this.addText(936, 10, p2Name, bananasInk(0xff55ff), '14px', 'Courier New', undefined, { originX: 1 });
 
     this.graphics.fillStyle(bananasInk(0x0000aa), 1);
     this.graphics.fillRect(0, top, 960, 134);
@@ -708,30 +713,30 @@ export class HudSystem {
     this.graphics.fillRect(0, top, 960, 2);
 
     bananasBox(this.graphics, 8, 366, 208, 122, bananasInk(0x000000), bananasInk(0xffffff));
-    bananasPixText(this.graphics, 'SCORE', 88, 374, 2, bananasInk(0xffffff));
-    bananasPixText(this.graphics, p1Name, 20, 398, 2, bananasInk(0x55ffff));
-    bananasPixText(this.graphics, `${match.profiles[0].wins}`, 180, 398, 2, bananasInk(0xffff55));
-    bananasPixText(this.graphics, p2Name, 20, 420, 2, bananasInk(0xff55ff));
-    bananasPixText(this.graphics, `${match.profiles[1].wins}`, 180, 420, 2, bananasInk(0xffff55));
-    bananasPixText(this.graphics, `BEST OF ${match.roundsToWin * 2 - 1}`, 20, 448, 2, bananasInk(0xaaaaaa));
-    bananasPixText(this.graphics, 'BANANA', 20, 466, 2, bananasInk(0xffff55));
+    this.addText(88, 374, 'SCORE', bananasInk(0xffffff), '14px', 'Courier New');
+    this.addText(20, 398, p1Name, bananasInk(0x55ffff), '14px', 'Courier New');
+    this.addText(180, 398, `${match.profiles[0].wins}`, bananasInk(0xffff55), '14px', 'Courier New');
+    this.addText(20, 420, p2Name, bananasInk(0xff55ff), '14px', 'Courier New');
+    this.addText(180, 420, `${match.profiles[1].wins}`, bananasInk(0xffff55), '14px', 'Courier New');
+    this.addText(20, 448, `BEST OF ${match.roundsToWin * 2 - 1}`, bananasInk(0xaaaaaa), '14px', 'Courier New');
+    this.addText(20, 466, 'BANANA', bananasInk(0xffff55), '14px', 'Courier New');
 
     bananasBox(this.graphics, 220, 366, 176, 122, bananasInk(0x000000), bananasInk(0xffffff));
-    bananasPixText(this.graphics, 'ANGLE', 274, 374, 2, bananasInk(0xffffff));
+    this.addText(274, 374, 'ANGLE', bananasInk(0xffffff), '14px', 'Courier New');
     bananasPixTextCentered(this.graphics, `${Math.round(tank.angle)}`, 308, 402, 5, bananasInk(0xffff55));
     this.graphics.fillStyle(bananasInk(0xffffff), 1);
     this.graphics.fillRect(238, 466, 140, 2);
     const angleRadians = (tank.angle * Math.PI) / 180;
     this.graphics.lineStyle(3, bananasInk(0x55ff55), 1);
     this.graphics.beginPath();
-    this.graphics.moveTo(250, 466);
-    this.graphics.lineTo(250 + Math.cos(angleRadians) * 60, 466 - Math.sin(angleRadians) * 60);
+    this.graphics.moveTo(308, 466);
+    this.graphics.lineTo(308 + Math.cos(angleRadians) * 60, 466 - Math.sin(angleRadians) * 60);
     this.graphics.strokePath();
-    bananasPixText(this.graphics, '<<', 230, 448, 2, bananasInk(0x555555));
-    bananasPixText(this.graphics, '>>', 356, 448, 2, bananasInk(0x555555));
+    this.addText(230, 448, '<<', bananasInk(0x555555), '14px', 'Courier New');
+    this.addText(356, 448, '>>', bananasInk(0x555555), '14px', 'Courier New');
 
     bananasBox(this.graphics, 400, 366, 204, 122, bananasInk(0x000000), bananasInk(0xffffff));
-    bananasPixText(this.graphics, 'VELOCITY', 462, 374, 2, bananasInk(0xffffff));
+    this.addText(462, 374, 'VELOCITY', bananasInk(0xffffff), '14px', 'Courier New');
     bananasPixTextCentered(this.graphics, `${Math.round(tank.power)}`, 502, 402, 5, bananasInk(0xffff55));
     bananasBox(this.graphics, 418, 452, 168, 22, bananasInk(0x000000), bananasInk(0xffffff));
     const filledSegments = Math.floor(tank.power / 10);
@@ -739,8 +744,8 @@ export class HudSystem {
       this.graphics.fillStyle(bananasInk(i < filledSegments ? 0x55ff55 : 0x555555), 1);
       this.graphics.fillRect(423 + i * 16, 457, 12, 12);
     }
-    bananasPixText(this.graphics, '<<', 410, 448, 2, bananasInk(0x555555));
-    bananasPixText(this.graphics, '>>', 578, 448, 2, bananasInk(0x555555));
+    this.addText(410, 448, '<<', bananasInk(0x555555), '14px', 'Courier New');
+    this.addText(578, 448, '>>', bananasInk(0x555555), '14px', 'Courier New');
 
     bananasBox(this.graphics, 610, 366, 140, 122, bananasInk(0x000000), bananasInk(0xffffff));
     bananasBox(
@@ -755,56 +760,42 @@ export class HudSystem {
       bananasInk(0xffffff)
     );
     bananasPixTextCentered(this.graphics, 'FIRE', 679, 412, 4, bananasInk(0xffff55));
-    bananasPixTextCentered(this.graphics, 'SPACE', 679, 462, 2, bananasInk(0xaaaaaa));
+    this.addText(679, 462, 'SPACE', bananasInk(0xaaaaaa), '14px', 'Courier New', undefined, { originX: 0.5 });
 
     bananasBox(this.graphics, 756, 366, 196, 122, bananasInk(0x000000), bananasInk(0xffffff));
-    bananasPixText(this.graphics, 'WIND', 838, 374, 2, bananasInk(0xffffff));
+    this.addText(838, 374, 'WIND', bananasInk(0xffffff), '14px', 'Courier New');
     this.drawBananasWindArrow(854, 412, turn.wind.magnitude, turn.wind.direction);
-    bananasPixText(
-      this.graphics,
-      `${turn.wind.direction > 0 ? 'RIGHT' : 'LEFT'}  ${turn.wind.magnitude}`,
+    this.addText(
       772,
       430,
-      2,
-      bananasInk(0xff5555)
+      `${turn.wind.direction > 0 ? 'RIGHT' : 'LEFT'}  ${turn.wind.magnitude}`,
+      bananasInk(0xff5555),
+      '14px',
+      'Courier New'
     );
-    bananasPixText(this.graphics, `ROUND   ${match.round}`, 772, 450, 2, bananasInk(0xffffff));
-    bananasPixText(this.graphics, 'GRAVITY 9.8', 772, 468, 2, bananasInk(0xaaaaaa));
+    this.addText(772, 450, `ROUND   ${match.round}`, bananasInk(0xffffff), '14px', 'Courier New');
+    this.addText(772, 468, 'GRAVITY 9.8', bananasInk(0xaaaaaa), '14px', 'Courier New');
 
     this.graphics.fillStyle(bananasInk(0x000000), 1);
     this.graphics.fillRect(0, 494, 960, 46);
     this.graphics.fillStyle(bananasInk(0xffffff), 1);
     this.graphics.fillRect(0, 494, 960, 2);
-    bananasPixText(this.graphics, '<- -> ANGLE   UP DN VELOCITY   SPACE THROW', 16, 504, 2, bananasInk(0x55ffff));
-    bananasPixText(this.graphics, 'V CYCLE DISPLAY   ENTER NEXT   ESC MENU', 16, 522, 2, bananasInk(0x55ffff));
+    this.addText(16, 504, '<- -> ANGLE   UP DN VELOCITY   SPACE THROW', bananasInk(0x55ffff), '14px', 'Courier New');
+    this.addText(16, 522, 'V CYCLE DISPLAY   ENTER NEXT   ESC MENU', bananasInk(0x55ffff), '14px', 'Courier New');
 
     const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
     bananasBox(this.graphics, 820, stripY + 2, 130, 22, bananasInk(0x000000), bananasInk(0x555555));
-    bananasPixTextCentered(this.graphics, 'ESC', 885, stripY + 8, 2, bananasInk(0xaaaaaa));
+    this.addText(885, stripY + 8, 'ESC', bananasInk(0xaaaaaa), '14px', 'Courier New', undefined, { originX: 0.5 });
     const throwText = `${activeName} THROWS`;
-    bananasPixText(
-      this.graphics,
-      throwText,
-      812 - bananasTextMask(throwText.toUpperCase()).w * 2,
-      504,
-      2,
-      bananasInk(0xffff55)
-    );
+    this.addText(812, 504, throwText, bananasInk(0xffff55), '14px', 'Courier New', undefined, { originX: 1 });
     if (turn.phase === 'projectileInFlight') {
       const flightText = 'BANANA IN FLIGHT';
-      bananasPixText(
-        this.graphics,
-        flightText,
-        812 - bananasTextMask(flightText).w * 2,
-        522,
-        2,
-        bananasInk(0xffffff)
-      );
+      this.addText(812, 522, flightText, bananasInk(0xffffff), '14px', 'Courier New', undefined, { originX: 1 });
     }
   }
 
   private drawBananasWindArrow(cx: number, y: number, magnitude: number, direction: -1 | 1): void {
-    const len = magnitude * 7 * direction;
+    const len = Math.min(magnitude, 20) * 4 * direction;
     this.graphics.fillStyle(bananasInk(0xff5555), 1);
     this.graphics.fillRect(Math.min(cx, cx + len), y, Math.abs(len), 3);
     const tipX = cx + len;
@@ -1226,7 +1217,7 @@ export class HudSystem {
     } else if (visualSystem === 'bananas') {
       bananasBox(this.graphics, x, y, w, h, bananasInk(0x000000), bananasInk(0xffffff));
       bananasPixTextCentered(this.graphics, line1, x + w / 2, y + 22, 3, bananasInk(0xffff55));
-      bananasPixTextCentered(this.graphics, line2, x + w / 2, y + 68, 2, bananasInk(0xffffff));
+      this.addText(x + w / 2, y + 68, line2, bananasInk(0xffffff), '16px', 'Courier New', undefined, { originX: 0.5 });
     } else if (visualSystem === 'retroPixel') {
       // Retro: boxy 2px steel + desertGold
       this.graphics.fillStyle(GAME_CONFIG.colors.steelMid, 1);

@@ -86,7 +86,7 @@ selection) and its own shopping priorities between rounds.
 
 ### Economy
 
-Cash from damage dealt ($30/HP), round wins ($5,000), and survival ($1,500).
+Cash from damage dealt ($45/HP), round wins ($8,000), and survival ($3,000).
 5% interest on savings between rounds. Prices drift on a persistent free
 market — buy in bulk and the price climbs; ignore an item and it slides back.
 Random sales each round.
@@ -113,9 +113,9 @@ physics settings carry over from the host's menu selections.
 | F10 | Sound on/off |
 | ESC | Forfeit / menu |
 
-Menu: G / A / F cycle gravity, air viscosity, tanks-fall; W walls; B match
-length. Tap a player's name to rename them (in-page editor, no browser
-pop-up). Full mouse/touch parity throughout.
+The menu and lobby are fully mouse/touch driven — tap a player row to cycle
+its controller, tap a name to rename (in-page editor), and tap settings rows
+to change them. In-match keyboard controls above.
 
 ## Architecture (short version)
 

@@ -29,8 +29,6 @@ export class LobbyScene extends Phaser.Scene {
   private graphics!: Phaser.GameObjects.Graphics;
 
   private escKey!: Phaser.Input.Keyboard.Key;
-  private enterKey!: Phaser.Input.Keyboard.Key;
-  private bKey!: Phaser.Input.Keyboard.Key;
 
   // DOM inputs. Positioned as `position: fixed` overlays anchored to the
   // canvas's bounding rect — Phaser's DOM container doesn't align cleanly
@@ -47,6 +45,7 @@ export class LobbyScene extends Phaser.Scene {
   }> = [];
   private resizeListener: (() => void) | null = null;
   private helloSent = false;
+  private connectAttemptInFlight = false;
 
   constructor() {
     super('LobbyScene');
@@ -62,17 +61,14 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   create(): void {
+    networkSystem.disconnect();
+    this.connectAttemptInFlight = false;
     this.cameras.main.setBackgroundColor(GAME_CONFIG.colors.black);
     this.cameras.main.setZoom(GAME_CONFIG.renderScale).centerOn(GAME_CONFIG.width / 2, GAME_CONFIG.height / 2);
     this.graphics = this.add.graphics();
 
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-    this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    this.bKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B);
-    this.input.keyboard!.addCapture([
-      Phaser.Input.Keyboard.KeyCodes.ESC,
-      Phaser.Input.Keyboard.KeyCodes.B
-    ]);
+    this.input.keyboard!.addCapture([Phaser.Input.Keyboard.KeyCodes.ESC]);
     this.game.canvas.setAttribute('tabindex', '0');
     this.game.canvas.focus();
 
@@ -107,14 +103,6 @@ export class LobbyScene extends Phaser.Scene {
       this.bail();
       return;
     }
-    const inputFocused = document.activeElement === this.nameInput || document.activeElement === this.codeInput;
-    if (!inputFocused && Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-      this.onEnter();
-      return;
-    }
-    if (this.phase === 'host-waiting' && !inputFocused && Phaser.Input.Keyboard.JustDown(this.bKey)) {
-      this.cycleMatchLength();
-    }
   }
 
   private cycleMatchLength(): void {
@@ -136,14 +124,6 @@ export class LobbyScene extends Phaser.Scene {
     this.render();
   }
 
-  private onEnter(): void {
-    if (this.phase === 'join-prompt') {
-      this.submitCode();
-    } else if (this.phase === 'lobby-ready' && this.mode === 'host') {
-      this.startMatch();
-    }
-  }
-
   private async startHost(): Promise<void> {
     try {
       this.code = await networkSystem.host();
@@ -157,6 +137,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private submitCode(): void {
+    if (this.connectAttemptInFlight) return;
     const raw = (this.codeInput?.value ?? '').trim().toUpperCase();
     if (raw.length !== 4) {
       this.errorMsg = 'Lobby codes are exactly 4 characters.';
@@ -169,7 +150,9 @@ export class LobbyScene extends Phaser.Scene {
     this.phase = 'join-connecting';
     this.destroyCodeInput();
     this.render();
+    this.connectAttemptInFlight = true;
     networkSystem.join(raw).catch((err) => {
+      this.connectAttemptInFlight = false;
       this.errorMsg = String(err);
       this.phase = 'error';
       this.render();
@@ -438,18 +421,23 @@ export class LobbyScene extends Phaser.Scene {
       this.graphics.strokeRect(ml.x, ml.y, ml.w, ml.h);
       const label = `BEST OF ${this.roundsToWin === 2 ? 3 : this.roundsToWin === 3 ? 5 : 7}`;
       this.addText(ml.x + 80, ml.y + 8, label, colors.cyan, GAME_CONFIG.font.large);
-      this.addText(cx - 130, 424, 'Press B or tap to change.', colors.dimGray, GAME_CONFIG.font.small);
+      this.addText(cx - 130, 424, 'Tap to change.', colors.dimGray, GAME_CONFIG.font.small);
     }
     if (this.phase === 'join-prompt') {
       // Code input centered at y=250 (spans ~222..278)
       this.addText(cx - 80, 195, 'LOBBY CODE', colors.white, GAME_CONFIG.font.medium);
+    }
+    if (this.phase === 'join-prompt' || this.phase === 'join-connecting') {
       const btn = { x: cx - 130, y: 320, w: 260, h: 40 };
       this.graphics.fillStyle(colors.panelDark, 1);
       this.graphics.fillRect(btn.x, btn.y, btn.w, btn.h);
       this.graphics.lineStyle(3, colors.yellow, 1);
       this.graphics.strokeRect(btn.x, btn.y, btn.w, btn.h);
-      this.addText(btn.x + 70, btn.y + 8, 'CONNECT', colors.yellow, GAME_CONFIG.font.large);
-      this.addText(cx - 140, 370, 'Type the code, then press ENTER.', colors.dimGray, GAME_CONFIG.font.small);
+      const connectLabel = this.phase === 'join-connecting' ? 'CONNECTING…' : 'CONNECT';
+      this.addText(btn.x + 70, btn.y + 8, connectLabel, colors.yellow, GAME_CONFIG.font.large);
+      if (this.phase === 'join-prompt') {
+        this.addText(cx - 140, 370, 'Type the code, then tap CONNECT.', colors.dimGray, GAME_CONFIG.font.small);
+      }
     }
     if (this.phase === 'join-connecting') {
       this.addText(cx - 130, 220, `Connecting to ${this.code}…`, colors.cyan, GAME_CONFIG.font.medium);

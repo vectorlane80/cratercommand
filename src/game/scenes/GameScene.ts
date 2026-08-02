@@ -1416,6 +1416,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.turn.phase === 'shopping') {
+      if (this.isOnlineHost && this.isCurrentShopperRemote()) return;
+      if (this.isOnlineJoiner) {
+        if (this.match.shoppingPlayerId !== this.localPlayerId) return;
+        this.handleJoinerShopPointer(x, y);
+        return;
+      }
       if (!this.isCurrentShopperAI()) this.handleShopPointer(x, y);
       return;
     }
@@ -1859,6 +1865,83 @@ export class GameScene extends Phaser.Scene {
           soundSystem.playUiSelect();
           this.renderAll();
         }
+        return;
+      }
+    }
+  }
+
+  private handleJoinerShopPointer(x: number, y: number): void {
+    if (this.match.shoppingPlayerId === null) return;
+
+    // FINISH button (top-right corner of the panel).
+    if (
+      x >= SHOP_LAYOUT.finishX &&
+      x < SHOP_LAYOUT.finishX + SHOP_LAYOUT.finishW &&
+      y >= SHOP_LAYOUT.finishY &&
+      y < SHOP_LAYOUT.finishY + SHOP_LAYOUT.finishH
+    ) {
+      this.sendInput({ kind: 'shop-finish' });
+      return;
+    }
+
+    // UNDO button (bottom of the left sidebar; only rendered when there's
+    // something to undo — but the hitbox is cheap regardless).
+    if (
+      x >= SHOP_LAYOUT.undoX &&
+      x < SHOP_LAYOUT.undoX + SHOP_LAYOUT.undoW &&
+      y >= SHOP_LAYOUT.undoY &&
+      y < SHOP_LAYOUT.undoY + SHOP_LAYOUT.undoH
+    ) {
+      this.sendInput({ kind: 'shop-undo' });
+      return;
+    }
+
+    // Page navigation buttons
+    const pageCount = this.economySystem.pageCount(SHOP_LAYOUT.pageSize);
+    if (
+      x >= SHOP_LAYOUT.pagePrevX &&
+      x < SHOP_LAYOUT.pagePrevX + SHOP_LAYOUT.pageBtnW &&
+      y >= SHOP_LAYOUT.pageY &&
+      y < SHOP_LAYOUT.pageY + SHOP_LAYOUT.pageBtnH &&
+      pageCount > 1
+    ) {
+      this.shopPage = Math.max(0, this.shopPage - 1);
+      this.renderAll();
+      return;
+    }
+    if (
+      x >= SHOP_LAYOUT.pageNextX &&
+      x < SHOP_LAYOUT.pageNextX + SHOP_LAYOUT.pageBtnW &&
+      y >= SHOP_LAYOUT.pageY &&
+      y < SHOP_LAYOUT.pageY + SHOP_LAYOUT.pageBtnH &&
+      pageCount > 1
+    ) {
+      this.shopPage = Math.min(pageCount - 1, this.shopPage + 1);
+      this.renderAll();
+      return;
+    }
+
+    // Item rows from visible slice
+    const visibleRows = this.economySystem.pageSlice(this.shopPage, SHOP_LAYOUT.pageSize);
+    for (let i = 0; i < visibleRows.length; i += 1) {
+      const entry = visibleRows[i];
+      const rowY = SHOP_LAYOUT.listYStart + i * SHOP_LAYOUT.rowH;
+      const inRowYBounds = y >= rowY - 6 && y < rowY + SHOP_LAYOUT.rowH - 4;
+      if (!inRowYBounds) continue;
+
+      // Minus button
+      if (x >= SHOP_LAYOUT.colMinus && x < SHOP_LAYOUT.colMinus + SHOP_LAYOUT.buttonW) {
+        this.sendInput({ kind: 'shop-remove', itemKey: entry.key });
+        return;
+      }
+      // Plus button
+      if (x >= SHOP_LAYOUT.colPlus && x < SHOP_LAYOUT.colPlus + SHOP_LAYOUT.buttonW) {
+        this.sendInput({ kind: 'shop-buy', itemKey: entry.key });
+        return;
+      }
+      // Quick-add for taps on the row's left half (name/price area).
+      if (x >= SHOP_LAYOUT.rowClickX && x < SHOP_LAYOUT.colMinus - 4) {
+        this.sendInput({ kind: 'shop-buy', itemKey: entry.key });
         return;
       }
     }
@@ -2476,7 +2559,12 @@ export class GameScene extends Phaser.Scene {
       this.weaponWindowStart,
       this.topToast,
       this.quitConfirmActive,
-      this.isOnlineHost || this.isOnlineJoiner
+      this.isOnlineHost || this.isOnlineJoiner,
+      !this.isOnlineHost && !this.isOnlineJoiner
+        ? true
+        : (this.isOnlineJoiner
+            ? this.match.shoppingPlayerId === this.localPlayerId
+            : !this.isCurrentShopperRemote())
     );
   }
 
