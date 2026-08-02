@@ -387,7 +387,7 @@ export class HudSystem {
 
     } else if (visualSystem === 'bananas') {
       bananasBox(this.graphics, cardX, cardY, cardW, cardH, bananasInk(0x000000), bananasInk(0xffffff));
-      bananasPixTextCentered(this.graphics, 'FORFEIT MATCH?', cx, cardY + 24, 3, bananasInk(0xffff55));
+      this.addText(cx, cardY + 24, 'FORFEIT MATCH?', bananasInk(0xffff55), '24px', 'Courier New', undefined, { originX: 0.5 });
 
       const btnH = 44;
       const btnW = 140;
@@ -723,7 +723,7 @@ export class HudSystem {
 
     bananasBox(this.graphics, 220, 366, 176, 122, bananasInk(0x000000), bananasInk(0xffffff));
     this.addText(274, 374, 'ANGLE', bananasInk(0xffffff), '14px', 'Courier New');
-    bananasPixTextCentered(this.graphics, `${Math.round(tank.angle)}`, 308, 402, 5, bananasInk(0xffff55));
+    this.addText(308, 398, `${Math.round(tank.angle)}`, bananasInk(0xffff55), '42px', 'Courier New', undefined, { originX: 0.5 });
     this.graphics.fillStyle(bananasInk(0xffffff), 1);
     this.graphics.fillRect(238, 466, 140, 2);
     const angleRadians = (tank.angle * Math.PI) / 180;
@@ -737,7 +737,7 @@ export class HudSystem {
 
     bananasBox(this.graphics, 400, 366, 204, 122, bananasInk(0x000000), bananasInk(0xffffff));
     this.addText(462, 374, 'VELOCITY', bananasInk(0xffffff), '14px', 'Courier New');
-    bananasPixTextCentered(this.graphics, `${Math.round(tank.power)}`, 502, 402, 5, bananasInk(0xffff55));
+    this.addText(502, 398, `${Math.round(tank.power)}`, bananasInk(0xffff55), '42px', 'Courier New', undefined, { originX: 0.5 });
     bananasBox(this.graphics, 418, 452, 168, 22, bananasInk(0x000000), bananasInk(0xffffff));
     const filledSegments = Math.floor(tank.power / 10);
     for (let i = 0; i < 10; i += 1) {
@@ -759,7 +759,7 @@ export class HudSystem {
         : bananasInk(turn.phase === 'aiming' ? 0xaa0000 : 0x555555),
       bananasInk(0xffffff)
     );
-    bananasPixTextCentered(this.graphics, 'FIRE', 679, 412, 4, bananasInk(0xffff55));
+    this.addText(679, 410, 'FIRE', bananasInk(0xffff55), '30px', 'Courier New', undefined, { originX: 0.5 });
     this.addText(679, 462, 'SPACE', bananasInk(0xaaaaaa), '14px', 'Courier New', undefined, { originX: 0.5 });
 
     bananasBox(this.graphics, 756, 366, 196, 122, bananasInk(0x000000), bananasInk(0xffffff));
@@ -1216,7 +1216,7 @@ export class HudSystem {
       this.addText(x + 24, y + 66, line2, 0xd8cfc4, '10px', 'JetBrains Mono', undefined, { weight: '400' });
     } else if (visualSystem === 'bananas') {
       bananasBox(this.graphics, x, y, w, h, bananasInk(0x000000), bananasInk(0xffffff));
-      bananasPixTextCentered(this.graphics, line1, x + w / 2, y + 22, 3, bananasInk(0xffff55));
+      this.addText(x + w / 2, y + 22, line1, bananasInk(0xffff55), '24px', 'Courier New', undefined, { originX: 0.5 });
       this.addText(x + w / 2, y + 68, line2, bananasInk(0xffffff), '16px', 'Courier New', undefined, { originX: 0.5 });
     } else if (visualSystem === 'retroPixel') {
       // Retro: boxy 2px steel + desertGold

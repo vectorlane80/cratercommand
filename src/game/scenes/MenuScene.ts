@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { soundSystem } from '../systems/SoundSystem';
-import { bananasBox, bananasPixText, bananasPixTextCentered } from '../systems/HudSystem';
+import { bananasBox, bananasPixText } from '../systems/HudSystem';
 import { drawGorilla, getPlayerPalette } from '../systems/TankSystem';
 import {
   BANANAS_DISPLAY_CYCLE,
@@ -835,7 +835,7 @@ export class MenuScene extends Phaser.Scene {
 
     const startColor = this.canStart() ? 0xffff55 : 0x555555;
     bananasBox(this.graphics, 310, 300, 340, 46, bananasInk(0x000000), bananasInk(startColor));
-    bananasPixTextCentered(this.graphics, 'START MATCH', 480, 312, 3, bananasInk(startColor));
+    this.addText(480, 310, 'START MATCH', bananasInk(startColor), '24px', 'Courier New', undefined, { originX: 0.5 });
     bananasBox(this.graphics, 310, 366, 340, 36, bananasInk(0x000000), bananasInk(0x555555));
     this.addText(480, 376, 'SETTINGS', bananasInk(0x555555), '14px', 'Courier New', undefined, { originX: 0.5 });
 
