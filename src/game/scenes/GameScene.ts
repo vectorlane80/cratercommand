@@ -301,8 +301,6 @@ export class GameScene extends Phaser.Scene {
       this.add.image(874, 24, 'hires-mini-tank-red').setOrigin(0, 0).setScale(0.4).setDepth(1)
     ];
 
-    this.applyVisualLayerTextures();
-
     this.projectileGraphics = this.add.graphics();
 
     this.terrainSystem = new TerrainSystem();
@@ -313,6 +311,7 @@ export class GameScene extends Phaser.Scene {
     this.aiSystem = new AISystem();
 
     this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode, this.pendingPhysics, this.economySystem.loadMarket(), this.pendingTerrain);
+    this.applyVisualLayerTextures();
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -2172,7 +2171,7 @@ export class GameScene extends Phaser.Scene {
     this.projectileGraphics.strokePath();
 
     this.settleTerrainAndTanks(activeTank);
-    this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
+    this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem, this.match.terrain);
     this.renderTanksAndHud();
 
     this.laserResolving = true;
@@ -2262,7 +2261,7 @@ export class GameScene extends Phaser.Scene {
     // Handle mid-flight terrain changes from tunneling
     if (anyTerrainChanged && terrainChangingShooter) {
       this.settleTerrainAndTanks(terrainChangingShooter);
-      this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
+      this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem, this.match.terrain);
     }
 
     this.activeProjectiles = [...remaining, ...spawnedThisFrame];
@@ -2405,20 +2404,36 @@ export class GameScene extends Phaser.Scene {
   private renderAll(): void {
     if (this.isBananas()) setBananasDisplayInk(this.bananasDisplay);
     this.drawRetroBattlefieldBackground();
-    this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem);
+    this.terrainSystem.draw(this.terrainGraphics, this.terrainData, this.visualSystem, this.match.terrain);
     this.updateRetroLayerVisibility();
     this.renderTanksAndHud();
     this.projectileSystem.drawAll(this.projectileGraphics, this.activeProjectiles, this.visualSystem, this.hiresShells);
   }
 
   private applyVisualLayerTextures(): void {
+    const terrain = this.match?.terrain ?? 'desert';
+
     if (this.visualSystem === 'retroPixel') {
-      this.retroBackdrop.setTexture('retro-backdrop').setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      const backdropKey = terrain === 'desert' ? 'retro-backdrop' : `sky_${terrain}_retro`;
+      this.retroBackdrop.setTexture(backdropKey);
+      if (terrain === 'desert') {
+        this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      } else {
+        // New panoramas are 960×400 with sky band in top 260px
+        this.retroBackdrop.setCrop(0, 0, 960, 260).setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      }
       this.retroCacti.forEach((cactus) => cactus.setTexture('retro-cactus').setScale(RETRO_CACTUS_SCALE));
       this.retroTankBodies[0].setTexture('retro-tank-blue').setScale(0.55);
       this.retroTankBodies[1].setTexture('retro-tank-red').setScale(0.55);
     } else if (this.visualSystem === 'hiRes') {
-      this.retroBackdrop.setTexture('hires-backdrop').setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      const backdropKey = terrain === 'desert' ? 'hires-backdrop' : `sky_${terrain}_hires`;
+      this.retroBackdrop.setTexture(backdropKey);
+      if (terrain === 'desert') {
+        this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      } else {
+        // New panoramas are 960×400 with sky band in top 260px
+        this.retroBackdrop.setCrop(0, 0, 960, 260).setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+      }
       this.retroCacti.forEach((cactus) => cactus.setTexture('hires-cactus').setScale(0.15));
       this.retroTankBodies[0].setTexture('hires-tank-blue').setScale(0.1375);
       this.retroTankBodies[1].setTexture('hires-tank-red').setScale(0.1375);

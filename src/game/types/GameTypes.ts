@@ -78,6 +78,50 @@ export const TERRAIN_LABELS: Record<TerrainSetting, string> = {
   alien: 'ALIEN'
 };
 
+export interface TerrainPalette {
+  classic: { flat: number; ridge: number; hatch: number };
+  retro: { dirt: number; dark: number; lip: number; hi: number; specks: [number, number, number] };
+  hires: { top: number; mid: number; deep: number; glow: { color: number; alpha: number }; spec: { color: number; alpha: number }; rubble: { color: number; alpha: number } };
+}
+
+export const TERRAIN_PALETTES: Record<TerrainKind, TerrainPalette> = {
+  desert: {
+    classic: { flat: 0x4b2b10, ridge: 0xc68417, hatch: 0x6b3a17 },
+    retro: { dirt: 0x4b2b10, dark: 0x1f1208, lip: 0xc68417, hi: 0xffb22e, specks: [0x6b3a17, 0x2a160a, 0x361f0d] },
+    hires: { top: 0x9a5f26, mid: 0x5a3113, deep: 0x0d0702, glow: { color: 0xffb347, alpha: 0.24 }, spec: { color: 0xffd68c, alpha: 0.6 }, rubble: { color: 0x2c180a, alpha: 0.45 } }
+  },
+  forest: {
+    classic: { flat: 0x1d3a17, ridge: 0x5ae04a, hatch: 0x2f5c25 },
+    retro: { dirt: 0x3f2a14, dark: 0x170e05, lip: 0x3fa845, hi: 0x7fd06a, specks: [0x5a3a1a, 0x150c05, 0x2b1a0b] },
+    hires: { top: 0x4d7a37, mid: 0x33210f, deep: 0x0a0602, glow: { color: 0x7ed678, alpha: 0.22 }, spec: { color: 0xcdffb9, alpha: 0.55 }, rubble: { color: 0x1e160a, alpha: 0.45 } }
+  },
+  snow: {
+    classic: { flat: 0x4c6f8c, ridge: 0xe8f6ff, hatch: 0x7f9fbb },
+    retro: { dirt: 0xdfe9f2, dark: 0x8ea8c0, lip: 0xffffff, hi: 0xa9c8e2, specks: [0xffffff, 0x7f9ab4, 0xb9cfe2] },
+    hires: { top: 0xf4f9ff, mid: 0xa8c0d6, deep: 0x3d4e61, glow: { color: 0xbee1ff, alpha: 0.3 }, spec: { color: 0xffffff, alpha: 0.8 }, rubble: { color: 0x6e8caa, alpha: 0.3 } }
+  },
+  volcanic: {
+    classic: { flat: 0x3a120c, ridge: 0xff5a1f, hatch: 0x6b2210 },
+    retro: { dirt: 0x3a1a12, dark: 0x160805, lip: 0xff6b1f, hi: 0xffc04a, specks: [0x7a2a10, 0x120504, 0x2a0f08] },
+    hires: { top: 0x803114, mid: 0x2c1109, deep: 0x0a0302, glow: { color: 0xff6e28, alpha: 0.3 }, spec: { color: 0xffbe78, alpha: 0.65 }, rubble: { color: 0x280c06, alpha: 0.5 } }
+  },
+  lunar: {
+    classic: { flat: 0x4a4a48, ridge: 0xdcdcd8, hatch: 0x6e6e6a },
+    retro: { dirt: 0x8d8b86, dark: 0x3b3a38, lip: 0xe8e6e0, hi: 0xb5b3ad, specks: [0xc9c7c1, 0x2c2b29, 0x5c5a56] },
+    hires: { top: 0xbcb9b1, mid: 0x5b5954, deep: 0x141413, glow: { color: 0xcde1ff, alpha: 0.2 }, spec: { color: 0xffffff, alpha: 0.6 }, rubble: { color: 0x2d2d2d, alpha: 0.4 } }
+  },
+  urban: {
+    classic: { flat: 0x2b2f33, ridge: 0x7de3ff, hatch: 0x4a5157 },
+    retro: { dirt: 0x6a6a68, dark: 0x26262a, lip: 0xc9c6bd, hi: 0x8f8d86, specks: [0x9a978d, 0x1a1a1c, 0x3d3d40] },
+    hires: { top: 0x8e8a80, mid: 0x42403c, deep: 0x101012, glow: { color: 0x7de3ff, alpha: 0.2 }, spec: { color: 0xe2f4ff, alpha: 0.55 }, rubble: { color: 0x141416, alpha: 0.5 } }
+  },
+  alien: {
+    classic: { flat: 0x2e0b46, ridge: 0x00ffc6, hatch: 0x7a1fb0 },
+    retro: { dirt: 0x3b0f57, dark: 0x170421, lip: 0xc33cff, hi: 0xff9bf2, specks: [0x8a2bc4, 0x20063a, 0x4a0f6b] },
+    hires: { top: 0x7d2fae, mid: 0x3a1052, deep: 0x0f0418, glow: { color: 0xc45cff, alpha: 0.3 }, spec: { color: 0xebafff, alpha: 0.65 }, rubble: { color: 0x5a198c, alpha: 0.4 } }
+  }
+};
+
 export function resolveTerrainSetting(setting: TerrainSetting): TerrainKind {
   if (setting !== 'random') return setting;
   return TERRAIN_KINDS[Math.floor(Math.random() * TERRAIN_KINDS.length)];

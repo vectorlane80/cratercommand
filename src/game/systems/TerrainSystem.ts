@@ -3,7 +3,9 @@ import {
   bananasInk,
   bananasIs1Bit,
   GAME_CONFIG,
+  TERRAIN_PALETTES,
   type TerrainData,
+  type TerrainKind,
   type VisualSystem
 } from '../types/GameTypes';
 
@@ -120,16 +122,16 @@ export class TerrainSystem {
     };
   }
 
-  draw(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData, visualSystem: VisualSystem = 'classic'): void {
+  draw(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData, visualSystem: VisualSystem = 'classic', terrain: TerrainKind = 'desert'): void {
     const { heights, width, height, segmentWidth } = terrainData;
 
     graphics.clear();
     if (visualSystem === 'retroPixel') {
-      this.drawRetroPixel(graphics, terrainData);
+      this.drawRetroPixel(graphics, terrainData, terrain);
       return;
     }
     if (visualSystem === 'hiRes') {
-      this.drawHiRes(graphics, terrainData);
+      this.drawHiRes(graphics, terrainData, terrain);
       return;
     }
     if (visualSystem === 'bananas') {
@@ -137,7 +139,12 @@ export class TerrainSystem {
       return;
     }
 
-    graphics.fillStyle(GAME_CONFIG.colors.darkGreen, 1);
+    // Classic path: desert keeps the existing green look, other terrains use per-terrain colors
+    const flatColor = terrain === 'desert' ? GAME_CONFIG.colors.darkGreen : TERRAIN_PALETTES[terrain].classic.flat;
+    const ridgeColor = terrain === 'desert' ? GAME_CONFIG.colors.ridgeGreen : TERRAIN_PALETTES[terrain].classic.ridge;
+    const hatchColor = terrain === 'desert' ? 0x00881a : TERRAIN_PALETTES[terrain].classic.hatch;
+
+    graphics.fillStyle(flatColor, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
 
@@ -149,7 +156,7 @@ export class TerrainSystem {
     graphics.closePath();
     graphics.fillPath();
 
-    graphics.lineStyle(3, GAME_CONFIG.colors.ridgeGreen, 1);
+    graphics.lineStyle(3, ridgeColor, 1);
     graphics.beginPath();
     heights.forEach((sampleHeight, index) => {
       const x = index * segmentWidth;
@@ -161,7 +168,7 @@ export class TerrainSystem {
     });
     graphics.strokePath();
 
-    graphics.fillStyle(0x00881a, 0.45);
+    graphics.fillStyle(hatchColor, 0.45);
     for (let index = 0; index < heights.length; index += 2) {
       const x = index * segmentWidth;
       const y = heights[index] + 12;
@@ -226,12 +233,12 @@ export class TerrainSystem {
     });
   }
 
-  private drawRetroPixel(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
+  private drawRetroPixel(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData, terrain: TerrainKind = 'desert'): void {
     const { heights, width, height, segmentWidth } = terrainData;
-    const colors = GAME_CONFIG.colors;
+    const palette = TERRAIN_PALETTES[terrain];
 
     // Solid dirt body
-    graphics.fillStyle(colors.desertBrown, 1);
+    graphics.fillStyle(palette.retro.dirt, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
     heights.forEach((sampleHeight, index) => {
@@ -242,7 +249,7 @@ export class TerrainSystem {
     graphics.fillPath();
 
     // Darker lower body, blended in below ~30px from surface
-    graphics.fillStyle(colors.desertDark, 0.62);
+    graphics.fillStyle(palette.retro.dark, 0.62);
     for (let index = 0; index < heights.length - 1; index += 1) {
       const x = index * segmentWidth;
       const nextX = (index + 1) * segmentWidth;
@@ -250,8 +257,8 @@ export class TerrainSystem {
       graphics.fillRect(x, y, Math.ceil(nextX - x) + 1, Math.max(0, height - y));
     }
 
-    // Bright gold lip along the ridge
-    graphics.lineStyle(4, colors.desertGold, 1);
+    // Bright lip along the ridge
+    graphics.lineStyle(4, palette.retro.lip, 1);
     graphics.beginPath();
     heights.forEach((sampleHeight, index) => {
       const x = index * segmentWidth;
@@ -263,8 +270,8 @@ export class TerrainSystem {
     });
     graphics.strokePath();
 
-    // Highlight band just under the gold lip
-    graphics.lineStyle(2, 0xffb22e, 0.9);
+    // Highlight band just under the lip
+    graphics.lineStyle(2, palette.retro.hi, 0.9);
     graphics.beginPath();
     heights.forEach((sampleHeight, index) => {
       const x = index * segmentWidth;
@@ -285,26 +292,27 @@ export class TerrainSystem {
         const noise = (x * 137 + y * 53) % 7;
         let shade: number;
         let size: number;
-        if (noise === 0) { shade = 0x6b3a17; size = 3; }
-        else if (noise < 3) { shade = 0x2a160a; size = 3; }
-        else if (noise < 5) { shade = 0x361f0d; size = 2; }
+        if (noise === 0) { shade = palette.retro.specks[0]; size = 3; }
+        else if (noise < 3) { shade = palette.retro.specks[1]; size = 3; }
+        else if (noise < 5) { shade = palette.retro.specks[2]; size = 2; }
         else continue;
         graphics.fillStyle(shade, 0.85);
         graphics.fillRect(x, y, size, 2);
       }
     }
 
-    // Cacti are now drawn as image sprites by GameScene's retro layer pass.
+    // Props are now drawn as image sprites by GameScene's retro layer pass.
   }
 
-  private drawHiRes(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData): void {
+  private drawHiRes(graphics: Phaser.GameObjects.Graphics, terrainData: TerrainData, terrain: TerrainKind = 'desert'): void {
     const { heights, width, height, segmentWidth } = terrainData;
+    const palette = TERRAIN_PALETTES[terrain];
 
     // Resample heights with Catmull-Rom at 2px steps for smooth curves
     const fineHeights = this.resampleHeightsCatmullRom(heights, segmentWidth);
 
-    // Pass A: Full terrain with gradient from top-mid brown to lower-mid dark
-    graphics.fillGradientStyle(0x9a5f26, 0x9a5f26, 0x2c180a, 0x2c180a, 1);
+    // Pass A: Full terrain with gradient from top to mid
+    graphics.fillGradientStyle(palette.hires.top, palette.hires.top, palette.hires.mid, palette.hires.mid, 1);
     graphics.beginPath();
     graphics.moveTo(0, height);
     for (let i = 0; i < fineHeights.length; i += 1) {
@@ -314,8 +322,8 @@ export class TerrainSystem {
     graphics.closePath();
     graphics.fillPath();
 
-    // Pass B: Lower half only with gradient from lower-mid to near-black
-    graphics.fillGradientStyle(0x2c180a, 0x2c180a, 0x0d0702, 0x0d0702, 0.9);
+    // Pass B: Lower half only with gradient from mid to deep
+    graphics.fillGradientStyle(palette.hires.mid, palette.hires.mid, palette.hires.deep, palette.hires.deep, 0.9);
     graphics.beginPath();
     graphics.moveTo(0, height);
     for (let i = 0; i < fineHeights.length; i += 1) {
@@ -329,7 +337,7 @@ export class TerrainSystem {
 
     // Rubble: soft dots using deterministic pseudo-noise (no Math.random)
     // ~40 dots scattered through the terrain
-    graphics.fillStyle(0x2c180a, 0.35);
+    graphics.fillStyle(palette.hires.rubble.color, palette.hires.rubble.alpha);
     for (let i = 0; i < 40; i += 1) {
       // Pseudo-random hash based on i to get deterministic placement
       const xHash = (i * 73) % Math.floor(width);
@@ -346,8 +354,8 @@ export class TerrainSystem {
     }
 
     // Ridge: layered strokes along fine-resampled surface polyline
-    // Layer 1: 7px warm glow
-    graphics.lineStyle(7, 0xffb347, 0.22);
+    // Layer 1: 7px glow
+    graphics.lineStyle(7, palette.hires.glow.color, palette.hires.glow.alpha);
     graphics.beginPath();
     for (let i = 0; i < fineHeights.length; i += 1) {
       const x = i * 2;
@@ -359,8 +367,8 @@ export class TerrainSystem {
     }
     graphics.strokePath();
 
-    // Layer 2: 4px mid-tone
-    graphics.lineStyle(4, 0xffb347, 0.3);
+    // Layer 2: 4px glow
+    graphics.lineStyle(4, palette.hires.glow.color, palette.hires.glow.alpha);
     graphics.beginPath();
     for (let i = 0; i < fineHeights.length; i += 1) {
       const x = i * 2;
@@ -373,7 +381,7 @@ export class TerrainSystem {
     graphics.strokePath();
 
     // Layer 3: 2px specular highlight
-    graphics.lineStyle(2, 0xffd68c, 0.55);
+    graphics.lineStyle(2, palette.hires.spec.color, palette.hires.spec.alpha);
     graphics.beginPath();
     for (let i = 0; i < fineHeights.length; i += 1) {
       const x = i * 2;
