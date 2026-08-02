@@ -45,6 +45,8 @@ const AI_TURN_FIRE_DELAY_MS = 250;
 // scaled to cover the battlefield. Cacti sit on the procedural terrain.
 const RETRO_BACKDROP_Y = 0;
 const RETRO_BACKDROP_HEIGHT = 260;
+/** Terrain panoramas start below the top HUD band so their skyline stays visible. */
+const TERRAIN_PANORAMA_TOP = 82;
 const RETRO_CACTUS_POSITIONS = [0.08, 0.3, 0.45, 0.6, 0.74, 0.93] as const;
 const RETRO_CACTUS_SCALE = 0.6;
 
@@ -2454,7 +2456,7 @@ export class GameScene extends Phaser.Scene {
       const backdropKey = terrain === 'desert' ? 'retro-backdrop' : `sky_${terrain}_retro`;
       this.retroBackdrop.setTexture(backdropKey);
       if (terrain === 'desert') {
-        this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+        this.retroBackdrop.setY(0).setCrop().setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
       } else {
         this.applyTerrainPanorama();
       }
@@ -2465,7 +2467,7 @@ export class GameScene extends Phaser.Scene {
       const backdropKey = terrain === 'desert' ? 'hires-backdrop' : `sky_${terrain}_hires`;
       this.retroBackdrop.setTexture(backdropKey);
       if (terrain === 'desert') {
-        this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+        this.retroBackdrop.setY(0).setCrop().setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
       } else {
         this.applyTerrainPanorama();
       }
@@ -2483,8 +2485,14 @@ export class GameScene extends Phaser.Scene {
    * left the terrain floating over black.
    */
   private applyTerrainPanorama(): void {
+    // The pack composes each panorama on a 960x400 field with no HUD over it,
+    // so its horizon sits far lower than a naive full-height fit puts it and
+    // its skyline detail lands behind our top bar. Fit the whole image into
+    // the band the player can actually see — under the HUD, down to the field
+    // bottom — which drops the designer's ground line onto our terrain zone.
     this.retroBackdrop.setCrop();
-    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
+    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight - TERRAIN_PANORAMA_TOP);
+    this.retroBackdrop.setY(TERRAIN_PANORAMA_TOP);
   }
 
   private updateRetroLayerVisibility(): void {
@@ -2497,13 +2505,16 @@ export class GameScene extends Phaser.Scene {
     this.hiresShells.forEach((shell) => (shell.visible = false));
     this.hiresPlayerCards.forEach((card) => (card.visible = false));
     this.terrainProps.forEach((prop) => (prop.visible = false));
+    // Every prop pool starts hidden each pass: leaving these to the branches
+    // below stranded desert cacti/rocks on screen after a switch to classic.
+    this.retroCacti.forEach((cactus) => (cactus.visible = false));
+    this.hiresRocks.forEach((rock) => (rock.visible = false));
     this.propSeatGraphics.clear();
 
     if (retro && this.terrainData) {
       // Desert: use traditional cacti/rocks; non-desert: use terrain props via anchors.
       if (this.match.terrain === 'desert') {
-        this.retroCacti.forEach((cactus) => (cactus.visible = retro));
-        this.hiresRocks.forEach((rock) => (rock.visible = false));
+        this.retroCacti.forEach((cactus) => (cactus.visible = true));
 
         RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
           const cactus = this.retroCacti[idx];
