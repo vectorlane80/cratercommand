@@ -2456,8 +2456,7 @@ export class GameScene extends Phaser.Scene {
       if (terrain === 'desert') {
         this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
       } else {
-        // New panoramas are 960×400 with sky band in top 260px
-        this.retroBackdrop.setCrop(0, 0, 960, 260).setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+        this.applyTerrainPanorama();
       }
       this.retroCacti.forEach((cactus) => cactus.setTexture('retro-cactus').setScale(RETRO_CACTUS_SCALE));
       this.retroTankBodies[0].setTexture('retro-tank-blue').setScale(0.55);
@@ -2468,13 +2467,24 @@ export class GameScene extends Phaser.Scene {
       if (terrain === 'desert') {
         this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
       } else {
-        // New panoramas are 960×400 with sky band in top 260px
-        this.retroBackdrop.setCrop(0, 0, 960, 260).setDisplaySize(GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+        this.applyTerrainPanorama();
       }
       this.retroCacti.forEach((cactus) => cactus.setTexture('hires-cactus').setScale(0.15));
       this.retroTankBodies[0].setTexture('hires-tank-blue').setScale(0.1375);
       this.retroTankBodies[1].setTexture('hires-tank-red').setScale(0.1375);
     }
+  }
+
+  /**
+   * Terrain panoramas are baked 960x400 with the sky band in the top 260px.
+   * Crop takes a source-pixel rect, so the sprite must sit at scale 1 for
+   * that band to fill the backdrop area — sizing it to 260 first squashed
+   * the whole 400px image and left the band ending 91px short of the
+   * ground, with black in between.
+   */
+  private applyTerrainPanorama(): void {
+    this.retroBackdrop.setScale(1);
+    this.retroBackdrop.setCrop(0, 0, GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
   }
 
   private updateRetroLayerVisibility(): void {
