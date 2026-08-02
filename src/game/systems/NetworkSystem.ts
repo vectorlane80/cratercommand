@@ -1,6 +1,6 @@
 import Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
-import type { ControllerKind, MatchState, TankState, TurnState, WallMode, PhysicsSettings } from '../types/GameTypes';
+import type { ControllerKind, MatchState, TankState, TurnState, TerrainKind, WallMode, PhysicsSettings } from '../types/GameTypes';
 
 /**
  * Code prefix that namespaces our peer ids on the shared PeerJS signaling
@@ -30,7 +30,7 @@ export type ConnectionState =
 export type NetworkMessage =
   | { type: 'lobby-hello'; name: string }
   | { type: 'lobby-name'; name: string }
-  | { type: 'lobby-ready'; controllers: ControllerKind[]; names: Array<string | null>; roundsToWin: number; wallMode: WallMode; physics: PhysicsSettings; bananas: boolean }
+  | { type: 'lobby-ready'; controllers: ControllerKind[]; names: Array<string | null>; roundsToWin: number; wallMode: WallMode; physics: PhysicsSettings; bananas: boolean; terrain: TerrainKind }
   | { type: 'lobby-start' }
   | { type: 'snapshot'; data: GameSnapshot }
   | { type: 'input'; action: NetInput };

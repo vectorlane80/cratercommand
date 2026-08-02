@@ -11,14 +11,19 @@ import {
   GRAVITY_LABELS,
   GRAVITY_STEPS,
   PHYSICS_DEFAULTS,
+  TERRAIN_LABELS,
+  TERRAIN_SETTINGS,
   VISCOSITY_LABELS,
   VISCOSITY_STEPS,
   WALL_LABELS,
   WALL_MODES,
+  resolveTerrainSetting,
   setBananasDisplayInk,
   type BananasDisplay,
   type ControllerKind,
   type PhysicsSettings,
+  type TerrainKind,
+  type TerrainSetting,
   type VisualSystem,
   type WallMode
 } from '../types/GameTypes';
@@ -33,6 +38,7 @@ export interface MenuResult {
   wallMode: WallMode;
   physics: PhysicsSettings;
   bananas: boolean;
+  terrain: TerrainKind;
 }
 
 const MAX_NAME_LEN = 12;
@@ -59,6 +65,7 @@ export class MenuScene extends Phaser.Scene {
   private gravityIndex = GRAVITY_STEPS.indexOf(PHYSICS_DEFAULTS.gravity);
   private viscosityIndex = VISCOSITY_STEPS.indexOf(PHYSICS_DEFAULTS.viscosity);
   private tanksFall = PHYSICS_DEFAULTS.tanksFall;
+  private terrainSetting: TerrainSetting = 'random';
   private visualSystem: VisualSystem = 'classic';
   private texts: Phaser.GameObjects.Text[] = [];
   private graphics!: Phaser.GameObjects.Graphics;
@@ -108,6 +115,7 @@ export class MenuScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.handlePointerDown(p.worldX, p.worldY));
 
     this.loadPhysicsFromStorage();
+    this.loadTerrainFromStorage();
     this.loadVisualSystemFromStorage();
     this.render();
   }
@@ -128,6 +136,12 @@ export class MenuScene extends Phaser.Scene {
 
   private cycleWallMode(): void {
     this.wallModeIndex = (this.wallModeIndex + 1) % WALL_MODES.length;
+  }
+
+  private cycleTerrain(): void {
+    const idx = TERRAIN_SETTINGS.indexOf(this.terrainSetting);
+    this.terrainSetting = TERRAIN_SETTINGS[(idx + 1) % TERRAIN_SETTINGS.length];
+    this.saveTerrainToStorage();
   }
 
   private cycleGravity(): void {
@@ -333,7 +347,8 @@ export class MenuScene extends Phaser.Scene {
         roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
         wallMode: this.visualSystem === 'bananas' ? 'none' : WALL_MODES[this.wallModeIndex],
         physics,
-        bananas: this.visualSystem === 'bananas'
+        bananas: this.visualSystem === 'bananas',
+        terrain: resolveTerrainSetting(this.terrainSetting)
       });
       return;
     }
@@ -362,6 +377,14 @@ export class MenuScene extends Phaser.Scene {
     const wmBtn = this.settingsWallModeRect();
     if (x >= wmBtn.x && x <= wmBtn.x + wmBtn.w && y >= wmBtn.y && y <= wmBtn.y + wmBtn.h) {
       this.cycleWallMode();
+      soundSystem.playUiClick();
+      this.render();
+      return;
+    }
+    // Terrain button
+    const terrBtn = this.settingsTerrainRect();
+    if (x >= terrBtn.x && x <= terrBtn.x + terrBtn.w && y >= terrBtn.y && y <= terrBtn.y + terrBtn.h) {
+      this.cycleTerrain();
       soundSystem.playUiClick();
       this.render();
       return;
@@ -425,20 +448,24 @@ export class MenuScene extends Phaser.Scene {
     return { x: 480, y: 180, w: 260, h: 36 };
   }
 
-  private settingsGravityRect() {
+  private settingsTerrainRect() {
     return { x: 480, y: 230, w: 260, h: 36 };
   }
 
-  private settingsViscosityRect() {
+  private settingsGravityRect() {
     return { x: 480, y: 280, w: 260, h: 36 };
   }
 
-  private settingsTanksFallRect() {
+  private settingsViscosityRect() {
     return { x: 480, y: 330, w: 260, h: 36 };
   }
 
+  private settingsTanksFallRect() {
+    return { x: 480, y: 380, w: 260, h: 36 };
+  }
+
   private backButtonRect() {
-    return { x: GAME_CONFIG.width / 2 - 120, y: 400, w: 240, h: 36 };
+    return { x: GAME_CONFIG.width / 2 - 120, y: 450, w: 240, h: 36 };
   }
 
   private menuPalette() {
@@ -537,7 +564,8 @@ export class MenuScene extends Phaser.Scene {
       roundsToWin: MATCH_LENGTHS[this.matchLengthIndex].roundsToWin,
       wallMode: wallMode,
       physics,
-      bananas: this.visualSystem === 'bananas'
+      bananas: this.visualSystem === 'bananas',
+      terrain: resolveTerrainSetting(this.terrainSetting)
     };
     this.scene.start('GameScene', result);
   }
@@ -1093,9 +1121,10 @@ export class MenuScene extends Phaser.Scene {
     const settingRows = [
       { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, color: palette.settingsValue },
       { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], color: palette.settingsValue },
-      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
-      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
-      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
+      { label: 'TERRAIN', y: 230, value: TERRAIN_LABELS[this.terrainSetting], color: palette.settingsValue },
+      { label: 'GRAVITY', y: 280, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], color: palette.settingsValue },
+      { label: 'AIR VISCOSITY', y: 330, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], color: palette.settingsValue },
+      { label: 'TANKS FALL', y: 380, value: this.tanksFall ? 'ON' : 'OFF', color: palette.settingsValue }
     ];
 
     for (const row of settingRows) {
@@ -1117,7 +1146,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.addText(
       GAME_CONFIG.width / 2 - 290,
-      452,
+      500,
       'Settings apply to local and hosted online matches',
       palette.hint,
       GAME_CONFIG.font.small
@@ -1131,9 +1160,10 @@ export class MenuScene extends Phaser.Scene {
     const settingRows = [
       { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label },
       { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]] },
-      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]] },
-      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]] },
-      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF' }
+      { label: 'TERRAIN', y: 230, value: TERRAIN_LABELS[this.terrainSetting] },
+      { label: 'GRAVITY', y: 280, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]] },
+      { label: 'AIR VISCOSITY', y: 330, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]] },
+      { label: 'TANKS FALL', y: 380, value: this.tanksFall ? 'ON' : 'OFF' }
     ];
 
     for (const row of settingRows) {
@@ -1155,7 +1185,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.addText(
       GAME_CONFIG.width / 2 - 290,
-      452,
+      500,
       'Settings apply to local and hosted online matches',
       0xa8a8a8,
       '12px',
@@ -1172,9 +1202,10 @@ export class MenuScene extends Phaser.Scene {
     const settingRows = [
       { label: 'MATCH LENGTH', y: 130, value: MATCH_LENGTHS[this.matchLengthIndex].label, isTanksFall: false },
       { label: 'WALLS', y: 180, value: WALL_LABELS[WALL_MODES[this.wallModeIndex]], isTanksFall: false },
-      { label: 'GRAVITY', y: 230, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], isTanksFall: false },
-      { label: 'AIR VISCOSITY', y: 280, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], isTanksFall: false },
-      { label: 'TANKS FALL', y: 330, value: this.tanksFall ? 'ON' : 'OFF', isTanksFall: true }
+      { label: 'TERRAIN', y: 230, value: TERRAIN_LABELS[this.terrainSetting], isTanksFall: false },
+      { label: 'GRAVITY', y: 280, value: GRAVITY_LABELS[GRAVITY_STEPS[this.gravityIndex]], isTanksFall: false },
+      { label: 'AIR VISCOSITY', y: 330, value: VISCOSITY_LABELS[VISCOSITY_STEPS[this.viscosityIndex]], isTanksFall: false },
+      { label: 'TANKS FALL', y: 380, value: this.tanksFall ? 'ON' : 'OFF', isTanksFall: true }
     ];
 
     for (const row of settingRows) {
@@ -1222,7 +1253,7 @@ export class MenuScene extends Phaser.Scene {
     // Bottom hint: uppercase incl. ONLINE, centered, 10px ls .16em @.4
     this.addText(
       GAME_CONFIG.width / 2,
-      452,
+      500,
       'SETTINGS APPLY TO LOCAL AND HOSTED ONLINE MATCHES',
       0x8a8078,
       '10px',
@@ -1335,6 +1366,25 @@ export class MenuScene extends Phaser.Scene {
   private savePhysicsToStorage(physics: PhysicsSettings): void {
     try {
       localStorage.setItem('cratercmd.physics', JSON.stringify(physics));
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
+  }
+
+  private loadTerrainFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('cratercmd.terrain');
+      if (stored && TERRAIN_SETTINGS.includes(stored as TerrainSetting)) {
+        this.terrainSetting = stored as TerrainSetting;
+      }
+    } catch (e) {
+      // If parsing fails, just use default (already initialized)
+    }
+  }
+
+  private saveTerrainToStorage(): void {
+    try {
+      localStorage.setItem('cratercmd.terrain', this.terrainSetting);
     } catch (e) {
       // Silently fail if localStorage is not available
     }

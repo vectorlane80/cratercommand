@@ -7,6 +7,7 @@ import {
   type PlayerId,
   type PlayerProfile,
   type TankState,
+  type TerrainKind,
   type TurnState,
   type WallMode,
   type WindState
@@ -34,7 +35,8 @@ export class TurnSystem {
     names: Array<string | null> = [],
     wallMode: WallMode = 'none',
     physics: PhysicsSettings = PHYSICS_DEFAULTS,
-    marketFactors: Record<string, number> = {}
+    marketFactors: Record<string, number> = {},
+    terrain: TerrainKind = 'desert'
   ): MatchState {
     const active = controllers.filter((c): c is ControllerKind => !!c);
     const activeWallMode = this.resolveActiveWallMode(wallMode);
@@ -49,7 +51,8 @@ export class TurnSystem {
       wallMode,
       activeWallMode,
       physics,
-      marketFactors
+      marketFactors,
+      terrain
     };
   }
 

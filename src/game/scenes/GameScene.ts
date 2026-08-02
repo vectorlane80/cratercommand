@@ -26,6 +26,7 @@ import {
   type ProjectileState,
   type TankState,
   type TerrainData,
+  type TerrainKind,
   type TurnState,
   type VisualSystem,
   type WallMode,
@@ -96,6 +97,7 @@ export class GameScene extends Phaser.Scene {
   private pendingRoundsToWin: number = GAME_CONFIG.match.roundsToWin;
   private pendingWallMode: WallMode = 'none';
   private pendingPhysics: PhysicsSettings = PHYSICS_DEFAULTS;
+  private pendingTerrain: TerrainKind = 'desert';
 
   // Tentative shop purchases for the current shopper. Committed on ENTER,
   // discarded on ESC. Keys: weapon ids + 'parachute' + 'shield'.
@@ -164,6 +166,7 @@ export class GameScene extends Phaser.Scene {
     wallMode?: WallMode;
     physics?: PhysicsSettings;
     bananas?: boolean;
+    terrain?: TerrainKind;
     online?: { isHost: boolean };
   }): void {
     this.startBananas = data?.bananas ?? null;
@@ -179,6 +182,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (data?.physics) {
       this.pendingPhysics = data.physics;
+    }
+    if (data?.terrain) {
+      this.pendingTerrain = data.terrain;
     }
     if (data?.online) {
       this.onlineBananas = data.bananas ?? null;
@@ -306,7 +312,7 @@ export class GameScene extends Phaser.Scene {
     this.hudSystem = new HudSystem(this);
     this.aiSystem = new AISystem();
 
-    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode, this.pendingPhysics, this.economySystem.loadMarket());
+    this.match = this.turnSystem.createMatchState(this.pendingControllers, this.pendingRoundsToWin, this.pendingNames, this.pendingWallMode, this.pendingPhysics, this.economySystem.loadMarket(), this.pendingTerrain);
     this.beginRound(0);
 
     this.cursors = this.input.keyboard!.createCursorKeys();

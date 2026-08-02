@@ -45,6 +45,8 @@ export function nextBananasDisplay(display: BananasDisplay): BananasDisplay {
 
 export type ItemCategory = 'missile' | 'terrain' | 'fire' | 'energy' | 'defense' | 'utility';
 export type WallMode = 'none' | 'concrete' | 'padded' | 'rubber' | 'spring' | 'wraparound' | 'random' | 'erratic';
+export type TerrainKind = 'desert' | 'forest' | 'snow' | 'volcanic' | 'lunar' | 'urban' | 'alien';
+export type TerrainSetting = 'random' | TerrainKind;
 export type Sale = { itemKey: string; discount: number } | null;
 
 export const WALL_MODES: WallMode[] = ['none', 'concrete', 'padded', 'rubber', 'spring', 'wraparound', 'random', 'erratic'];
@@ -59,6 +61,27 @@ export const WALL_LABELS: Record<WallMode, string> = {
   random: 'RANDOM',
   erratic: 'ERRATIC'
 };
+
+// Order matches the pack's TERRAIN_IDS.
+export const TERRAIN_KINDS: TerrainKind[] = ['desert', 'forest', 'snow', 'volcanic', 'lunar', 'urban', 'alien'];
+
+export const TERRAIN_SETTINGS: TerrainSetting[] = ['random', ...TERRAIN_KINDS];
+
+export const TERRAIN_LABELS: Record<TerrainSetting, string> = {
+  random: 'RANDOM',
+  desert: 'DESERT',
+  forest: 'FOREST',
+  snow: 'SNOW',
+  volcanic: 'VOLCANIC',
+  lunar: 'LUNAR',
+  urban: 'URBAN',
+  alien: 'ALIEN'
+};
+
+export function resolveTerrainSetting(setting: TerrainSetting): TerrainKind {
+  if (setting !== 'random') return setting;
+  return TERRAIN_KINDS[Math.floor(Math.random() * TERRAIN_KINDS.length)];
+}
 
 export interface PhysicsSettings {
   gravity: number;
@@ -186,6 +209,7 @@ export interface MatchState {
   physics: PhysicsSettings;
   // Free-market price factors: item/weapon key → multiplier. Missing keys default to 1.
   marketFactors: Record<string, number>;
+  terrain: TerrainKind;
 }
 
 export const MAX_PLAYERS = 4;
