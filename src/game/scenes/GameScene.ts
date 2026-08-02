@@ -47,6 +47,10 @@ const RETRO_BACKDROP_Y = 0;
 const RETRO_BACKDROP_HEIGHT = 260;
 /** Terrain panoramas start below the top HUD band so their skyline stays visible. */
 const TERRAIN_PANORAMA_TOP = 82;
+/** Baked panorama dimensions, and how much of it is sky (pack SKY_BAND_HEIGHT). */
+const TERRAIN_PANORAMA_SOURCE_WIDTH = 960;
+const TERRAIN_PANORAMA_SOURCE_HEIGHT = 400;
+const TERRAIN_SKY_BAND = 260;
 const RETRO_CACTUS_POSITIONS = [0.08, 0.3, 0.45, 0.6, 0.74, 0.93] as const;
 const RETRO_CACTUS_SCALE = 0.6;
 
@@ -2485,13 +2489,20 @@ export class GameScene extends Phaser.Scene {
    * left the terrain floating over black.
    */
   private applyTerrainPanorama(): void {
-    // The pack composes each panorama on a 960x400 field with no HUD over it,
-    // so its horizon sits far lower than a naive full-height fit puts it and
-    // its skyline detail lands behind our top bar. Fit the whole image into
-    // the band the player can actually see — under the HUD, down to the field
-    // bottom — which drops the designer's ground line onto our terrain zone.
-    this.retroBackdrop.setCrop();
-    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight - TERRAIN_PANORAMA_TOP);
+    // Panoramas are baked on the pack's 960x400 field, where only the top
+    // TERRAIN_SKY_BAND rows are sky — the rest is ground the pack expects its
+    // own (much deeper) terrain to cover. Our terrain is a thinner strip, so
+    // that ground region would show through as a dark band above the hills.
+    // Show ONLY the sky band, stretched over the whole visible field so the
+    // skyline runs behind the terrain all the way down.
+    //
+    // Phaser applies displaySize to the full frame and crop selects a sub-rect
+    // of it, so the frame has to be oversized for the cropped band to land at
+    // the size we want.
+    const band = GAME_CONFIG.layout.battlefieldHeight - TERRAIN_PANORAMA_TOP;
+    const frameHeight = TERRAIN_PANORAMA_SOURCE_HEIGHT * (band / TERRAIN_SKY_BAND);
+    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, frameHeight);
+    this.retroBackdrop.setCrop(0, 0, TERRAIN_PANORAMA_SOURCE_WIDTH, TERRAIN_SKY_BAND);
     this.retroBackdrop.setY(TERRAIN_PANORAMA_TOP);
   }
 
