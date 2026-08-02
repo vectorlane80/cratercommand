@@ -1016,6 +1016,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tauntOnDeath(target: TankState): void {
+    // Death quips are Crater Command flavor — Gorillas apes go quietly.
+    if (this.isBananas()) return;
     const profile = this.match.profiles[target.id];
     const name = profile.displayName ?? `PLAYER ${target.id + 1}`;
     const taunt = GAME_CONFIG.taunts[Math.floor(Math.random() * GAME_CONFIG.taunts.length)];
@@ -2347,7 +2349,8 @@ export class GameScene extends Phaser.Scene {
       this.tanks,
       this.terrainSystem,
       this.terrainData,
-      this.match.physics.tanksFall
+      this.match.physics.tanksFall,
+      !this.isBananas()
     );
     falls.forEach((fall) => {
       if (fall.damage > 0 && fall.tankId !== shooter.id) {

@@ -217,7 +217,8 @@ export class TankSystem {
     tanks: TankState[],
     terrainSystem: TerrainSystem,
     terrainData: TerrainData,
-    tanksFall: boolean = PHYSICS_DEFAULTS.tanksFall
+    tanksFall: boolean = PHYSICS_DEFAULTS.tanksFall,
+    applyFallDamage: boolean = true
   ): FallEvent[] {
     const events: FallEvent[] = [];
 
@@ -234,8 +235,10 @@ export class TankSystem {
       // Snap tank to ground
       tank.y = groundY;
 
-      // Only process fall events if tanksFall is enabled
-      if (!tanksFall) return;
+      // Only process fall events if tanksFall is enabled. Bananas passes
+      // applyFallDamage=false: apes still drop with destroyed roofs, but
+      // silently — Gorillas has no fall damage, chutes, or fall toasts.
+      if (!tanksFall || !applyFallDamage) return;
 
       if (fallDistance > GAME_CONFIG.fall.threshold) {
         // SE parachute logic: only deploy on falls that would cause damage
