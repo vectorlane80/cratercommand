@@ -2476,15 +2476,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Terrain panoramas are baked 960x400 with the sky band in the top 260px.
-   * Crop takes a source-pixel rect, so the sprite must sit at scale 1 for
-   * that band to fill the backdrop area — sizing it to 260 first squashed
-   * the whole 400px image and left the band ending 91px short of the
-   * ground, with black in between.
+   * Terrain panoramas are baked on the pack's full 960x400 design field —
+   * drawSky paints all of it, and its lower third is meant to sit BEHIND
+   * the terrain. Map the whole image onto the battlefield rather than
+   * cropping to the 260px sky band: cropping threw that third away and
+   * left the terrain floating over black.
    */
   private applyTerrainPanorama(): void {
-    this.retroBackdrop.setScale(1);
-    this.retroBackdrop.setCrop(0, 0, GAME_CONFIG.width, RETRO_BACKDROP_HEIGHT);
+    this.retroBackdrop.setCrop();
+    this.retroBackdrop.setDisplaySize(GAME_CONFIG.width, GAME_CONFIG.layout.battlefieldHeight);
   }
 
   private updateRetroLayerVisibility(): void {
