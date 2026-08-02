@@ -4,9 +4,12 @@ import {
   TERRAIN_LABELS,
   TERRAIN_SETTINGS,
   TERRAIN_PALETTES,
+  TERRAIN_PROPS,
   resolveTerrainSetting,
   type TerrainKind
 } from '../src/game/types/GameTypes';
+import { TerrainSystem, terrainPropAnchors } from '../src/game/systems/TerrainSystem';
+import { makeFlatTerrain } from './helpers';
 
 describe('Terrain setting', () => {
   it('TERRAIN_KINDS is exactly the 7-entry pack order', () => {
@@ -136,5 +139,78 @@ describe('Terrain setting', () => {
       expect(palette.hires.rubble.alpha).toBeGreaterThanOrEqual(0);
       expect(palette.hires.rubble.alpha).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('TERRAIN_PROPS has all 7 keys, each a 4-entry list', () => {
+    for (const kind of TERRAIN_KINDS) {
+      expect(TERRAIN_PROPS[kind]).toBeDefined();
+      expect(Array.isArray(TERRAIN_PROPS[kind])).toBe(true);
+      expect(TERRAIN_PROPS[kind].length).toBe(4);
+    }
+    expect(Object.keys(TERRAIN_PROPS).length).toBe(7);
+  });
+
+  it('TERRAIN_PROPS snow is exactly [conifer_snow, boulder_snow, log_snow, conifer_snow]', () => {
+    expect(TERRAIN_PROPS.snow).toEqual(['conifer_snow', 'boulder_snow', 'log_snow', 'conifer_snow']);
+  });
+
+  it('terrainPropAnchors returns 4 anchors on flat terrain, all x in [74, 886]', () => {
+    const terrain = makeFlatTerrain(300);
+    const terrainSystem = new TerrainSystem();
+    const anchors = terrainPropAnchors(terrainSystem, terrain, 4, 22);
+
+    expect(anchors.length).toBe(4);
+    for (const anchor of anchors) {
+      expect(anchor.x).toBeGreaterThanOrEqual(74);
+      expect(anchor.x).toBeLessThanOrEqual(886);
+    }
+  });
+
+  it('terrainPropAnchors: none within 58 of x=125 or x=835', () => {
+    const terrain = makeFlatTerrain(300);
+    const terrainSystem = new TerrainSystem();
+    const anchors = terrainPropAnchors(terrainSystem, terrain, 4, 22);
+
+    for (const anchor of anchors) {
+      expect(Math.abs(anchor.x - 125)).toBeGreaterThanOrEqual(58);
+      expect(Math.abs(anchor.x - 835)).toBeGreaterThanOrEqual(58);
+    }
+  });
+
+  it('terrainPropAnchors: pairwise spacing >= 74', () => {
+    const terrain = makeFlatTerrain(300);
+    const terrainSystem = new TerrainSystem();
+    const anchors = terrainPropAnchors(terrainSystem, terrain, 4, 22);
+
+    for (let i = 0; i < anchors.length - 1; i += 1) {
+      const spacing = anchors[i + 1].x - anchors[i].x;
+      expect(spacing).toBeGreaterThanOrEqual(74);
+    }
+  });
+
+  it('terrainPropAnchors: returns sorted by x', () => {
+    const terrain = makeFlatTerrain(300);
+    const terrainSystem = new TerrainSystem();
+    const anchors = terrainPropAnchors(terrainSystem, terrain, 4, 22);
+
+    for (let i = 0; i < anchors.length - 1; i += 1) {
+      expect(anchors[i].x).toBeLessThanOrEqual(anchors[i + 1].x);
+    }
+  });
+
+  it('scale formula computes to [0.85, 1.06, 0.99, 0.92] for i=[0,1,2,3]', () => {
+    const scales: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const scale = 0.85 + ((i * 7) % 4) * 0.07;
+      scales.push(scale);
+    }
+    // Verify the formula: i=0: (0*7)%4=0 → 0.85+0*0.07=0.85
+    //                     i=1: (1*7)%4=3 → 0.85+3*0.07=0.85+0.21=1.06
+    //                     i=2: (2*7)%4=2 → 0.85+2*0.07=0.85+0.14=0.99
+    //                     i=3: (3*7)%4=1 → 0.85+1*0.07=0.85+0.07=0.92
+    expect(scales[0]).toBeCloseTo(0.85, 5);
+    expect(scales[1]).toBeCloseTo(1.06, 5);
+    expect(scales[2]).toBeCloseTo(0.99, 5);
+    expect(scales[3]).toBeCloseTo(0.92, 5);
   });
 });

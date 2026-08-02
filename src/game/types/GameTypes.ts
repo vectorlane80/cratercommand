@@ -78,6 +78,16 @@ export const TERRAIN_LABELS: Record<TerrainSetting, string> = {
   alien: 'ALIEN'
 };
 
+export const TERRAIN_PROPS: Record<TerrainKind, string[]> = {
+  desert: ['cactus', 'rock', 'cactus', 'rock'],
+  forest: ['conifer', 'fern', 'log', 'conifer'],
+  snow: ['conifer_snow', 'boulder_snow', 'log_snow', 'conifer_snow'],
+  volcanic: ['basalt', 'vent', 'snag', 'basalt'],
+  lunar: ['boulder', 'crater', 'mast', 'boulder'],
+  urban: ['slab', 'lamppost', 'husk', 'slab'],
+  alien: ['spire', 'pod', 'arch', 'spire']
+};
+
 export interface TerrainPalette {
   classic: { flat: number; ridge: number; hatch: number };
   retro: { dirt: number; dark: number; lip: number; hi: number; specks: [number, number, number] };

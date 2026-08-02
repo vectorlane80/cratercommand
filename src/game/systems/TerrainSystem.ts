@@ -30,6 +30,45 @@ export interface BananasBuilding {
   seed: number;
 }
 
+export interface TerrainAnchor {
+  x: number;
+  slope: number;
+  y: number;
+}
+
+/** Flat-ground anchors: low local slope, clear of tanks and edges, spaced apart.
+ * Scans x from 74..W-74 step 4; skips |x-125|<58 and |x-835|<58; slope from
+ * three-sample max with 0.8 factor; strict pass slope<=7 spacing 92;
+ * loose pass slope<=14 spacing 74; returns sorted by x. */
+export function terrainPropAnchors(terrainSystem: TerrainSystem, td: TerrainData, count: number, halfWidth = 22): TerrainAnchor[] {
+  const cands: TerrainAnchor[] = [];
+  const W = td.width;
+  for (let x = 74; x <= W - 74; x += 4) {
+    if (Math.abs(x - 125) < 58 || Math.abs(x - 835) < 58) continue;
+    const hl = terrainSystem.getHeightAtX(td, x - halfWidth);
+    const hc = terrainSystem.getHeightAtX(td, x);
+    const hr = terrainSystem.getHeightAtX(td, x + halfWidth);
+    const slope = Math.max(Math.abs(hc - hl), Math.abs(hr - hc), Math.abs(hr - hl) * 0.8);
+    cands.push({ x, slope, y: Math.max(hl, hc, hr) });
+  }
+  cands.sort((a, b) => a.slope - b.slope);
+  const picked: TerrainAnchor[] = [];
+  for (const c of cands) {
+    if (picked.length >= count) break;
+    if (c.slope > 7) break;
+    if (picked.some((p) => Math.abs(p.x - c.x) < 92)) continue;
+    picked.push(c);
+  }
+  // Second, looser pass so the full prop set always gets placed on rough seeds.
+  for (const c of cands) {
+    if (picked.length >= count) break;
+    if (c.slope > 14) break;
+    if (picked.some((p) => Math.abs(p.x - c.x) < 74)) continue;
+    picked.push(c);
+  }
+  return picked.sort((a, b) => a.x - b.x);
+}
+
 export function bananasBuildings(seed: number, sceneWidth: number): BananasBuilding[] {
   const rand = bananasRng(seed);
   const buildings: BananasBuilding[] = [];

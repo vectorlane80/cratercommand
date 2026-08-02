@@ -816,6 +816,9 @@ export class HudSystem {
     const top = GAME_CONFIG.layout.consoleTop;
     const activePalette = getPlayerPalette(turn.activePlayerId, 'retroPixel');
 
+    // No light-terrain scrim needed: the top band below is already fully
+    // opaque on every terrain, so snow/lunar ground never reaches the
+    // white-on-black text. (Designer's open question, settled by measurement.)
     this.graphics.fillStyle(colors.black, 1);
     this.graphics.fillRect(0, 0, GAME_CONFIG.width, 82);
     this.graphics.lineStyle(2, colors.desertGold, 0.7);

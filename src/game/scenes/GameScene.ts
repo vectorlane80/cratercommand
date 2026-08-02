@@ -6,7 +6,7 @@ import { networkSystem, type GameSnapshot, type NetInput, type NetworkMessage } 
 import { soundSystem } from '../systems/SoundSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
-import { TerrainSystem } from '../systems/TerrainSystem';
+import { TerrainSystem, terrainPropAnchors } from '../systems/TerrainSystem';
 import { TurnSystem } from '../systems/TurnSystem';
 import { adjustWindow, cycleWeapon } from '../systems/WeaponWindow';
 import {
@@ -14,6 +14,8 @@ import {
   BANANAS_DISPLAY_CYCLE,
   GAME_CONFIG,
   PHYSICS_DEFAULTS,
+  TERRAIN_PALETTES,
+  TERRAIN_PROPS,
   nextBananasDisplay,
   setBananasDisplayInk,
   type BananasDisplay,
@@ -62,6 +64,11 @@ export class GameScene extends Phaser.Scene {
   private hiresShells: Phaser.GameObjects.Image[] = [];
   private hiresRocks: Phaser.GameObjects.Image[] = [];
   private hiresPlayerCards: Phaser.GameObjects.Image[] = [];
+
+  // Terrain props (retro/hires modes only, positioned via anchors).
+  private terrainProps: Phaser.GameObjects.Image[] = [];
+  private propSeatGraphics!: Phaser.GameObjects.Graphics;
+  private terrainPropAnchors_: Array<{ x: number; y: number }> = [];
 
   private terrainSystem!: TerrainSystem;
   private tankSystem!: TankSystem;
@@ -294,6 +301,14 @@ export class GameScene extends Phaser.Scene {
     this.hiresRocks = HIRES_ROCK_POSITIONS.map(() =>
       this.add.image(0, 0, 'hires-rock').setOrigin(0.5, 1).setScale(0.3)
     );
+
+    // Terrain props (retro/hires modes, positioned via anchors).
+    this.terrainProps = Array.from({ length: 4 }, () =>
+      this.add.image(0, 0, 'retro-cactus').setOrigin(0.5, 1).setVisible(false)
+    );
+
+    // Prop seat marks graphics (drawn just under the prop layer).
+    this.propSeatGraphics = this.add.graphics();
 
     // HiRes-mode player card mini-tanks (for the top bar).
     this.hiresPlayerCards = [
@@ -701,6 +716,10 @@ export class GameScene extends Phaser.Scene {
         t.parachutes = 0;
       });
     }
+
+    // Compute terrain prop anchors once per round (used for placement and reseating).
+    const anchors = terrainPropAnchors(this.terrainSystem, this.terrainData, 4, 22);
+    this.terrainPropAnchors_ = anchors.map((a) => ({ x: a.x, y: a.y }));
 
     // Auto-arm shields for players with autoDefense or AI
     for (const tank of this.tanks) {
@@ -2377,6 +2396,23 @@ export class GameScene extends Phaser.Scene {
         }
       }
     });
+
+    // Destruction reseating: hide props whose ground was destroyed.
+    if (!this.isBananas() && this.match.terrain !== 'desert') {
+      const hiRes = this.visualSystem === 'hiRes';
+      for (let i = 0; i < this.terrainProps.length; i += 1) {
+        const prop = this.terrainProps[i];
+        const anchorData = this.terrainPropAnchors_[i];
+        if (!prop || !anchorData || !prop.visible) continue;
+
+        const currentHeight = this.terrainSystem.getHeightAtX(this.terrainData, anchorData.x);
+        if (Math.abs(currentHeight - anchorData.y) > 6) {
+          prop.visible = false;
+        }
+      }
+      // Redraw seats for remaining visible props
+      this.redrawPropSeats(hiRes);
+    }
   }
 
   private endTurn(): void {
@@ -2444,51 +2480,66 @@ export class GameScene extends Phaser.Scene {
     const retro = this.visualSystem === 'retroPixel' || this.visualSystem === 'hiRes';
     const hiRes = this.visualSystem === 'hiRes';
     this.retroBackdrop.visible = retro;
-    this.retroCacti.forEach((cactus) => (cactus.visible = retro));
     this.retroTankBodies.forEach((tankImg) => (tankImg.visible = retro));
     this.hiresBarrels.forEach((barrel) => (barrel.visible = false));
     this.hiresChutes.forEach((chute) => (chute.visible = false));
     this.hiresShells.forEach((shell) => (shell.visible = false));
-    this.hiresRocks.forEach((rock) => (rock.visible = false));
     this.hiresPlayerCards.forEach((card) => (card.visible = false));
+    this.terrainProps.forEach((prop) => (prop.visible = false));
+    this.propSeatGraphics.clear();
 
     if (retro && this.terrainData) {
-      RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
-        const cactus = this.retroCacti[idx];
-        if (!cactus) return;
-        // Skip cacti that would land on tank spawn columns
-        if (Math.abs(t - 0.16) < 0.06 || Math.abs(t - 0.86) < 0.06) {
-          cactus.visible = false;
-          return;
+      // Desert: use traditional cacti/rocks; non-desert: use terrain props via anchors.
+      if (this.match.terrain === 'desert') {
+        this.retroCacti.forEach((cactus) => (cactus.visible = retro));
+        this.hiresRocks.forEach((rock) => (rock.visible = false));
+
+        RETRO_CACTUS_POSITIONS.forEach((t, idx) => {
+          const cactus = this.retroCacti[idx];
+          if (!cactus) return;
+          // Skip cacti that would land on tank spawn columns
+          if (Math.abs(t - 0.16) < 0.06 || Math.abs(t - 0.86) < 0.06) {
+            cactus.visible = false;
+            return;
+          }
+          const x = t * GAME_CONFIG.width;
+          const y = this.terrainSystem.getHeightAtX(this.terrainData, x);
+          cactus.setPosition(Math.round(x), Math.round(y) + 2);
+        });
+
+        // HiRes rocks: position them along terrain
+        if (hiRes) {
+          const HIRES_ROCK_POSITIONS = [0.22, 0.55, 0.81] as const;
+          HIRES_ROCK_POSITIONS.forEach((t, idx) => {
+            const rock = this.hiresRocks[idx];
+            if (!rock) return;
+            const x = t * GAME_CONFIG.width;
+            // Sample terrain across the rock's ~48px footprint and sit its base
+            // on the LOWEST ground under it — center-only sampling left rocks
+            // overhanging on slopes.
+            const halfW = 24;
+            let baseY = 0;
+            for (let dx = -halfW; dx <= halfW; dx += 8) {
+              const sampleX = Math.min(Math.max(x + dx, 0), GAME_CONFIG.width - 1);
+              baseY = Math.max(baseY, this.terrainSystem.getHeightAtX(this.terrainData, sampleX));
+            }
+            rock.setPosition(Math.round(x), Math.round(baseY) + 2);
+            rock.visible = true;
+          });
         }
-        const x = t * GAME_CONFIG.width;
-        const y = this.terrainSystem.getHeightAtX(this.terrainData, x);
-        cactus.setPosition(Math.round(x), Math.round(y) + 2);
-      });
+      } else {
+        // Non-desert: hide cacti and rocks, show terrain props via anchors
+        this.retroCacti.forEach((cactus) => (cactus.visible = false));
+        this.hiresRocks.forEach((rock) => (rock.visible = false));
+
+        this.placePropsByAnchors(hiRes);
+        this.redrawPropSeats(hiRes);
+      }
 
       // Position tank sprites at each tank's current position.
       this.syncTankBodySprites();
 
-      // HiRes rocks: position them along terrain
       if (hiRes) {
-        const HIRES_ROCK_POSITIONS = [0.22, 0.55, 0.81] as const;
-        HIRES_ROCK_POSITIONS.forEach((t, idx) => {
-          const rock = this.hiresRocks[idx];
-          if (!rock) return;
-          const x = t * GAME_CONFIG.width;
-          // Sample terrain across the rock's ~48px footprint and sit its base
-          // on the LOWEST ground under it — center-only sampling left rocks
-          // overhanging on slopes.
-          const halfW = 24;
-          let baseY = 0;
-          for (let dx = -halfW; dx <= halfW; dx += 8) {
-            const sampleX = Math.min(Math.max(x + dx, 0), GAME_CONFIG.width - 1);
-            baseY = Math.max(baseY, this.terrainSystem.getHeightAtX(this.terrainData, sampleX));
-          }
-          rock.setPosition(Math.round(x), Math.round(baseY) + 2);
-          rock.visible = true;
-        });
-
         // Show mini-tank player cards in hiRes (hide during shopping)
         const inShop = this.turn.phase === 'shopping' && this.match.shoppingPlayerId !== null;
         this.hiresPlayerCards.forEach((card) => (card.visible = !inShop));
@@ -2497,6 +2548,96 @@ export class GameScene extends Phaser.Scene {
         this.hiresChutes.forEach((chute) => (chute.visible = false));
       }
     }
+  }
+
+  /** Place terrain props based on stored anchors. Computes scales and texture keys. */
+  private placePropsByAnchors(hiRes: boolean): void {
+    if (!this.terrainData) return;
+    const kinds = TERRAIN_PROPS[this.match.terrain];
+    const anchors = this.terrainPropAnchors_;
+
+    anchors.forEach((anchor, i) => {
+      const prop = this.terrainProps[i];
+      if (!prop) return;
+
+      const kind = kinds[i % kinds.length];
+      const displayMode = hiRes ? 'hires' : 'retro';
+      const textureKey = `${this.match.terrain}_${displayMode}_${kind}`;
+
+      // Scale formula: retro at 0.85 + ((i*7)%4)*0.07, hires at 0.5x that
+      const retroScale = 0.85 + ((i * 7) % 4) * 0.07;
+      const scale = hiRes ? retroScale * 0.5 : retroScale;
+
+      // Position: x = anchor.x, y = anchor.y + 2 (origin bottom-center)
+      const x = anchor.x;
+      let y = anchor.y + 2;
+
+      // DECAL exception: crater gets y = anchor.y + fh * 0.34
+      if (kind === 'crater') {
+        // fh = displayed height (rim above ground, pit below)
+        // "displayed height" means the visual extent. crater: { w: 40, h: 16 } (retro) or 62×26
+        // Approximate: fh ≈ retro 26 or hires 52 (authored dims 2x for hires)
+        const fh = hiRes ? 52 : 26;
+        y = anchor.y + fh * 0.34;
+      }
+
+      prop.setTexture(textureKey).setScale(scale).setPosition(Math.round(x), Math.round(y));
+      prop.visible = true;
+    });
+
+    // Hide any unused prop slots
+    for (let i = anchors.length; i < this.terrainProps.length; i++) {
+      const prop = this.terrainProps[i];
+      if (prop) prop.visible = false;
+    }
+  }
+
+  /** Draw seat marks graphics for visible terrain props. */
+  private redrawPropSeats(hiRes: boolean): void {
+    this.propSeatGraphics.clear();
+    if (!this.terrainData) return;
+    const anchors = this.terrainPropAnchors_;
+    const palette = TERRAIN_PALETTES[this.match.terrain];
+    const kinds = TERRAIN_PROPS[this.match.terrain];
+
+    anchors.forEach((anchor, i) => {
+      const kind = kinds[i % kinds.length];
+      if (kind === 'crater') return; // Decals get no seat
+
+      // Seat width follows the sprite actually placed at this anchor, so
+      // wide props (logs, husks) get wide seats and narrow ones don't.
+      const prop = this.terrainProps[i];
+      if (!prop || !prop.visible) return;
+      const fw = prop.displayWidth * 0.8;
+      const x = anchor.x;
+      const gy = anchor.y + 1;
+
+      if (hiRes) {
+        // Graphics has no radial gradient: three concentric filled ellipses
+        // approximate the design's contact shadow. fillEllipse takes full
+        // width/height, so the design's radii are doubled.
+        this.propSeatGraphics.fillStyle(0x000000, 0.18);
+        this.propSeatGraphics.fillEllipse(x, gy, fw * 1.24, Math.max(6, fw * 0.32));
+        this.propSeatGraphics.fillStyle(0x000000, 0.2);
+        this.propSeatGraphics.fillEllipse(x, gy, fw * 0.88, Math.max(5, fw * 0.22));
+        this.propSeatGraphics.fillStyle(0x000000, 0.22);
+        this.propSeatGraphics.fillEllipse(x, gy, fw * 0.52, Math.max(4, fw * 0.14));
+      } else {
+        // Retro: three rects
+        const dark = palette.retro.dark;
+        const dirt = palette.retro.dirt;
+        const hi = palette.retro.hi;
+
+        this.propSeatGraphics.fillStyle(dark, 0.55);
+        this.propSeatGraphics.fillRect(Math.round(x - fw * 0.42), Math.round(gy) - 1, Math.round(fw * 0.84), 3);
+
+        this.propSeatGraphics.fillStyle(dirt, 1);
+        this.propSeatGraphics.fillRect(Math.round(x - fw * 0.34), Math.round(gy) - 3, Math.round(fw * 0.68), 3);
+
+        this.propSeatGraphics.fillStyle(hi, 0.55);
+        this.propSeatGraphics.fillRect(Math.round(x - fw * 0.3), Math.round(gy) - 4, Math.round(fw * 0.6), 1);
+      }
+    });
   }
 
   /**
