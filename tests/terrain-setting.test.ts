@@ -3,6 +3,7 @@ import {
   TERRAIN_KINDS,
   TERRAIN_LABELS,
   TERRAIN_SETTINGS,
+  quadPoints,
   TERRAIN_PALETTES,
   TERRAIN_PROPS,
   resolveTerrainSetting,
@@ -212,5 +213,46 @@ describe('Terrain setting', () => {
     expect(scales[1]).toBeCloseTo(1.06, 5);
     expect(scales[2]).toBeCloseTo(0.99, 5);
     expect(scales[3]).toBeCloseTo(0.92, 5);
+  });
+});
+
+describe('quadPoints', () => {
+  it('returns n+1 points', () => {
+    const pts = quadPoints(0, 0, 10, 20, 20, 0, 8);
+    expect(pts.length).toBe(9);
+  });
+
+  it('endpoints are exact', () => {
+    const pts = quadPoints(0, 0, 10, 20, 20, 0, 8);
+    expect(pts[0].x).toBe(0);
+    expect(pts[0].y).toBe(0);
+    expect(pts[8].x).toBe(20);
+    expect(pts[8].y).toBe(0);
+  });
+
+  it('midpoint of a symmetric quad lies on the expected axis', () => {
+    // Symmetric quadratic: P0=(0,0), CP=(10,20), P1=(20,0).
+    // The curve is symmetric about x=10, and t=0.5 gives (10, 10).
+    const pts = quadPoints(0, 0, 10, 20, 20, 0, 4);
+    const mid = pts[2]; // t = 2/4 = 0.5
+    expect(mid.x).toBeCloseTo(10, 5);
+    expect(mid.y).toBeCloseTo(10, 5);
+  });
+});
+
+describe('latitude-line half-length formula', () => {
+  const R = 38;
+
+  it('i=0 gives half === R', () => {
+    const half = Math.sqrt(Math.max(0, R * R - (0 * R * 0.3) * (0 * R * 0.3)));
+    expect(half).toBe(R);
+  });
+
+  it('i=3 gives ~0.436R', () => {
+    const i = 3;
+    const half = Math.sqrt(Math.max(0, R * R - (i * R * 0.3) * (i * R * 0.3)));
+    // R*0.3*3 = R*0.9. sqrt(R² - (0.9R)²) = sqrt(R²(1-0.81)) = R*sqrt(0.19) ≈ R * 0.43589
+    expect(half).toBeCloseTo(R * Math.sqrt(0.19), 5);
+    expect(half).toBeCloseTo(38 * 0.43589, 3);
   });
 });

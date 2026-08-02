@@ -132,6 +132,27 @@ export const TERRAIN_PALETTES: Record<TerrainKind, TerrainPalette> = {
   }
 };
 
+/** A 2D point returned by quadPoints. */
+export interface QuadPoint { x: number; y: number }
+
+/**
+ * Approximate a quadratic Bezier with n straight segments — Phaser's
+ * Graphics path API has no quadraticCurveTo, and the classic wireframe
+ * Earth's continents are authored as quadratics.
+ */
+export function quadPoints(x0: number, y0: number, cx: number, cy: number, x1: number, y1: number, n: number): QuadPoint[] {
+  const points: QuadPoint[] = [];
+  for (let i = 0; i <= n; i += 1) {
+    const t = i / n;
+    const u = 1 - t;
+    points.push({
+      x: u * u * x0 + 2 * u * t * cx + t * t * x1,
+      y: u * u * y0 + 2 * u * t * cy + t * t * y1
+    });
+  }
+  return points;
+}
+
 export function resolveTerrainSetting(setting: TerrainSetting): TerrainKind {
   if (setting !== 'random') return setting;
   return TERRAIN_KINDS[Math.floor(Math.random() * TERRAIN_KINDS.length)];

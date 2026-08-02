@@ -6,11 +6,12 @@ import { networkSystem, type GameSnapshot, type NetInput, type NetworkMessage } 
 import { soundSystem } from '../systems/SoundSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { TankSystem } from '../systems/TankSystem';
-import { TerrainSystem, terrainPropAnchors } from '../systems/TerrainSystem';
+import { bananasRng, TerrainSystem, terrainPropAnchors } from '../systems/TerrainSystem';
 import { TurnSystem } from '../systems/TurnSystem';
 import { adjustWindow, cycleWeapon } from '../systems/WeaponWindow';
 import {
   BANANA_WEAPON,
+  quadPoints,
   BANANAS_DISPLAY_CYCLE,
   GAME_CONFIG,
   PHYSICS_DEFAULTS,
@@ -2758,9 +2759,256 @@ export class GameScene extends Phaser.Scene {
         const py = ((i * 41 + starSeed) % 150) + 12;
         this.backgroundGraphics.fillRect(px, py, 1, 1);
       }
+      this.drawClassicTerrainFeature();
     }
     // Retro mode: backdrop is supplied by retroSky / retroFarMountains /
     // retroMidMountains image game objects; no procedural drawing needed.
+  }
+
+  /**
+   * Classic-mode background feature: one line-art landmark per terrain,
+   * stroked in the terrain's ridge color between the starfield and the
+   * ground fill, so the destructible terrain buries its base. Desert draws
+   * none (the shipped classic look is frozen).
+   */
+  private drawClassicTerrainFeature(): void {
+    if (this.match.terrain === 'desert' || this.isBananas()) return;
+
+    const t = this.match.terrain;
+    const acc = TERRAIN_PALETTES[t].classic.ridge;
+    const W = GAME_CONFIG.width;
+    const H = GAME_CONFIG.layout.battlefieldHeight;
+    const YS = H / 400;
+    const g = this.backgroundGraphics;
+
+    if (t === 'alien') {
+      // Moons: ringed planet + small moon.
+      g.lineStyle(2, acc, 0.75);
+      g.strokeCircle(792, 92 * YS, 36);
+      // Ring — locked substitute: unrotated ellipse (pack rotated -0.28 rad).
+      g.strokeEllipse(792, 92 * YS, 124, 28 * YS);
+      g.strokeCircle(150, 60 * YS, 15);
+      return;
+    }
+
+    if (t === 'lunar') {
+      // Earth: extra starfield + wireframe globe.
+      const r = bananasRng(21);
+      g.fillStyle(0xffffff, 1);
+      for (let i = 0; i < 130; i++) {
+        const alpha = 0.15 + r() * 0.8;
+        g.fillStyle(0xffffff, alpha);
+        g.fillRect(Math.round(r() * W), Math.round(r() * 260 * YS), 1, 1);
+      }
+
+      const cx = 182;
+      const cy = 86 * YS;
+      const R = 38;
+
+      // Vertical meridian ellipses.
+      g.lineStyle(1, 0x5b8fd8, 1);
+      for (let i = -3; i <= 3; i++) {
+        g.strokeEllipse(cx, cy, Math.abs(R * i * 0.3) * 2, R * 2 * YS);
+      }
+
+      // Horizontal latitude lines (manually clipped to the globe).
+      for (let i = -3; i <= 3; i++) {
+        const ly = cy + i * R * 0.3 * YS;
+        const half = Math.sqrt(Math.max(0, R * R - (i * R * 0.3) * (i * R * 0.3)));
+        g.beginPath();
+        g.moveTo(cx - half, ly);
+        g.lineTo(cx + half, ly);
+        g.strokePath();
+      }
+
+      // Continents — three quadratic-curve blobs, each approximated with 8
+      // straight segments via quadPoints.
+      g.lineStyle(2, 0x3fd06a, 1);
+
+      // Blob 1 (3 quads chained).
+      let pts = quadPoints(
+        cx - R * 0.62, cy - R * 0.1 * YS,
+        cx - R * 0.5, cy - R * 0.62 * YS,
+        cx - R * 0.1, cy - R * 0.5 * YS,
+        8
+      );
+      g.beginPath();
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      pts = quadPoints(
+        cx - R * 0.1, cy - R * 0.5 * YS,
+        cx + R * 0.1, cy - R * 0.2 * YS,
+        cx - R * 0.22, cy - R * 0.02 * YS,
+        8
+      );
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      pts = quadPoints(
+        cx - R * 0.22, cy - R * 0.02 * YS,
+        cx - R * 0.42, cy + R * 0.12 * YS,
+        cx - R * 0.62, cy - R * 0.1 * YS,
+        8
+      );
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.strokePath();
+
+      // Blob 2 (2 quads chained).
+      pts = quadPoints(
+        cx - R * 0.2, cy + R * 0.2 * YS,
+        cx + R * 0.16, cy + R * 0.08 * YS,
+        cx + R * 0.34, cy + R * 0.46 * YS,
+        8
+      );
+      g.beginPath();
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      pts = quadPoints(
+        cx + R * 0.34, cy + R * 0.46 * YS,
+        cx + R * 0.02, cy + R * 0.7 * YS,
+        cx - R * 0.2, cy + R * 0.2 * YS,
+        8
+      );
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.strokePath();
+
+      // Blob 3 (1 quad).
+      pts = quadPoints(
+        cx + R * 0.42, cy - R * 0.46 * YS,
+        cx + R * 0.74, cy - R * 0.2 * YS,
+        cx + R * 0.4, cy - R * 0.06 * YS,
+        8
+      );
+      g.beginPath();
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.strokePath();
+
+      // Skip diagonal hatch pass (requires clipping to globe; without clip
+      // it would smear across the sky).
+      // Rim.
+      g.lineStyle(2, 0xdcdcd8, 1);
+      g.strokeCircle(cx, cy, R);
+      return;
+    }
+
+    if (t === 'volcanic') {
+      // Volcano cone + crater notch + smoke.
+      g.lineStyle(2, acc, 1);
+      // Cone runs below the play line so the destructible ground buries its base.
+      g.beginPath();
+      g.moveTo(510, 402 * YS);
+      g.lineTo(680, 84 * YS);
+      g.lineTo(724, 84 * YS);
+      g.lineTo(896, 402 * YS);
+      g.strokePath();
+      // Crater notch.
+      g.beginPath();
+      g.moveTo(684, 88 * YS);
+      g.lineTo(702, 118 * YS);
+      g.lineTo(720, 88 * YS);
+      g.strokePath();
+      // Smoke plume.
+      g.lineStyle(2, acc, 0.6);
+      g.beginPath();
+      g.moveTo(700, 122 * YS);
+      g.lineTo(690, 168 * YS);
+      g.lineTo(704, 214 * YS);
+      g.lineTo(688, 268 * YS);
+      g.lineTo(700, 330 * YS);
+      g.lineTo(690, 402 * YS);
+      g.strokePath();
+      return;
+    }
+
+    if (t === 'urban') {
+      // City skyline: deterministic buildings with windows.
+      const r = bananasRng(1207);
+      let x = -20;
+      while (x < W + 40) {
+        const w = 34 + Math.floor(r() * 56);
+        const top = 92 + Math.floor(r() * 76);
+        // Building outline — runs past the play line so the terrain fill
+        // buries its base.
+        g.lineStyle(2, acc, 0.8);
+        g.beginPath();
+        g.moveTo(Math.round(x), H);
+        g.lineTo(Math.round(x), Math.round(top * YS));
+        g.lineTo(Math.round(x) + w, Math.round(top * YS));
+        g.lineTo(Math.round(x) + w, H);
+        g.strokePath();
+        // Window lines.
+        g.lineStyle(2, acc, 0.5);
+        for (let wy = top * YS + 12 * YS; wy < 300 * YS; wy += 20 * YS) {
+          g.beginPath();
+          g.moveTo(Math.round(x) + 5, wy);
+          g.lineTo(Math.round(x) + w - 5, wy);
+          g.strokePath();
+        }
+        x += w + 4 + Math.floor(r() * 14);
+      }
+      return;
+    }
+
+    if (t === 'forest') {
+      // Treeline: conifers standing behind the ground, seated on live terrain.
+      g.lineStyle(2, acc, 0.9);
+      const positions: Array<[number, number]> = [
+        [112, 1],
+        [318, 0.84],
+        [530, 1.08],
+        [742, 0.9],
+        [900, 0.96]
+      ];
+      for (const [x, k] of positions) {
+        // Sit each tree ON the ground so no bare stem hangs in the sky.
+        const gy = this.terrainSystem.getHeightAtX(this.terrainData, x) + 3;
+        const trunk = 8 * k;
+        const step = 15 * k;
+        const hw = 22 * k;
+        const widths = [hw, hw * 0.76, hw * 0.5];
+        const left: Array<[number, number]> = [];
+        const right: Array<[number, number]> = [];
+        widths.forEach((w, i) => {
+          const yBot = gy - trunk - i * step;
+          left.push([x - w, yBot], [x - w * 0.48, yBot - step]);
+          right.push([x + w, yBot], [x + w * 0.48, yBot - step]);
+        });
+        const apex = gy - trunk - widths.length * step;
+        g.beginPath();
+        g.moveTo(x - widths[0] * 0.3, gy);
+        g.lineTo(x - widths[0] * 0.3, gy - trunk);
+        left.forEach(([px, py]) => g.lineTo(px, py));
+        g.lineTo(x, apex);
+        right.slice().reverse().forEach(([px, py]) => g.lineTo(px, py));
+        g.lineTo(x + widths[0] * 0.3, gy - trunk);
+        g.lineTo(x + widths[0] * 0.3, gy);
+        g.strokePath();
+      }
+      return;
+    }
+
+    if (t === 'snow') {
+      // Flurry: deterministic falling snow.
+      const r = bananasRng(53);
+      for (let i = 0; i < 150; i++) {
+        const x = Math.round(r() * W);
+        const y = Math.round(r() * 320 * YS);
+        const big = i % 5 === 0;
+        const alpha = big ? 0.9 : 0.45 + r() * 0.35;
+        if (big) {
+          g.lineStyle(1, 0xffffff, alpha);
+          g.beginPath();
+          g.moveTo(x, y);
+          g.lineTo(x - 2, y + 6 * YS);
+          g.strokePath();
+          g.fillStyle(0xffffff, alpha);
+          g.fillRect(x - 1, y, 2, 2 * YS);
+        } else {
+          g.fillStyle(0xffffff, alpha);
+          g.fillRect(x, y, 1, 1);
+        }
+      }
+      return;
+    }
   }
 
   private loadVisualSystemFromStorage(): void {
