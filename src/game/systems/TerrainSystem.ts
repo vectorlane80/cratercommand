@@ -36,7 +36,9 @@ export function bananasBuildings(seed: number, sceneWidth: number): BananasBuild
 
   while (x < sceneWidth) {
     const w = Math.round(60 + rand() * 60);
-    const h = Math.round(120 + rand() * 150);
+    // User-directed deviation from the mock's 120 + rand()*150: cap tower
+    // height so roofs (356 - h >= 106) always clear the sun's rays (y <= 96).
+    const h = Math.round(120 + rand() * 130);
     buildings.push({
       x,
       w: Math.min(w, sceneWidth - x),
@@ -181,7 +183,13 @@ export class TerrainSystem {
       const sampleIndex = Phaser.Math.Clamp(Math.round(x / segmentWidth), 0, heights.length - 1);
       const surfaceY = heights[sampleIndex];
       if (is1Bit) {
-        graphics.fillRect(x, surfaceY, 2, 2);
+        // Connect each column to its neighbor's surface so crater bites and
+        // building steps read as a continuous contour — per-column dots made
+        // damaged rooflines look like broken dotted lines.
+        const nextIndex = Phaser.Math.Clamp(Math.round((x + 2) / segmentWidth), 0, heights.length - 1);
+        const nextY = heights[nextIndex];
+        const topY = Math.min(surfaceY, nextY);
+        graphics.fillRect(x, topY, 2, Math.max(2, Math.abs(nextY - surfaceY) + 2));
       } else {
         const building = this.bananasBuildingList.find((b) => x >= b.x && x < b.x + b.w)!;
         graphics.fillStyle(buildingColors[building.colorIndex], 1);

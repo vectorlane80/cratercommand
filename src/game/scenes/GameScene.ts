@@ -455,8 +455,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // ESC anywhere opens the forfeit-confirm modal.
+    // ESC opens the forfeit-confirm modal — except at match over, where
+    // there is nothing left to forfeit: it goes straight back to the menu.
     if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
+      if (this.turn.phase === 'matchOver') {
+        this.returnToMenu();
+        return;
+      }
       this.quitConfirmActive = true;
       soundSystem.playUiClick();
       this.renderTanksAndHud();
@@ -1391,7 +1396,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.turn.phase === 'matchOver') {
-      if (this.isOnlineHost || this.isOnlineJoiner) {
+      // ESC strip zone → menu; anywhere else replays (offline) or exits
+      // to the menu (online — no rematch protocol).
+      const stripY = GAME_CONFIG.layout.bottomStatusTop - 5;
+      const escTapped = x >= 820 && x <= 950 && y >= stripY + 2 && y <= stripY + 24;
+      if (escTapped || this.isOnlineHost || this.isOnlineJoiner) {
         this.returnToMenu();
       } else {
         this.scene.restart();
@@ -2466,7 +2475,8 @@ export class GameScene extends Phaser.Scene {
       },
       this.weaponWindowStart,
       this.topToast,
-      this.quitConfirmActive
+      this.quitConfirmActive,
+      this.isOnlineHost || this.isOnlineJoiner
     );
   }
 

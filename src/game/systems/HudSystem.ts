@@ -28,27 +28,43 @@ interface BananasGlyphMask {
 
 const bananasGlyphCache: Record<string, BananasGlyphMask> = {};
 
-export function bananasTextMask(str: string): BananasGlyphMask {
-  if (bananasGlyphCache[str]) return bananasGlyphCache[str];
+export function bananasTextMask(str: string, fine = false): BananasGlyphMask {
+  const cacheKey = (fine ? 'f:' : 'c:') + str;
+  if (bananasGlyphCache[cacheKey]) return bananasGlyphCache[cacheKey];
   const w = Math.max(1, str.length * 6);
   const h = 9;
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  const scale = fine ? 2 : 1;
+  canvas.width = w * scale;
+  canvas.height = h * scale;
   const context = canvas.getContext('2d')!;
-  context.font = '9px monospace';
+  context.font = fine ? '18px monospace' : '9px monospace';
   context.textBaseline = 'top';
   context.fillStyle = '#fff';
   context.fillText(str, 0, 0);
-  const data = context.getImageData(0, 0, w, h).data;
+  const data = context.getImageData(0, 0, w * scale, h * scale).data;
   const pts: Array<[number, number]> = [];
   for (let py = 0; py < h; py += 1) {
     for (let px = 0; px < w; px += 1) {
-      if (data[(py * w + px) * 4 + 3] > 100) pts.push([px, py]);
+      if (fine) {
+        // Supersample: light a cell when at least half its 2x2 subpixels
+        // have ink. The straight 9px threshold dropped thin strokes and left
+        // small text ragged; big cells keep the coarse mask, whose open
+        // counters read better at wordmark sizes.
+        let covered = 0;
+        for (let sy = 0; sy < 2; sy += 1) {
+          for (let sx = 0; sx < 2; sx += 1) {
+            if (data[((py * 2 + sy) * w * 2 + px * 2 + sx) * 4 + 3] > 60) covered += 1;
+          }
+        }
+        if (covered >= 2) pts.push([px, py]);
+      } else if (data[(py * w + px) * 4 + 3] > 100) {
+        pts.push([px, py]);
+      }
     }
   }
-  bananasGlyphCache[str] = { pts, w, h };
-  return bananasGlyphCache[str];
+  bananasGlyphCache[cacheKey] = { pts, w, h };
+  return bananasGlyphCache[cacheKey];
 }
 
 export function bananasPixText(
@@ -59,7 +75,7 @@ export function bananasPixText(
   cell: number,
   color: number
 ): number {
-  const mask = bananasTextMask(str.toUpperCase());
+  const mask = bananasTextMask(str.toUpperCase(), cell <= 2);
   graphics.fillStyle(color, 1);
   mask.pts.forEach(([px, py]) => graphics.fillRect(x + px * cell, y + py * cell, cell, cell));
   return mask.w * cell;
@@ -73,7 +89,7 @@ export function bananasPixTextCentered(
   cell: number,
   color: number
 ): number {
-  const mask = bananasTextMask(str.toUpperCase());
+  const mask = bananasTextMask(str.toUpperCase(), cell <= 2);
   return bananasPixText(graphics, str, Math.round(cx - (mask.w * cell) / 2), y, cell, color);
 }
 
@@ -206,7 +222,8 @@ export class HudSystem {
     pendingShop: ShopPending = EMPTY_SHOP_PENDING,
     weaponWindowStart = 0,
     topToast: { text: string; color: number } | null = null,
-    quitConfirm = false
+    quitConfirm = false,
+    isOnline = false
   ): void {
     this.currentPendingShop = pendingShop;
     this.clearTexts();
@@ -264,9 +281,10 @@ export class HudSystem {
       this.drawFullScreenBackdrop();
       const winId = match.matchWinnerId!;
       const winName = match.profiles[winId].displayName ?? `PLAYER ${winId + 1}`;
+      // Online rematch isn't a thing — the only exit is back to the menu.
       this.drawCenterBanner(
         `${winName} WINS THE MATCH`,
-        'PRESS R TO RESTART',
+        isOnline ? 'ESC FOR MENU' : 'R TO PLAY AGAIN  ·  ESC FOR MENU',
         visualSystem
       );
     }
@@ -2013,7 +2031,9 @@ export class HudSystem {
     }
 
     // Wind gauge with new layout
-    this.drawHiResWindGauge(turn, 360, 60, 420, 510, 75);
+    // One row tucked under the TO FIRE headline (label · segments · arrow ·
+    // magnitude) — the old placement overlapped the headline's glyph box.
+    this.drawHiResWindGauge(turn, 436, 78, 444, 540, 78);
 
     // ===== CONSOLE BAND (3-stop gradient) =====
     // 3-stop gradient for console background
@@ -2143,8 +2163,8 @@ export class HudSystem {
     const filledSegments = Math.min(Math.ceil(windMag / 5), 4); // 4 segments, filled = ceil(|wind|/5) capped at 4
     const hasPartialSegment = (windMag % 5) > 0 && filledSegments < 4;
 
-    // WIND label: 10px ls .24em @.5
-    this.addText(labelX, labelY, 'WIND', 0xf4ece2, '10px', 'JetBrains Mono', 2.4, { alpha: 0.5, weight: '400' });
+    // WIND label: 10px ls .24em @.5, right-aligned so the gauge row centers
+    this.addText(labelX, labelY, 'WIND', 0xf4ece2, '10px', 'JetBrains Mono', 2.4, { alpha: 0.5, originX: 1, weight: '400' });
 
     // Segments: 16×3 gap3, 4 total, empty rgba(255,255,255,.16), partial @.55
     let segX = segmentX;

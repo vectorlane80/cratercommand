@@ -338,7 +338,7 @@ describe('EconomySystem', () => {
     expect(system.bundleSizeFor('force-shield')).toBe(3);
     expect(system.basePriceFor('heavy-shield')).toBe(30000);
     expect(system.bundleSizeFor('heavy-shield')).toBe(2);
-    expect(system.basePriceFor('super-mag')).toBe(40000);
+    expect(system.basePriceFor('super-mag')).toBe(35000);
     expect(system.bundleSizeFor('super-mag')).toBe(2);
     expect(system.basePriceFor('mag-deflector')).toBe(10000);
     expect(system.bundleSizeFor('mag-deflector')).toBe(2);

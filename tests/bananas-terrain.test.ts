@@ -28,13 +28,13 @@ describe('Bananas terrain', () => {
     });
   });
 
-  it('first buildings match the mock exactly for seed 90210: w 101 h 202, then w 68 h 140', () => {
+  it('first buildings match the capped formula for seed 90210: w 101 h 191, then w 68 h 137', () => {
     const buildings = bananasBuildings(90210, 960);
     expect(buildings[0].w).toBe(101);
-    expect(buildings[0].roof).toBe(356 - 202);
+    expect(buildings[0].roof).toBe(356 - 191);
     expect(buildings[1].x).toBe(101);
     expect(buildings[1].w).toBe(68);
-    expect(buildings[1].roof).toBe(356 - 140);
+    expect(buildings[1].roof).toBe(356 - 137);
   });
 
   it('bananasBuildings covers the skyline with preview dimensions and metadata', () => {
@@ -50,7 +50,7 @@ describe('Bananas terrain', () => {
     buildings.forEach((building, index) => {
       expect(building.w).toBeGreaterThanOrEqual(1);
       expect(building.w).toBeLessThanOrEqual(120);
-      expect(building.roof).toBeGreaterThanOrEqual(86);
+      expect(building.roof).toBeGreaterThanOrEqual(106);
       expect(building.roof).toBeLessThanOrEqual(236);
       expect(building.seed).toBe((building.x * 7919) | 0);
       expect(building.colorIndex).toBe(index % 3);

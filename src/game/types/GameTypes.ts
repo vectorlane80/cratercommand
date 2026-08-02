@@ -436,9 +436,11 @@ export const GAME_CONFIG = {
     startingParachutes: 1,
     startingBatteries: 0,
     batteryHealAmount: 10,
-    damageCashMultiplier: 30,
-    roundWinBonus: 5000,
-    survivalBonus: 1500,
+    // Tuned for the default best-of-3: a 2-0 sweep sees only one shop, so
+    // per-round income must put the expensive tier in reach (was 30/5000/1500).
+    damageCashMultiplier: 45,
+    roundWinBonus: 8000,
+    survivalBonus: 3000,
     // Each round past round 1, every base price is multiplied by
     // (1 + (round - 1) * roundPriceInflation). At 0.15, round 2 prices are
     // 1.15x, round 5 are 1.60x, round 7 are 1.90x.
@@ -973,7 +975,7 @@ export const GAME_CONFIG = {
     { id: 'battery', name: 'Battery', price: 5000, bundleSize: 10, hotkey: 'B', description: '+10 HP or fuels energy weapons', category: 'energy', sidebarLabel: 'BATTERIES' },
     { id: 'force-shield', name: 'Force Shield', price: 25000, bundleSize: 3, hotkey: 'F', description: 'Absorbs 65 damage when armed', category: 'defense', absorb: 65 },
     { id: 'heavy-shield', name: 'Heavy Shield', price: 30000, bundleSize: 2, hotkey: 'H', description: 'Absorbs 90 damage when armed', category: 'defense', absorb: 90 },
-    { id: 'super-mag', name: 'Super Mag', price: 40000, bundleSize: 2, hotkey: 'M', description: 'Absorbs 100 + deflects shots', category: 'defense', absorb: 100, deflects: true },
+    { id: 'super-mag', name: 'Super Mag', price: 35000, bundleSize: 2, hotkey: 'M', description: 'Absorbs 100 + deflects shots', category: 'defense', absorb: 100, deflects: true },
     { id: 'mag-deflector', name: 'Mag Deflector', price: 10000, bundleSize: 2, hotkey: 'G', description: 'Deflects nearby shots upward', category: 'defense', deflects: true },
     { id: 'auto-defense', name: 'Auto Defense', price: 1500, bundleSize: 1, hotkey: 'O', description: 'Shields auto-arm each round', category: 'defense', oneTime: true },
     { id: 'fuel-tank', name: 'Fuel Tank', price: 10000, bundleSize: 10, hotkey: 'U', description: '+10 movement fuel each', category: 'utility', sidebarLabel: 'FUEL TANKS' },
