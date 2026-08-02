@@ -75,8 +75,24 @@ guidance systems: Heat, Ballistic, Horizontal, Vertical, Lazy Boy.
 ### Match options
 
 - **Walls:** none / concrete / padded / rubber / spring / wraparound / random / erratic
+- **Terrain:** random (default) / desert / forest / snow / volcanic / lunar / urban / alien
 - **Physics:** gravity (5 steps), air viscosity (4 steps), tanks-fall on/off — persisted in localStorage
 - **Match length:** best of 3 / 5 / 7
+
+### Terrain
+
+Seven battlegrounds, each rendered natively in all three Scorched visual
+modes. One terrain is chosen when the match starts and holds for every
+round — switching visual modes mid-match never changes it. **Random** (the
+default) picks for you; pick a specific one in Settings if you'd rather.
+
+Desert is the original. **Forest** puts conifers and ferns on loam under a
+misty treeline; **snow** drifts over capped peaks with snow settling on
+every sprite; **volcanic** burns orange under an erupting cone; **lunar**
+is hard vacuum, gray regolith and crater fields under a wireframe Earth;
+**urban** is rubble and husks beneath a ruined skyline; **alien** glows
+purple under a ringed planet. Classic mode draws each as line art over its
+starfield — no ground props, the way vector artillery always played.
 
 ### CPU personalities
 
@@ -95,8 +111,10 @@ Random sales each round.
 
 Peer-to-peer 2-player via PeerJS (public signaling only — no game server).
 One player hosts and shares a 4-character code; the host runs the authoritative
-simulation and streams snapshots, the joiner sends inputs. Wall mode and
-physics settings carry over from the host's menu selections.
+simulation and streams snapshots, the joiner sends inputs. Wall mode, terrain,
+and physics settings all come from the host's menu selections — including a
+random terrain, which the host resolves before the match so both players land
+on the same world.
 
 ## Controls
 
