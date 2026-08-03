@@ -35,6 +35,12 @@ display choice stays personal.
 
 ![Hi-Res match setup menu with the logo wordmark](screenshots/menu-hires.png)
 
+## Guides
+
+- **[Weapons](guide/WEAPONS.md)** — all 39, with damage, blast radius, price
+  and tactics. Note that riot weapons deliberately do **zero** damage.
+- **[Items](guide/ITEMS.md)** — shields, guidance, batteries and the economy.
+
 ## Quick start
 
 ```bash
@@ -55,6 +61,9 @@ the shop.
 
 ### Arsenal — 39 weapons
 
+**→ [Full weapon guide](guide/WEAPONS.md)** — every weapon with damage, blast
+radius, price and what it actually does.
+
 - **Missiles:** Small (free/unlimited), Big, Triple, Huge, Missile, Baby Nuke, Nuke
 - **Splitters:** MIRV, Death's Head, Leapfrog (sequential hops), Funky Bomb (chain bomblets)
 - **Rollers:** Baby Roller / Roller / Heavy Roller — roll downhill until they find someone
@@ -65,6 +74,9 @@ the shop.
 - **Utility:** Bullet, Stream, Bouncing Bomb, Tracer, Smoke Tracer, Dirt Mover
 
 ### Items — 15
+
+**→ [Full item guide](guide/ITEMS.md)** — shields, guidance systems and the
+economy in detail.
 
 Parachutes, Shield / Force Shield / Heavy Shield / Super Mag (armable, absorb
 damage), Mag Deflector (pushes incoming shells away), Auto Defense (auto-arms
